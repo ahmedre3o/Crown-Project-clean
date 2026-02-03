@@ -1,0 +1,13 @@
+{
+  "/admin/page": "app/admin/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/excel-import/page": "app/excel-import/page.js",
+  "/inventory/page": "app/inventory/page.js",
+  "/invoices/page": "app/invoices/page.js",
+  "/manual-entry/page": "app/manual-entry/page.js",
+  "/page": "app/page.js",
+  "/settings/page": "app/settings/page.js",
+  "/store-admin/domains/page": "app/store-admin/domains/page.js",
+  "/store/[shop_slug]/page": "app/store/[shop_slug]/page.js",
+  "/storefront/page": "app/storefront/page.js"
+}

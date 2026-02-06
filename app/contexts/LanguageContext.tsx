@@ -20,9 +20,12 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.manualEntry': 'Manual Entry',
     'nav.excelImport': 'Excel Import',
     'nav.invoices': 'Invoices',
+    'nav.reports': 'Reports',
     'nav.settings': 'Settings',
     'nav.admin': 'System Admin',
     'nav.storeAdmin': 'Store Admin',
+    'nav.onlineOrders': 'Online Orders',
+    'nav.notifications': 'Activity & Notifications',
     'nav.logout': 'Logout',
 
     // Dashboard
@@ -40,6 +43,9 @@ const translations: Record<Language, Record<string, string>> = {
     'dashboard.sales': 'Sales',
     'dashboard.profit': 'Profit',
     'dashboard.noAlerts': 'No alerts',
+    'dashboard.onlineSales': 'Online Sales (Confirmed)',
+    'dashboard.onlineSalesChart': 'Online Sales',
+    'dashboard.deadSlowStock': 'Dead/Slow Stock',
 
     // POS
     'pos.title': 'Point of Sale',
@@ -104,6 +110,31 @@ const translations: Record<Language, Record<string, string>> = {
     // Invoices
     'invoices.title': 'Invoices',
 
+    // Reports
+    'reports.title': 'Reports',
+    'reports.dateRange': 'Date Range',
+    'reports.today': 'Today',
+    'reports.thisWeek': 'This Week',
+    'reports.thisMonth': 'This Month',
+    'reports.posSales': 'POS Sales',
+    'reports.onlineSales': 'Online Sales',
+    'reports.totalPos': 'Total POS',
+    'reports.totalOnline': 'Total Online',
+    'reports.transactions': 'Transactions',
+    'reports.viewAll': 'View all notifications',
+    'reports.yesterday': 'Yesterday',
+    'reports.last7days': 'Last 7 days',
+    'reports.last30days': 'Last 30 days',
+    'reports.lastMonth': 'Last Month',
+    'reports.salesSummary': 'Sales Summary',
+    'reports.profitSummary': 'Profit Summary',
+    'reports.topProducts': 'Top Products',
+    'reports.ordersStatusBreakdown': 'Orders Status (Online)',
+    'reports.generateReport': 'Generate Report',
+    'reports.fullReport': 'Full Report',
+    'reports.grossProfitUnavailable': 'Gross profit unavailable',
+    'nav.slowMoving': 'Dead/Slow Stock',
+
     // AI
     'ai.title': 'AI Assistant',
     'ai.placeholder': 'I am at your service...',
@@ -126,9 +157,12 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.manualEntry': 'إدخال يدوي',
     'nav.excelImport': 'استيراد إكسيل',
     'nav.invoices': 'الفواتير',
+    'nav.reports': 'التقارير',
     'nav.settings': 'الإعدادات',
     'nav.admin': 'إدارة النظام',
     'nav.storeAdmin': 'إدارة المتجر',
+    'nav.onlineOrders': 'طلبات الأونلاين',
+    'nav.notifications': 'النشاط والإشعارات',
     'nav.logout': 'تسجيل الخروج',
 
     // Dashboard
@@ -146,6 +180,9 @@ const translations: Record<Language, Record<string, string>> = {
     'dashboard.sales': 'المبيعات',
     'dashboard.profit': 'الأرباح',
     'dashboard.noAlerts': 'لا توجد تنبيهات',
+    'dashboard.onlineSales': 'مبيعات الأونلاين (المؤكدة)',
+    'dashboard.onlineSalesChart': 'مبيعات الأونلاين',
+    'dashboard.deadSlowStock': 'الراكد/البطيء',
 
     // POS
     'pos.title': 'نقطة البيع',
@@ -209,6 +246,31 @@ const translations: Record<Language, Record<string, string>> = {
 
     // Invoices
     'invoices.title': 'الفواتير',
+
+    // Reports
+    'reports.title': 'التقارير',
+    'reports.dateRange': 'الفترة',
+    'reports.today': 'اليوم',
+    'reports.thisWeek': 'هذا الأسبوع',
+    'reports.thisMonth': 'هذا الشهر',
+    'reports.posSales': 'مبيعات نقطة البيع',
+    'reports.onlineSales': 'مبيعات الأونلاين',
+    'reports.transactions': 'العمليات',
+    'reports.totalPos': 'إجمالي نقطة البيع',
+    'reports.totalOnline': 'إجمالي الأونلاين',
+    'reports.viewAll': 'عرض جميع الإشعارات',
+    'reports.yesterday': 'أمس',
+    'reports.last7days': 'آخر 7 أيام',
+    'reports.last30days': 'آخر 30 يوم',
+    'reports.lastMonth': 'الشهر الماضي',
+    'reports.salesSummary': 'إجمالي المبيعات',
+    'reports.profitSummary': 'الأرباح',
+    'reports.topProducts': 'الأكثر مبيعاً',
+    'reports.ordersStatusBreakdown': 'حالة الطلبات (الأونلاين)',
+    'reports.generateReport': 'إنشاء تقرير',
+    'reports.fullReport': 'التقرير الكامل',
+    'reports.grossProfitUnavailable': 'الأرباح الإجمالية غير متوفرة',
+    'nav.slowMoving': 'الراكد/البطيء',
 
     // AI
     'ai.title': 'المساعد الذكي',

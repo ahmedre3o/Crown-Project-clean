@@ -1,0 +1,16 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/store-admin/layout,_N_T_/store-admin/notifications/layout,_N_T_/store-admin/notifications/page,_N_T_/store-admin/notifications"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/store-admin/notifications/__PAGE__",
+    "/store-admin/notifications",
+    "/store-admin",
+    "/_index",
+    "/_head"
+  ]
+}

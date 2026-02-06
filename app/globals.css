@@ -53,3 +53,27 @@ body {
   font-weight: 700;
 }
 
+@keyframes crown-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.6));
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 14px rgba(34, 211, 238, 0.95));
+    opacity: 0.95;
+    transform: scale(1.05);
+  }
+}
+
+/* Print styles for reports */
+@media print {
+  .print\:hidden { display: none !important; }
+  .print\:block { display: block !important; }
+  .no-print, aside, nav, header { display: none !important; }
+  .print-area { display: block !important; max-width: 100%; }
+  body { background: white; color: #1f2937; }
+  .neon-card { border-color: #0d9488; box-shadow: none; }
+  .break-inside-avoid { break-inside: avoid; }
+}
+

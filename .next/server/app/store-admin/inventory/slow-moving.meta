@@ -1,0 +1,17 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/store-admin/layout,_N_T_/store-admin/inventory/layout,_N_T_/store-admin/inventory/slow-moving/layout,_N_T_/store-admin/inventory/slow-moving/page,_N_T_/store-admin/inventory/slow-moving"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/store-admin/inventory/slow-moving/__PAGE__",
+    "/store-admin/inventory/slow-moving",
+    "/store-admin/inventory",
+    "/store-admin",
+    "/_index",
+    "/_head"
+  ]
+}

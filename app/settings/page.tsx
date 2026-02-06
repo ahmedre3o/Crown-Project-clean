@@ -185,13 +185,14 @@ export default function SettingsPage() {
             onChange={(e) => {
               const option = currencyOptions.find((item) => item.code === e.target.value);
               if (!option) return;
+              const code = option.code as typeof currency;
               setProfile((prev) => ({
                 ...prev,
                 countryName: option.country,
-                currencyCode: option.code,
+                currencyCode: code,
                 currencySymbol: option.symbol,
               }));
-              setCurrency(option.code as any);
+              setCurrency(code);
             }}
             className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
           >

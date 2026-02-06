@@ -123,7 +123,8 @@ export const useAuth = () => {
 export const apiRequest = async (url: string, options: RequestInit = {}) => {
   const token = localStorage.getItem('token');
   const storedUser = localStorage.getItem('user');
-  const shopId = storedUser ? JSON.parse(storedUser).shopId : null;
+  const userObj = storedUser ? JSON.parse(storedUser) : null;
+  const shopId = userObj?.shopId ?? userObj?.shop_id ?? null;
 
   const response = await fetch(`${API_BASE_URL}${url}`, {
     ...options,

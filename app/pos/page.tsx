@@ -21,6 +21,7 @@ interface Product {
   brand: string;
   sell_price: number;
   stock_quantity: number;
+  available_stock?: number;
   category_id: number;
   image_url?: string;
   sku?: string;
@@ -120,19 +121,18 @@ export default function PosPage() {
   const hasUncategorized = products.some((product) => !product.category_id);
 
   const addToCart = (product: Product) => {
-    if (product.stock_quantity === 0) return;
+    const avail = Number(product.available_stock ?? product.stock_quantity ?? 0);
+    if (avail <= 0) return;
 
     setCart((prev) => {
       const existing = prev.find((item) => item.productId === product.id);
       if (existing) {
-        if (existing.quantity >= product.stock_quantity) return prev;
+        const cap = Number(product.available_stock ?? product.stock_quantity ?? 0);
+        if (existing.quantity >= cap) return prev;
+        const nextQty = Math.min(existing.quantity + 1, cap);
         return prev.map((item) =>
           item.productId === product.id
-            ? {
-                ...item,
-                quantity: item.quantity + 1,
-                total: (item.quantity + 1) * Number(item.price || 0),
-              }
+            ? { ...item, quantity: nextQty, total: nextQty * Number(item.price || 0) }
             : item
         );
       }
@@ -305,7 +305,7 @@ export default function PosPage() {
       if (newQuantity <= 0) {
         return prev.filter((i) => i.productId !== productId);
       }
-      if (newQuantity > product.stock_quantity) return prev;
+      if (newQuantity > (product.available_stock ?? product.stock_quantity)) return prev;
 
       return prev.map((i) =>
         i.productId === productId ? { ...i, quantity: newQuantity, total: newQuantity * i.price } : i
@@ -685,7 +685,7 @@ export default function PosPage() {
                   <button
                     key={product.id}
                     onClick={() => addToCart(product)}
-                    disabled={product.stock_quantity === 0}
+                    disabled={(product.available_stock ?? product.stock_quantity) <= 0}
                     className="p-4 bg-[#0d1422] rounded-xl hover:bg-[#111a2b] transition text-right disabled:opacity-50 disabled:cursor-not-allowed border border-cyan-500/20 hover:border-cyan-400/50"
                   >
                     <div className="h-20 w-full rounded-lg border border-cyan-500/30 bg-black/60 flex items-center justify-center mb-3">
@@ -716,8 +716,8 @@ export default function PosPage() {
                       <span className="text-cyan-400 font-bold">
                         {Number(product.sell_price || 0).toFixed(2)} {symbol}
                       </span>
-                      <span className={`text-xs ${product.stock_quantity > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {product.stock_quantity} {t('pos.inStock')}
+                      <span className={`text-xs ${(product.available_stock ?? product.stock_quantity) > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {(product.available_stock ?? product.stock_quantity)} {t('pos.inStock')}
                       </span>
                     </div>
                   </button>

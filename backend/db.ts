@@ -1,6 +1,13 @@
 import mysql from 'mysql2/promise';
 import crypto from 'crypto';
 
+function generatePublicCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s = '';
+  for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
+
 // Google Cloud SQL connection configuration
 // Note: Update the host with your actual Google Cloud SQL instance IP or connection name
 const dbConfig = {
@@ -336,6 +343,21 @@ export async function initializeDatabase() {
       }
     }
 
+    try {
+      await pool.execute('ALTER TABLE products ADD COLUMN import_batch_id INT NULL');
+    } catch (error: any) {
+      if (error?.code !== 'ER_DUP_FIELDNAME') {
+        throw error;
+      }
+    }
+    try {
+      await pool.execute('CREATE INDEX idx_products_import_batch ON products (import_batch_id)');
+    } catch (error: any) {
+      if (error?.code !== 'ER_DUP_KEYNAME') {
+        throw error;
+      }
+    }
+
     const salesColumns: Array<{ name: string; definition: string }> = [
       { name: 'customer_name', definition: 'VARCHAR(255) NULL' },
       { name: 'customer_phone', definition: 'VARCHAR(64) NULL' },
@@ -465,6 +487,45 @@ export async function initializeDatabase() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
+    // Import staging: batches and rows
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS import_batches (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        shop_id INT NOT NULL,
+        file_name VARCHAR(255) NOT NULL,
+        status ENUM('pending', 'partial', 'committed') DEFAULT 'pending',
+        imported_count INT DEFAULT 0,
+        failed_count INT DEFAULT 0,
+        rolled_back_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE,
+        INDEX idx_import_batch_shop (shop_id),
+        INDEX idx_import_batch_status (status)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    try {
+      await pool.execute('ALTER TABLE import_batches ADD COLUMN rolled_back_at TIMESTAMP NULL');
+    } catch (error: any) {
+      if (error?.code !== 'ER_DUP_FIELDNAME') throw error;
+    }
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS import_batch_rows (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        batch_id INT NOT NULL,
+        row_index INT NOT NULL,
+        raw_data JSON,
+        mapped_data JSON,
+        errors JSON,
+        status ENUM('pending', 'valid', 'invalid', 'imported', 'fixed') DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (batch_id) REFERENCES import_batches(id) ON DELETE CASCADE,
+        INDEX idx_import_row_batch (batch_id),
+        INDEX idx_import_row_status (status)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
     // Insert default categories if they don't exist
     await pool.execute(`
       INSERT IGNORE INTO categories (name_en, name_ar) VALUES
@@ -472,6 +533,200 @@ export async function initializeDatabase() {
       ('Tires', 'إطارات'),
       ('Batteries', 'بطاريات');
     `);
+
+    // Online orders (storefront) - spec schema
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS online_orders (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        shop_id INT NOT NULL,
+        status ENUM('pending', 'confirmed', 'cancelled', 'completed') DEFAULT 'pending',
+        customer_name VARCHAR(255) NOT NULL,
+        phone VARCHAR(64) NOT NULL,
+        governorate VARCHAR(128) NOT NULL,
+        city VARCHAR(128) NOT NULL,
+        address TEXT NOT NULL,
+        notes TEXT NULL,
+        payment_method VARCHAR(50) NULL,
+        subtotal DECIMAL(12, 2) NOT NULL DEFAULT 0,
+        total DECIMAL(12, 2) NOT NULL DEFAULT 0,
+        currency VARCHAR(8) DEFAULT 'EGP',
+        source VARCHAR(32) DEFAULT 'online',
+        public_code VARCHAR(16) NOT NULL UNIQUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE,
+        INDEX idx_online_orders_shop (shop_id),
+        INDEX idx_online_orders_status (status),
+        INDEX idx_online_orders_public_code (public_code),
+        INDEX idx_online_orders_created (created_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS online_order_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        order_id INT NOT NULL,
+        product_id INT NOT NULL,
+        name_snapshot VARCHAR(255) NULL,
+        sku_snapshot VARCHAR(128) NULL,
+        barcode_snapshot VARCHAR(128) NULL,
+        sell_price_snapshot DECIMAL(10, 2) NOT NULL,
+        quantity INT NOT NULL DEFAULT 1,
+        FOREIGN KEY (order_id) REFERENCES online_orders(id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT,
+        INDEX idx_online_order_items_order (order_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // Extend sales for online invoices
+    const salesExtensions: Array<{ name: string; definition: string }> = [
+      { name: 'source', definition: "VARCHAR(16) DEFAULT 'pos'" },
+      { name: 'online_order_id', definition: 'INT NULL' },
+      { name: 'last_printed_at', definition: 'TIMESTAMP NULL' },
+      { name: 'invoice_serial', definition: 'VARCHAR(64) NULL' },
+    ];
+    for (const col of salesExtensions) {
+      try {
+        await pool.execute(`ALTER TABLE sales ADD COLUMN ${col.name} ${col.definition};`);
+      } catch (err: any) {
+        if (err?.code !== 'ER_DUP_FIELDNAME') throw err;
+      }
+    }
+    try {
+      await pool.execute('CREATE UNIQUE INDEX idx_sales_invoice_serial ON sales(invoice_serial);');
+    } catch (err: any) {
+      if (err?.code !== 'ER_DUP_KEYNAME' && err?.code !== 'ER_MULTIPLE_PRI_KEY') {
+        // column may not exist or index already exists
+      }
+    }
+
+    // Dedicated online invoices (separate from POS sales)
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS online_invoices (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        shop_id INT NOT NULL,
+        order_id INT NOT NULL UNIQUE,
+        invoice_number INT NOT NULL,
+        total DECIMAL(12, 2) NOT NULL DEFAULT 0,
+        printed_count INT DEFAULT 0,
+        last_printed_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE,
+        FOREIGN KEY (order_id) REFERENCES online_orders(id) ON DELETE CASCADE,
+        INDEX idx_online_invoices_shop (shop_id),
+        INDEX idx_online_invoices_order (order_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS online_invoice_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        invoice_id INT NOT NULL,
+        product_id INT NULL,
+        name_snapshot VARCHAR(255) NULL,
+        sku_snapshot VARCHAR(128) NULL,
+        price_snapshot DECIMAL(10, 2) NOT NULL,
+        quantity INT NOT NULL DEFAULT 1,
+        FOREIGN KEY (invoice_id) REFERENCES online_invoices(id) ON DELETE CASCADE,
+        INDEX idx_online_invoice_items_invoice (invoice_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // Add public_code to existing online_orders if missing
+    try {
+      await pool.execute('ALTER TABLE online_orders ADD COLUMN public_code VARCHAR(16) NULL');
+    } catch (err: any) {
+      if (err?.code !== 'ER_DUP_FIELDNAME') {
+        // ignore
+      }
+    }
+    try {
+      const [rows] = await pool.execute("SELECT id FROM online_orders WHERE public_code IS NULL OR public_code = ''");
+      for (const r of rows as any[]) {
+        const code = generatePublicCode();
+        await pool.execute('UPDATE online_orders SET public_code = ? WHERE id = ?', [code, r.id]);
+      }
+    } catch {
+      // best effort backfill
+    }
+
+    // Notifications (activity log: online + pos + system) - persistent forever
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        shop_id BIGINT NOT NULL,
+        source VARCHAR(32) NOT NULL DEFAULT 'online',
+        type VARCHAR(64) NOT NULL DEFAULT 'online_order_created',
+        title_ar VARCHAR(255) NOT NULL DEFAULT '',
+        title_en VARCHAR(255) NOT NULL DEFAULT '',
+        body_ar TEXT NOT NULL,
+        body_en TEXT NOT NULL,
+        is_read TINYINT(1) NOT NULL DEFAULT 0,
+        meta JSON NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE,
+        INDEX idx_notifications_shop_created (shop_id, created_at DESC),
+        INDEX idx_notifications_shop_read (shop_id, is_read),
+        INDEX idx_notifications_shop_source_created (shop_id, source, created_at DESC)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    // Safe migrations for existing tables
+    try {
+      await pool.execute('ALTER TABLE notifications ADD COLUMN source VARCHAR(32) NOT NULL DEFAULT \'online\' AFTER shop_id');
+    } catch (m: any) {
+      if (!String(m?.message || m).includes('Duplicate column')) console.error('notifications.source:', m?.message || m);
+    }
+    try {
+      await pool.execute('CREATE INDEX idx_notifications_shop_source_created ON notifications (shop_id, source, created_at DESC)');
+    } catch (m: any) {
+      if (!String(m?.message || m).includes('Duplicate')) console.error('notifications.idx_shop_source_created:', m?.message || m);
+    }
+
+    // Stock reservations for online orders (prevent overselling)
+    // shop_id, order_id, product_id must match shops.id, online_orders.id, products.id (all INT)
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS stock_reservations (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        shop_id INT NOT NULL,
+        order_id INT NOT NULL,
+        product_id INT NOT NULL,
+        qty INT NOT NULL,
+        status VARCHAR(32) NOT NULL DEFAULT 'reserved',
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE,
+        FOREIGN KEY (order_id) REFERENCES online_orders(id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+        INDEX idx_reservations_order (order_id),
+        INDEX idx_reservations_shop_status (shop_id, status)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // Migration: if stock_reservations existed with BIGINT (FK incompatible), drop and recreate
+    try {
+      const [cols] = await pool.execute(
+        `SELECT DATA_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'stock_reservations' AND COLUMN_NAME = 'shop_id'`
+      );
+      const row = (cols as any[])[0];
+      if (row && String(row.DATA_TYPE || '').toLowerCase() === 'bigint') {
+        await pool.execute(`DROP TABLE IF EXISTS stock_reservations`);
+        await pool.execute(`
+          CREATE TABLE stock_reservations (
+            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            shop_id INT NOT NULL,
+            order_id INT NOT NULL,
+            product_id INT NOT NULL,
+            qty INT NOT NULL,
+            status VARCHAR(32) NOT NULL DEFAULT 'reserved',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE,
+            FOREIGN KEY (order_id) REFERENCES online_orders(id) ON DELETE CASCADE,
+            FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+            INDEX idx_reservations_order (order_id),
+            INDEX idx_reservations_shop_status (shop_id, status)
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        `);
+      }
+    } catch (_) {
+      /* ignore migration errors */
+    }
 
     console.log('✅ Database tables initialized');
   } catch (error) {

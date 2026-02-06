@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
+  Bell,
   Clock,
   LayoutDashboard,
   ShoppingCart,
@@ -16,12 +17,16 @@ import {
   FilePlus2,
   LogOut,
   Menu,
-  Zap,
   ChevronLeft,
   ChevronRight,
+  ShoppingBag,
+  BarChart2,
+  AlertTriangle,
 } from 'lucide-react';
+import { NeonCrownIcon } from './NeonCrownIcon';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
+import { NotificationsBell } from './NotificationsBell';
 import { useRouter } from 'next/navigation';
 
 export function Sidebar() {
@@ -42,6 +47,7 @@ export function Sidebar() {
   const canSeeInvoices = user?.role === 'super_admin' || user?.role === 'shop_owner' || user?.role === 'cashier';
   const canSeeSystemAdmin = user?.role === 'super_admin';
   const canSeeStoreAdmin = user?.role === 'shop_owner' || user?.role === 'super_admin';
+  const canSeeOnlineOrders = canSeeStoreAdmin || user?.role === 'cashier';
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -85,11 +91,15 @@ export function Sidebar() {
         ]
       : []),
     ...(canUsePos ? [{ href: '/pos', label: t('nav.pos'), icon: ShoppingCart }] : []),
+    ...(canUsePos ? [{ href: '/store-admin/reports', label: t('nav.reports'), icon: BarChart2 }] : []),
     ...(canUseInventory ? [{ href: '/inventory', label: t('nav.inventory'), icon: Package }] : []),
+    ...(canUseInventory ? [{ href: '/store-admin/inventory/slow-moving', label: t('nav.slowMoving'), icon: AlertTriangle }] : []),
     ...(canUseInventory ? [{ href: '/manual-entry', label: t('nav.manualEntry'), icon: FilePlus2 }] : []),
     ...(canUseExcel ? [{ href: '/excel-import', label: t('nav.excelImport'), icon: FileSpreadsheet }] : []),
     ...(canSeeInvoices ? [{ href: '/invoices', label: t('nav.invoices'), icon: FileText }] : []),
     { href: '/settings', label: t('nav.settings'), icon: Settings },
+    ...(canSeeOnlineOrders ? [{ href: '/store-admin/orders', label: t('nav.onlineOrders'), icon: ShoppingBag }] : []),
+    ...(canSeeStoreAdmin || canSeeOnlineOrders ? [{ href: '/store-admin/notifications', label: t('nav.notifications'), icon: Bell }] : []),
     ...(canSeeStoreAdmin ? [{ href: '/store-admin/domains', label: t('nav.storeAdmin'), icon: Shield }] : []),
     ...(canSeeSystemAdmin ? [{ href: '/admin', label: t('nav.admin'), icon: Shield }] : []),
   ];
@@ -123,7 +133,7 @@ export function Sidebar() {
           <div className={`border-b border-cyan-500/20 ${collapsed ? 'px-4 py-6' : 'px-6 py-6'}`}>
             <div className={`flex ${collapsed ? 'justify-center' : 'items-start gap-3'}`}>
               <div className="h-10 w-10 rounded-xl border border-cyan-500/30 bg-black/30 flex items-center justify-center shadow-[0_0_18px_rgba(0,243,255,0.22)]">
-                <Zap className="h-5 w-5 text-cyan-200" />
+                <NeonCrownIcon size={24} />
               </div>
 
               {!collapsed && (
@@ -133,8 +143,9 @@ export function Sidebar() {
                       CROWN <span className="text-slate-100">SERVICES</span>
                     </div>
                     <div className="mt-3 flex flex-col items-start gap-2">
-                      {/* Live Clock */}
-                      <div className="inline-flex items-center gap-2 rounded-full border border-cyan-500/30 bg-black/25 px-3 py-1.5 shadow-[0_0_14px_rgba(0,243,255,0.12)]">
+                      {/* Live Clock + Notifications Bell */}
+                      <div className="flex items-center gap-2">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-cyan-500/30 bg-black/25 px-3 py-1.5 shadow-[0_0_14px_rgba(0,243,255,0.12)]">
                         <span className="relative flex h-2 w-2">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-50" />
                           <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-300 shadow-[0_0_10px_rgba(0,243,255,0.65)]" />
@@ -146,6 +157,8 @@ export function Sidebar() {
                             minute: '2-digit',
                           })}
                         </span>
+                        </div>
+                        {canSeeOnlineOrders && <NotificationsBell />}
                       </div>
 
                       {/* Language Switcher */}

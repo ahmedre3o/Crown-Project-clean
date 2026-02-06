@@ -157,6 +157,24 @@ The system automatically creates these categories:
 - **AI**: Google Gemini API
 - **Authentication**: JWT, bcryptjs
 
+## End-to-End Test: Notifications & Activity
+
+1. **Start app:** `npm run dev:all` (backend :5001, frontend :3000)
+2. **Create an online order:**
+   - Open `/storefront?shopId=1` (or `/storefront?preview=1-shop`)
+   - Add products to cart, click "Order Now", fill checkout form, submit
+   - Check bell icon: unread badge should appear; dropdown shows "New online order"
+3. **Create a POS sale:**
+   - Log in as shop_owner/cashier, go to `/pos`
+   - Add products to cart, complete sale
+   - Check bell: new "New POS sale" notification
+4. **View full activity:** Click "View all notifications" → `/store-admin/notifications`
+   - Filters: All / Online / POS / System
+   - Search, mark all read, load more (pagination)
+5. **Track order & Back to Store:**
+   - After placing online order, click "Track Order" → `/track?code=...&phone=...`
+   - Click "Back to Store" → should land on working storefront (no Unknown domain)
+
 ## Notes
 
 - The database connection uses Google Cloud SQL. Make sure your IP is whitelisted.

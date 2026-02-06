@@ -6,14 +6,13 @@ import {
   BarChart,
   CartesianGrid,
   Legend,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
 import { AlertTriangle, Package, TrendingUp, Users } from 'lucide-react';
+import Link from 'next/link';
 import { useLanguage } from '../contexts/LanguageContext';
 import { apiRequest, useAuth } from '../contexts/AuthContext';
 import { useCurrency } from '../contexts/CurrencyContext';
@@ -24,6 +23,19 @@ interface DashboardStats {
   monthlyRevenue: number;
   totalProducts: number;
   lowStockCount: number;
+}
+
+interface AnalyticsSummary {
+  ok: boolean;
+  pos: { total: number; count: number };
+  online: { total: number; count: number };
+  combined: { total: number; count: number };
+}
+
+interface TimeseriesPoint {
+  date: string;
+  total: number;
+  count: number;
 }
 
 interface ChartData {
@@ -63,6 +75,10 @@ export default function DashboardPage() {
   });
   const [salesChartData, setSalesChartData] = useState<ChartData[]>([]);
   const [profitChartData, setProfitChartData] = useState<ChartData[]>([]);
+  const [onlineStats, setOnlineStats] = useState<{ total: number; count: number }>({ total: 0, count: 0 });
+  const [operationsCount, setOperationsCount] = useState(0);
+  const [onlineChartData, setOnlineChartData] = useState<TimeseriesPoint[]>([]);
+  const [deadSlowStats, setDeadSlowStats] = useState<{ deadCount: number; slowCount: number; deadValue: number; slowValue: number } | null>(null);
   const [lowStockProducts, setLowStockProducts] = useState<LowStockProduct[]>([]);
   const [recentProducts, setRecentProducts] = useState<RecentProduct[]>([]);
   const [staffCount, setStaffCount] = useState<number | null>(null);
@@ -99,12 +115,17 @@ export default function DashboardPage() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const [statsData, salesData, profitData, lowStockData, recentData] = await Promise.all([
+      const today = new Date().toISOString().slice(0, 10);
+      const firstDay = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+      const [statsData, salesData, profitData, lowStockData, recentData, summaryRes, onlineTimeseriesRes, slowMovingRes] = await Promise.all([
         apiRequest('/dashboard/stats'),
         apiRequest('/dashboard/sales-chart?days=30'),
         apiRequest('/dashboard/profit-chart?days=30'),
         apiRequest('/products/low-stock'),
         apiRequest('/products'),
+        apiRequest(`/admin/analytics/summary?from=${firstDay}&to=${today}`).catch(() => ({ ok: false, online: { total: 0, count: 0 } })),
+        apiRequest(`/admin/analytics/timeseries?from=${firstDay}&to=${today}&source=online`).catch(() => ({ ok: true, points: [] })),
+        apiRequest('/admin/inventory/slow-moving/summary?days=120&threshold=2').catch(() => ({ ok: false, deadCount: 0, slowCount: 0, deadValue: 0, slowValue: 0 })),
       ]);
 
       setStats(statsData);
@@ -112,6 +133,12 @@ export default function DashboardPage() {
       setProfitChartData(profitData);
       setLowStockProducts(lowStockData);
       setRecentProducts(recentData.slice(0, 6));
+      const summary = summaryRes as AnalyticsSummary;
+      setOnlineStats(summary?.ok ? summary.online : { total: 0, count: 0 });
+      setOperationsCount(summary?.ok ? (Number(summary.pos?.count ?? 0) + Number(summary.online?.count ?? 0)) : 0);
+      setOnlineChartData((onlineTimeseriesRes as { ok?: boolean; points?: TimeseriesPoint[] })?.points ?? []);
+      const sm = slowMovingRes as { ok?: boolean; deadCount?: number; slowCount?: number; deadValue?: number; slowValue?: number };
+      setDeadSlowStats(sm?.ok ? { deadCount: sm.deadCount ?? 0, slowCount: sm.slowCount ?? 0, deadValue: sm.deadValue ?? 0, slowValue: sm.slowValue ?? 0 } : null);
       try {
         const staffData = await apiRequest('/users');
         setStaffCount(Array.isArray(staffData) ? staffData.length : 0);
@@ -164,7 +191,7 @@ export default function DashboardPage() {
           </div>
         </div>
         {/* Header Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div className="p-6 neon-card rounded-xl neon-glow-cyan">
             <div className="flex items-center justify-between mb-2">
               <p className="text-gray-400 text-sm">{t('dashboard.totalSales')}</p>
@@ -173,6 +200,30 @@ export default function DashboardPage() {
             <h3 className="text-3xl font-bold text-cyan-400">
               {loading ? '...' : format(stats.monthlyRevenue)}
             </h3>
+          </div>
+          <div className="p-6 neon-card rounded-xl border border-fuchsia-500/40 shadow-[0_0_18px_rgba(236,72,153,0.2)]">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-gray-400 text-sm">{t('dashboard.onlineSales')}</p>
+              <TrendingUp className="w-5 h-5 text-fuchsia-400" />
+            </div>
+            <h3 className="text-3xl font-bold text-fuchsia-400">
+              {loading ? '...' : format(onlineStats.total)}
+            </h3>
+            <p className="text-xs text-gray-500 mt-1">
+              {onlineStats.count} {language === 'ar' ? 'طلب مؤكد' : 'confirmed orders'}
+            </p>
+          </div>
+          <div className="p-6 neon-card rounded-xl border border-amber-500/40">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-gray-400 text-sm">{language === 'ar' ? 'العمليات (POS + أونلاين مؤكد)' : 'Operations (POS + Online)'}</p>
+              <TrendingUp className="w-5 h-5 text-amber-400" />
+            </div>
+            <h3 className="text-3xl font-bold text-amber-400">
+              {loading ? '...' : operationsCount}
+            </h3>
+            <p className="text-xs text-gray-500 mt-1">
+              {language === 'ar' ? 'فواتير + طلبات مؤكدة' : 'invoices + confirmed orders'}
+            </p>
           </div>
           <div className="p-6 neon-card rounded-xl neon-glow-fuchsia">
             <div className="flex items-center justify-between mb-2">
@@ -192,11 +243,25 @@ export default function DashboardPage() {
               {staffCount === null ? '—' : staffCount.toLocaleString()}
             </h3>
           </div>
+          {deadSlowStats && (deadSlowStats.deadCount > 0 || deadSlowStats.slowCount > 0) && (
+            <Link href="/store-admin/inventory/slow-moving">
+              <div className="p-6 neon-card rounded-xl border border-amber-500/40 hover:border-amber-500/60 cursor-pointer transition">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-gray-400 text-sm">{t('dashboard.deadSlowStock')}</p>
+                  <AlertTriangle className="w-5 h-5 text-amber-400" />
+                </div>
+                <h3 className="text-2xl font-bold text-amber-400">
+                  {language === 'ar' ? 'راكد' : 'Dead'}: {deadSlowStats.deadCount} | {language === 'ar' ? 'بطيء' : 'Slow'}: {deadSlowStats.slowCount}
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">{format(deadSlowStats.deadValue + deadSlowStats.slowValue)} {language === 'ar' ? 'قيمة مربوطة' : 'tied value'}</p>
+              </div>
+            </Link>
+          )}
         </div>
 
         {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Sales Chart */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* Sales Chart - grouped bars: POS amount + operations (transactions count) */}
           <div className="p-6 neon-card rounded-xl">
             <h3 className="text-xl font-bold mb-4 text-cyan-200">{t('dashboard.salesChart')}</h3>
             {loading ? (
@@ -208,33 +273,52 @@ export default function DashboardPage() {
                 <p className="text-gray-500">{language === 'ar' ? 'لا توجد بيانات' : 'No data available'}</p>
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={chartSalesData}>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={chartSalesData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
                   <XAxis dataKey="date" stroke="#94a3b8" tickFormatter={formatDate} />
-                  <YAxis stroke="#94a3b8" />
+                  <YAxis yAxisId="left" stroke="#00f3ff" tickFormatter={(v) => (v >= 1000 ? `${v / 1000}k` : String(v))} />
+                  <YAxis yAxisId="right" orientation="right" stroke="#ec4899" tickFormatter={(v) => String(v)} />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#0b1220', border: '1px solid #00f3ff', borderRadius: '8px' }}
                     labelStyle={{ color: '#00f3ff' }}
+                    formatter={(val: number, name: string) => [name === 'revenue' ? format(val) : String(val), name === 'revenue' ? (language === 'ar' ? 'المبيعات' : 'Sales') : (language === 'ar' ? 'العمليات' : 'Operations')]}
                   />
                   <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="revenue"
-                    stroke="#00f3ff"
-                    strokeWidth={2}
-                    dot={{ fill: '#00f3ff', r: 4 }}
-                    name={t('dashboard.sales')}
+                  <Bar dataKey="revenue" yAxisId="left" fill="#00f3ff" name={language === 'ar' ? 'المبيعات' : 'Sales'} />
+                  <Bar dataKey="transactions" yAxisId="right" fill="#ec4899" name={language === 'ar' ? 'العمليات' : 'Operations'} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          {/* Online Sales Chart - grouped bars: amount + confirmed orders count */}
+          <div className="p-6 neon-card rounded-xl">
+            <h3 className="text-xl font-bold mb-4 text-cyan-200">{t('dashboard.onlineSalesChart')}</h3>
+            {loading ? (
+              <div className="h-64 flex items-center justify-center">
+                <p className="text-gray-500">{t('common.loading')}</p>
+              </div>
+            ) : onlineChartData.length === 0 ? (
+              <div className="h-64 flex items-center justify-center">
+                <p className="text-gray-500">{language === 'ar' ? 'لا توجد بيانات' : 'No data available'}</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={onlineChartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                  <XAxis dataKey="date" stroke="#94a3b8" tickFormatter={formatDate} />
+                  <YAxis yAxisId="left" stroke="#ec4899" tickFormatter={(v) => (v >= 1000 ? `${v / 1000}k` : String(v))} />
+                  <YAxis yAxisId="right" orientation="right" stroke="#00f3ff" tickFormatter={(v) => String(v)} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#0b1220', border: '1px solid #ec4899', borderRadius: '8px' }}
+                    labelStyle={{ color: '#ec4899' }}
+                    formatter={(val: number, name: string) => [name === 'total' ? format(val) : String(val), name === 'total' ? (language === 'ar' ? 'المبيعات' : 'Sales') : (language === 'ar' ? 'العمليات' : 'Operations')]}
                   />
-                  <Line
-                    type="monotone"
-                    dataKey="transactions"
-                    stroke="#ec4899"
-                    strokeWidth={2}
-                    dot={{ fill: '#ec4899', r: 4 }}
-                    name={t('dashboard.transactions')}
-                  />
-                </LineChart>
+                  <Legend />
+                  <Bar dataKey="total" yAxisId="left" fill="#ec4899" name={language === 'ar' ? 'المبيعات' : 'Sales'} />
+                  <Bar dataKey="count" yAxisId="right" fill="#00f3ff" name={language === 'ar' ? 'العمليات' : 'Operations'} />
+                </BarChart>
               </ResponsiveContainer>
             )}
           </div>
@@ -251,7 +335,7 @@ export default function DashboardPage() {
                 <p className="text-gray-500">{language === 'ar' ? 'لا توجد بيانات' : 'No data available'}</p>
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={chartProfitData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
                   <XAxis dataKey="date" stroke="#94a3b8" tickFormatter={formatDate} />

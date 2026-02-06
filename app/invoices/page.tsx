@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Sidebar } from '../components/Sidebar';
 import { useLanguage } from '../contexts/LanguageContext';
 import { apiRequest } from '../contexts/AuthContext';
@@ -8,25 +9,39 @@ import { useCurrency } from '../contexts/CurrencyContext';
 
 interface Invoice {
   id: number;
-  invoice_number: string;
-  total_amount: number;
-  payment_method: string;
-  created_at: string;
+  invoice_number: string | number;
+  invoice_serial?: string | null;
+  total_amount?: number;
+  total?: number;
+  payment_method?: string;
+  created_at?: string;
+  order_created_at?: string;
   print_count?: number;
+  printed_count?: number;
+  last_printed_at?: string | null;
+  source?: string | null;
+  online_order_id?: number | null;
+  order_id?: number;
+  invoiceSource?: 'pos' | 'online';
   customer_name?: string;
   customer_phone?: string;
+  phone?: string;
   customer_address?: string;
+  address?: string;
+  public_code?: string;
   cashier_name?: string;
   business_name?: string;
   owner_name?: string;
   activity_type?: string;
-  address?: string;
   contact_email?: string;
   contact_phone?: string;
   logo_url?: string;
 }
 
-export default function InvoicesPage() {
+function InvoicesPageContent() {
+  const searchParams = useSearchParams();
+  const focusId = searchParams.get('focus');
+  const sourceParam = searchParams.get('source');
   const { t, direction, language } = useLanguage();
   const { symbol } = useCurrency();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -36,21 +51,84 @@ export default function InvoicesPage() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [itemsMap, setItemsMap] = useState<Record<number, any[]>>({});
   const [printingId, setPrintingId] = useState<number | null>(null);
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'pos' | 'online'>(
+    sourceParam === 'online' ? 'online' : sourceParam === 'pos' ? 'pos' : 'all'
+  );
+  const [search, setSearch] = useState('');
+  const [toast, setToast] = useState<string | null>(null);
+  const focusHandledRef = useRef(false);
 
   useEffect(() => {
-    loadInvoices();
-  }, []);
+    if (sourceParam === 'online') setSourceFilter('online');
+    else if (sourceParam === 'pos') setSourceFilter('pos');
+  }, [sourceParam]);
+
+  useEffect(() => {
+    const handler = () => {
+      loadInvoices();
+    };
+    const delay = search.trim() ? 350 : 0;
+    const timer = setTimeout(handler, delay);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceFilter, search]);
+
+  useEffect(() => {
+    if (focusId && invoices.length > 0 && !focusHandledRef.current) {
+      const id = parseInt(focusId, 10);
+      if (Number.isFinite(id) && invoices.some((inv) => inv.id === id)) {
+        setExpanded(id);
+        focusHandledRef.current = true;
+      }
+    }
+  }, [focusId, invoices]);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 4000);
+  };
 
   const loadInvoices = async () => {
     try {
       setLoading(true);
       setError(null);
-      const [invoiceData, shopData] = await Promise.all([
-        apiRequest('/sales?limit=200'),
-        apiRequest('/shops/profile'),
-      ]);
-      setInvoices(invoiceData);
+      const [shopData, ...rest] = await Promise.all([apiRequest('/shops/profile')]);
       setBusiness(shopData);
+      if (sourceFilter === 'online') {
+        const params = new URLSearchParams({ limit: '200' });
+        if (search.trim()) params.set('query', search.trim());
+        const data = await apiRequest(`/admin/online-invoices?${params.toString()}`);
+        setInvoices(
+          (data || []).map((r: any) => ({
+            ...r,
+            invoiceSource: 'online' as const,
+            total_amount: r.total,
+            created_at: r.order_created_at || r.created_at,
+            print_count: r.printed_count,
+            customer_phone: r.phone,
+          }))
+        );
+      } else if (sourceFilter === 'pos') {
+        const params = new URLSearchParams({ limit: '200', source: 'pos' });
+        if (search.trim()) params.set('search', search.trim());
+        const data = await apiRequest(`/sales?${params.toString()}`);
+        setInvoices((data || []).map((r: any) => ({ ...r, invoiceSource: 'pos' as const })));
+      } else {
+        const [posData, onlineData] = await Promise.all([
+          apiRequest('/sales?limit=200&source=pos'),
+          apiRequest('/admin/online-invoices?limit=200'),
+        ]);
+        const pos = (posData || []).map((r: any) => ({ ...r, invoiceSource: 'pos' as const }));
+        const online = (onlineData || []).map((r: any) => ({
+          ...r,
+          invoiceSource: 'online' as const,
+          total_amount: r.total,
+          created_at: r.order_created_at || r.created_at,
+          print_count: r.printed_count,
+          customer_phone: r.phone,
+        }));
+        setInvoices([...online, ...pos].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()));
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to load invoices');
     } finally {
@@ -58,7 +136,7 @@ export default function InvoicesPage() {
     }
   };
 
-  const toggleInvoice = async (invoiceId: number) => {
+  const toggleInvoice = async (invoiceId: number, invoice?: Invoice) => {
     if (expanded === invoiceId) {
       setExpanded(null);
       return;
@@ -66,7 +144,10 @@ export default function InvoicesPage() {
     setExpanded(invoiceId);
     if (!itemsMap[invoiceId]) {
       try {
-        const items = await apiRequest(`/sales/${invoiceId}/items`);
+        const isOnline = invoice?.invoiceSource === 'online';
+        const items = isOnline
+          ? (await apiRequest(`/admin/online-invoices/${invoiceId}`))?.items || []
+          : await apiRequest(`/sales/${invoiceId}/items`);
         setItemsMap((prev) => ({ ...prev, [invoiceId]: items }));
       } catch (err) {
         // ignore
@@ -79,22 +160,48 @@ export default function InvoicesPage() {
       setPrintingId(invoice.id);
       setError(null);
 
+      const isOnline = invoice.invoiceSource === 'online';
       let items = itemsMap[invoice.id];
       if (!items) {
-        items = await apiRequest(`/sales/${invoice.id}/items`);
+        items = isOnline
+          ? (await apiRequest(`/admin/online-invoices/${invoice.id}`))?.items || []
+          : await apiRequest(`/sales/${invoice.id}/items`);
         setItemsMap((prev) => ({ ...prev, [invoice.id]: items }));
       }
 
-      // Increment print counter (backend source of truth)
+      const prevCount = Number(invoice.print_count || invoice.printed_count || 0);
       let printCount = 0;
+      let lastPrintedAt: string | null = null;
       try {
-        const printInfo = await apiRequest(`/sales/${invoice.id}/print`, { method: 'POST' });
-        printCount = Number(printInfo?.printCount || 0);
+        if (isOnline) {
+          const printInfo = await apiRequest(`/admin/online-invoices/${invoice.id}/print`, { method: 'POST' });
+          printCount = Number(printInfo?.printCount || 0);
+          lastPrintedAt = printInfo?.lastPrintedAt || null;
+        } else {
+          const printInfo = await apiRequest(`/sales/${invoice.id}/print`, { method: 'POST' });
+          printCount = Number(printInfo?.printCount || 0);
+          lastPrintedAt = printInfo?.lastPrintedAt || null;
+        }
         setInvoices((prev) =>
-          prev.map((row) => (row.id === invoice.id ? { ...row, print_count: printCount } : row))
+          prev.map((row) =>
+            row.id === invoice.id
+              ? { ...row, print_count: printCount, printed_count: printCount, last_printed_at: lastPrintedAt }
+              : row
+          )
         );
       } catch {
         // If print counter fails, still allow printing
+      }
+
+      if (prevCount > 0) {
+        const lastPrinted = invoice.last_printed_at
+          ? new Date(invoice.last_printed_at).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')
+          : '';
+        showToast(
+          language === 'ar'
+            ? `تنبيه: تمت طباعة الفاتورة من قبل (آخر طباعة: ${lastPrinted})`
+            : `Warning: invoice was printed before (last printed: ${lastPrinted})`
+        );
       }
 
       const receiptWindow = window.open('', '_blank');
@@ -105,13 +212,17 @@ export default function InvoicesPage() {
 
       const itemsHtml = (items || [])
         .map(
-          (item: any) => `
+          (item: any) => {
+            const name = item.name_snapshot || (language === 'ar' ? item.name_ar : item.name_en);
+            const totalPrice = item.total_price ?? (Number(item.price_snapshot || 0) * Number(item.quantity || 0));
+            return `
             <div class="item">
-              <span class="item-name">${language === 'ar' ? item.name_ar : item.name_en}</span>
+              <span class="item-name">${name}</span>
               <span class="item-qty">${Number(item.quantity || 0)}x</span>
-              <span class="item-price">${Number(item.total_price || 0).toFixed(2)} ${symbol}</span>
+              <span class="item-price">${Number(totalPrice).toFixed(2)} ${symbol}</span>
             </div>
-          `
+          `;
+          }
         )
         .join('');
 
@@ -241,12 +352,12 @@ export default function InvoicesPage() {
                   ${duplicateLabel ? `<div class="copy-label">${duplicateLabel}</div>` : ''}
                 </div>
                 <div class="info">
-                  <p>Invoice # / رقم الفاتورة: ${invoice.invoice_number || invoice.id}</p>
-                  <p>Date / التاريخ: ${new Date(invoice.created_at).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US')}</p>
+                  <p>Invoice # / رقم الفاتورة: ${invoice.invoiceSource === 'online' ? `ON-${invoice.invoice_number}` : (invoice.invoice_serial || invoice.invoice_number || invoice.id)}</p>
+                  <p>Date / التاريخ: ${new Date(invoice.created_at ?? Date.now()).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US')}</p>
                   <p>Cashier / الكاشير: ${invoice.cashier_name || 'N/A'}</p>
                   <p>Customer / العميل: ${invoice.customer_name || (language === 'ar' ? 'عميل مباشر' : 'Walk-in')}</p>
-                  ${invoice.customer_phone ? `<p>Phone / الهاتف: ${invoice.customer_phone}</p>` : ''}
-                  ${invoice.customer_address ? `<p>Address / العنوان: ${invoice.customer_address}</p>` : ''}
+                  ${(invoice.customer_phone || invoice.phone) ? `<p>Phone / الهاتف: ${invoice.customer_phone || invoice.phone}</p>` : ''}
+                  ${(invoice.customer_address || invoice.address) ? `<p>Address / العنوان: ${invoice.customer_address || invoice.address}</p>` : ''}
                   ${business?.address ? `<p>Shop Address: ${business.address}</p>` : ''}
                   ${business?.contact_phone ? `<p>Shop Phone: ${business.contact_phone}</p>` : ''}
                 </div>
@@ -260,7 +371,7 @@ export default function InvoicesPage() {
                 </div>
                 <div class="total">
                   <span>Total / الإجمالي</span>
-                  <span>${Number(invoice.total_amount || 0).toFixed(2)} ${symbol}</span>
+                  <span>${Number(invoice.total_amount ?? invoice.total ?? 0).toFixed(2)} ${symbol}</span>
                 </div>
               </div>
               <div class="footer">
@@ -288,7 +399,51 @@ export default function InvoicesPage() {
     <div className="min-h-screen bg-black text-white flex" dir={direction}>
       <Sidebar />
       <div className="flex-1 p-8 pt-20 md:pt-8 overflow-y-auto">
-        <h1 className="text-2xl font-bold text-cyan-200 mb-6">{t('invoices.title')}</h1>
+          <h1 className="text-2xl font-bold text-cyan-200 mb-6">{t('invoices.title')}</h1>
+        <div className="flex flex-wrap gap-2 mb-4">
+          <button
+            onClick={() => setSourceFilter('all')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition ${
+              sourceFilter === 'all'
+                ? 'bg-cyan-600 text-white'
+                : 'border border-cyan-500/30 text-cyan-200 hover:bg-cyan-500/10'
+            }`}
+          >
+            {language === 'ar' ? 'الكل' : 'All'}
+          </button>
+          <button
+            onClick={() => setSourceFilter('pos')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition ${
+              sourceFilter === 'pos'
+                ? 'bg-cyan-600 text-white'
+                : 'border border-cyan-500/30 text-cyan-200 hover:bg-cyan-500/10'
+            }`}
+          >
+            POS
+          </button>
+          <button
+            onClick={() => setSourceFilter('online')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition ${
+              sourceFilter === 'online'
+                ? 'bg-cyan-600 text-white'
+                : 'border border-cyan-500/30 text-cyan-200 hover:bg-cyan-500/10'
+            }`}
+          >
+            {language === 'ar' ? 'أونلاين' : 'Online'}
+          </button>
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={language === 'ar' ? 'ابحث برقم الفاتورة / الهاتف / اسم العميل...' : 'Search by invoice #, phone, customer name...'}
+            className="flex-1 min-w-[180px] px-4 py-2 rounded-xl border border-cyan-500/30 bg-black/30 text-slate-100 placeholder:text-slate-500"
+          />
+        </div>
+        {toast && (
+          <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">
+            {toast}
+          </div>
+        )}
         <div className="neon-card rounded-xl p-6">
           {error && (
             <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
@@ -340,11 +495,21 @@ export default function InvoicesPage() {
                       <React.Fragment key={invoice.id}>
                         <tr className="border-b border-cyan-500/10">
                           <td className="py-2">
-                            <div className="flex items-center gap-2">
-                              <span>{invoice.invoice_number || invoice.id}</span>
-                              {invoice.print_count && invoice.print_count > 1 && (
-                                <span className="text-[10px] px-2 py-1 rounded-full bg-red-500/15 border border-red-500/40 text-red-200">
-                                  Duplicate Copy No. {Math.max(1, invoice.print_count - 1)}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span>{invoice.invoiceSource === 'online' ? `ON-${invoice.invoice_number}` : (invoice.invoice_serial || invoice.invoice_number || invoice.id)}</span>
+                              {(invoice.source === 'online' || invoice.online_order_id) && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-fuchsia-500/20 border border-fuchsia-500/40 text-fuchsia-200">
+                                  {language === 'ar' ? 'أونلاين' : 'Online'}
+                                </span>
+                              )}
+                              {(!invoice.source || invoice.source === 'pos') && !invoice.online_order_id && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-200">
+                                  POS
+                                </span>
+                              )}
+                              {((invoice.print_count ?? invoice.printed_count ?? 0) >= 1) && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-500/20 border border-slate-500/40 text-slate-200">
+                                  {language === 'ar' ? `تمت الطباعة (${invoice.print_count ?? invoice.printed_count})` : `Printed #${invoice.print_count ?? invoice.printed_count}`}
                                 </span>
                               )}
                             </div>
@@ -354,14 +519,14 @@ export default function InvoicesPage() {
                             <div className="text-xs text-slate-400">{invoice.customer_phone || ''}</div>
                           </td>
                           <td className="py-2">
-                            {new Date(invoice.created_at).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US')}
+                            {new Date(invoice.created_at ?? Date.now()).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US')}
                           </td>
                           <td className="py-2">
-                            {Number(invoice.total_amount || 0).toFixed(2)} {symbol}
+                            {Number(invoice.total_amount ?? invoice.total ?? 0).toFixed(2)} {symbol}
                           </td>
                           <td className="py-2">
                             <button
-                              onClick={() => toggleInvoice(invoice.id)}
+                              onClick={() => toggleInvoice(invoice.id, invoice)}
                               className="text-cyan-300 hover:text-cyan-200 text-xs"
                             >
                               {expanded === invoice.id
@@ -408,14 +573,18 @@ export default function InvoicesPage() {
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {(itemsMap[invoice.id] || []).map((item) => (
-                                      <tr key={item.id}>
-                                        <td className="py-1">{language === 'ar' ? item.name_ar : item.name_en}</td>
+                                    {(itemsMap[invoice.id] || []).map((item: any, idx: number) => {
+                                      const name = item.name_snapshot || (language === 'ar' ? item.name_ar : item.name_en);
+                                      const unitPrice = item.unit_price ?? item.price_snapshot ?? 0;
+                                      const totalPrice = item.total_price ?? (Number(item.price_snapshot || 0) * Number(item.quantity || 0));
+                                      return (
+                                      <tr key={item.id || idx}>
+                                        <td className="py-1">{name}</td>
                                         <td className="py-1">{item.quantity}</td>
-                                        <td className="py-1">{Number(item.unit_price || 0).toFixed(2)} {symbol}</td>
-                                        <td className="py-1">{Number(item.total_price || 0).toFixed(2)} {symbol}</td>
+                                        <td className="py-1">{Number(unitPrice).toFixed(2)} {symbol}</td>
+                                        <td className="py-1">{Number(totalPrice).toFixed(2)} {symbol}</td>
                                       </tr>
-                                    ))}
+                                    );})}
                                     {(itemsMap[invoice.id] || []).length === 0 && (
                                       <tr>
                                         <td colSpan={4} className="py-2 text-slate-500">
@@ -439,6 +608,14 @@ export default function InvoicesPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function InvoicesPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-gray-400">Loading...</div>}>
+      <InvoicesPageContent />
+    </Suspense>
   );
 }
 

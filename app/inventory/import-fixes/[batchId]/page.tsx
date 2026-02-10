@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Sidebar } from '../../../components/Sidebar';
+import { Sidebar } from '@/components/Sidebar';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { API_BASE_URL } from '../../../api-config';
 import Link from 'next/link';

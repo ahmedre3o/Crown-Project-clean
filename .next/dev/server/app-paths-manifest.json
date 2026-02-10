@@ -1,0 +1,10 @@
+{
+  "/dashboard/page": "app/dashboard/page.js",
+  "/inventory/page": "app/inventory/page.js",
+  "/invoices/page": "app/invoices/page.js",
+  "/login/page": "app/login/page.js",
+  "/manifest.webmanifest/route": "app/manifest.webmanifest/route.js",
+  "/store-admin/reports/page": "app/store-admin/reports/page.js",
+  "/storefront/page": "app/storefront/page.js",
+  "/track/page": "app/track/page.js"
+}

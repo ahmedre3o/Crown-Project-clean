@@ -1,0 +1,126 @@
+[00:00:00.557] Server  LOG      ✓ Ready in 366ms
+[00:05:49.079] Server  LOG      ✓ Compiled in 41ms
+[00:06:17.962] Server  LOG      ✓ Compiled in 37ms
+[00:11:43.072] Server  LOG      ✓ Compiled in 46ms
+[00:12:44.903] Server  LOG      ✓ Compiled in 82ms
+[00:12:46.845] Browser ERROR   uncaughtError: ReferenceError: format is not defined
+[00:15:44.036] Browser ERROR   uncaughtError: ReferenceError: format is not defined
+[00:19:13.133] Server  WARN     ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[00:19:13.256] Server  LOG      ✓ Compiled in 53ms
+[00:19:35.504] Server  LOG      ✓ Compiled in 47ms
+[00:30:36.236] Browser ERROR   Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 1
+[00:36:16.682] Server  LOG      ✓ Compiled in 38ms
+[00:36:19.391] Browser ERROR   Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 1
+[00:36:38.730] Server  LOG      ✓ Compiled in 55ms
+[00:36:38.857] Browser ERROR   Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 1
+[00:36:45.448] Server  LOG      ✓ Compiled in 60ms
+[00:36:45.562] Browser ERROR   Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 1
+[00:37:27.659] Browser ERROR   uncaughtError: ReferenceError: format is not defined
+[00:37:38.346] Browser ERROR   uncaughtError: ReferenceError: format is not defined
+[00:37:53.062] Browser ERROR   uncaughtError: ReferenceError: format is not defined
+[00:50:39.549] Browser ERROR   uncaughtError: ReferenceError: format is not defined
+[00:50:56.715] Browser ERROR   uncaughtError: ReferenceError: format is not defined
+[01:04:00.242] Server  LOG      ✓ Compiled in 57ms
+[01:04:02.398] Server  LOG      ✓ Compiled in 49ms
+[01:15:39.795] Server  LOG      ✓ Compiled in 157ms
+[01:24:19.936] Server  LOG      ✓ Compiled in 44ms
+[01:30:07.711] Server  LOG      ✓ Compiled in 111ms
+[01:30:15.475] Server  LOG      ✓ Compiled in 41ms
+[01:30:54.822] Server  LOG      ✓ Compiled in 92ms
+[01:52:23.732] Server  LOG      ✓ Compiled in 95ms
+[01:52:28.670] Server  LOG      ✓ Compiled in 44ms
+[01:52:46.319] Server  LOG      ✓ Compiled in 66ms
+[01:53:03.966] Server  LOG      ✓ Compiled in 83ms
+[01:53:16.479] Server  LOG      ✓ Compiled in 46ms
+[01:53:44.252] Server  LOG      ✓ Compiled in 43ms
+[01:53:55.772] Server  LOG      ✓ Compiled in 59ms
+[01:54:42.040] Server  LOG      ✓ Compiled in 46ms
+[01:55:05.985] Server  LOG      ✓ Compiled in 42ms
+[01:55:26.994] Server  LOG      ✓ Compiled in 49ms
+[01:56:53.214] Server  LOG      ✓ Compiled in 89ms
+[02:17:39.592] Server  LOG      ✓ Compiled in 54ms
+[02:22:15.908] Browser ERROR   Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 1
+[02:22:16.986] Browser ERROR   Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 1
+[02:22:20.013] Browser LOG     REPORTS PAGE LOADED v999
+[02:22:20.013] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:22:20.013] Browser LOG     REPORTS PAGE LOADED v999
+[02:22:20.013] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:22:21.664] Browser LOG     REPORTS PAGE LOADED v999
+[02:22:21.664] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:22:24.071] Browser LOG     REPORTS API RAW: {"charts":{"dailyProfit":[{"date":"Tue Feb 10","profit":1000}],"dailyRevenue":[{"date":"Tue Feb 10","onlineConfirmed":34320,"pos":5200,"total":39520}]},"ok":true,"profit":{"available":true,"totalProfit":1000},"range":{"from":"2026-01-31","to":"2026-02-10"},"sales":{"avgOrderValue":9880,"onlineOrdersConfirmedCount":3,"onlineRevenueConfirmed":34320,"ordersCount":4,"posRevenue":5200,"statusBreakdown":{"cancelled":0,"completed":2,"confirmed":1,"pending":0},"totalRevenue":39520},"topProducts":[{"name":"Turbocharger Unit","productId":3,"qty":1,"revenue":19500,"sku":"SKU-TURBO-003","source":"online"},{"name":"Racing Clutch Kit","productId":1,"qty":3,"revenue":15600,"sku":"SKU-CLUTCH-001","source":"mixed"},{"name":"LED Headlight Set","productId":6,"qty":1,"revenue":2400,"sku":"SKU-LED-006","source":"online"},{"name":"High-Perf Brake Pads","productId":2,"qty":1,"revenue":1800,"sku":"SKU-BRAKE-002","source":"online"},{"name":"Premium Oil Filter","productId":4,"qty":1,"revenue":220,"sku":"SKU-OIL-004","source":"online"}]}
+[02:22:24.071] Browser LOG     dailySales: undefined
+[02:22:24.071] Browser LOG     dailyProfit: [{"date":"Tue Feb 10","profit":1000}]
+[02:22:24.071] Browser LOG     REPORTS PAGE LOADED v999
+[02:22:24.071] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:24:56.354] Browser ERROR   Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 1
+[02:24:58.378] Browser ERROR   Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 1
+[02:24:59.291] Browser ERROR   Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 1
+[02:25:10.308] Browser LOG     REPORTS PAGE LOADED v999
+[02:25:10.308] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:25:10.308] Browser LOG     REPORTS PAGE LOADED v999
+[02:25:10.308] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:25:23.528] Browser LOG     REPORTS PAGE LOADED v999
+[02:25:23.528] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:25:24.894] Browser LOG     REPORTS API RAW: {"charts":{"dailyProfit":[{"date":"Tue Feb 10","profit":1000}],"dailyRevenue":[{"date":"Tue Feb 10","onlineConfirmed":34320,"pos":5200,"total":39520}]},"ok":true,"profit":{"available":true,"totalProfit":1000},"range":{"from":"2026-01-31","to":"2026-02-10"},"sales":{"avgOrderValue":9880,"onlineOrdersConfirmedCount":3,"onlineRevenueConfirmed":34320,"ordersCount":4,"posRevenue":5200,"statusBreakdown":{"cancelled":0,"completed":2,"confirmed":1,"pending":0},"totalRevenue":39520},"topProducts":[{"name":"Turbocharger Unit","productId":3,"qty":1,"revenue":19500,"sku":"SKU-TURBO-003","source":"online"},{"name":"Racing Clutch Kit","productId":1,"qty":3,"revenue":15600,"sku":"SKU-CLUTCH-001","source":"mixed"},{"name":"LED Headlight Set","productId":6,"qty":1,"revenue":2400,"sku":"SKU-LED-006","source":"online"},{"name":"High-Perf Brake Pads","productId":2,"qty":1,"revenue":1800,"sku":"SKU-BRAKE-002","source":"online"},{"name":"Premium Oil Filter","productId":4,"qty":1,"revenue":220,"sku":"SKU-OIL-004","source":"online"}]}
+[02:25:24.894] Browser LOG     dailySales: undefined
+[02:25:24.894] Browser LOG     dailyProfit: [{"date":"Tue Feb 10","profit":1000}]
+[02:25:24.894] Browser LOG     REPORTS PAGE LOADED v999
+[02:25:24.894] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:25:31.119] Browser LOG     REPORTS PAGE LOADED v999
+[02:25:31.119] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:25:31.119] Browser LOG     REPORTS PAGE LOADED v999
+[02:25:31.119] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:25:32.454] Browser LOG     REPORTS PAGE LOADED v999
+[02:25:32.454] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:25:32.454] Browser LOG     REPORTS PAGE LOADED v999
+[02:25:32.454] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:25:35.355] Browser LOG     REPORTS PAGE LOADED v999
+[02:25:35.355] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:25:35.355] Browser LOG     REPORTS PAGE LOADED v999
+[02:25:35.355] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:25:36.395] Browser LOG     REPORTS PAGE LOADED v999
+[02:25:36.395] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:25:36.395] Browser LOG     REPORTS PAGE LOADED v999
+[02:25:36.395] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:25:37.423] Browser LOG     REPORTS PAGE LOADED v999
+[02:25:37.423] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:25:37.423] Browser LOG     REPORTS PAGE LOADED v999
+[02:25:37.423] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:25:38.277] Browser LOG     REPORTS PAGE LOADED v999
+[02:25:38.277] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:25:38.277] Browser LOG     REPORTS PAGE LOADED v999
+[02:25:38.277] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:25:38.867] Browser LOG     REPORTS PAGE LOADED v999
+[02:25:38.867] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:25:38.867] Browser LOG     REPORTS PAGE LOADED v999
+[02:25:38.867] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:25:39.986] Browser LOG     REPORTS PAGE LOADED v999
+[02:25:39.986] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:25:39.986] Browser LOG     REPORTS PAGE LOADED v999
+[02:25:39.986] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:25:41.509] Browser LOG     REPORTS PAGE LOADED v999
+[02:25:41.509] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:25:41.509] Browser LOG     REPORTS PAGE LOADED v999
+[02:25:41.509] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:25:42.543] Browser LOG     REPORTS PAGE LOADED v999
+[02:25:42.544] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:25:42.544] Browser LOG     REPORTS PAGE LOADED v999
+[02:25:42.544] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:37:10.452] Browser LOG     REPORTS PAGE LOADED v999
+[02:37:10.452] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:37:10.452] Browser LOG     REPORTS PAGE LOADED v999
+[02:37:10.452] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:37:11.797] Browser LOG     REPORTS PAGE LOADED v999
+[02:37:11.797] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:37:11.797] Browser LOG     REPORTS PAGE LOADED v999
+[02:37:11.797] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:37:13.238] Browser LOG     REPORTS PAGE LOADED v999
+[02:37:13.238] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:37:13.238] Browser LOG     REPORTS PAGE LOADED v999
+[02:37:13.238] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:37:48.987] Browser LOG     REPORTS PAGE LOADED v999
+[02:37:48.987] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:37:48.987] Browser LOG     REPORTS PAGE LOADED v999
+[02:37:48.987] Browser LOG     [2;38;2;124;124;124m%s[0m REPORTS PAGE LOADED v999
+[02:45:50.945] Server  LOG      ✓ Compiled in 72ms
+[02:47:57.345] Browser ERROR   Failed to load dashboard data: {}

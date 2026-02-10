@@ -39,14 +39,13 @@ interface CurrencyContextType {
   currency: CurrencyCode;
   symbol: string;
   setCurrency: (code: CurrencyCode) => void;
-  format: (value: number) => string;
 }
 
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
 
 function detectCurrency(): CurrencyCode {
-  if (typeof navigator === 'undefined') return 'SAR';
-  const locale = navigator.language || 'ar-SA';
+  if (typeof navigator === 'undefined') return 'EGP';
+  const locale = navigator.language || 'ar-EG';
   if (locale.startsWith('ar-EG')) return 'EGP';
   if (locale.startsWith('ar-SA')) return 'SAR';
   if (locale.startsWith('ar-AE')) return 'AED';
@@ -59,7 +58,7 @@ function detectCurrency(): CurrencyCode {
 }
 
 export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currency, setCurrencyState] = useState<CurrencyCode>('SAR');
+  const [currency, setCurrencyState] = useState<CurrencyCode>('EGP');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -76,11 +75,8 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const symbol = useMemo(() => currencySymbols[currency], [currency]);
 
-  const format = (value: number) =>
-    new Intl.NumberFormat('ar', { style: 'currency', currency }).format(value);
-
   return (
-    <CurrencyContext.Provider value={{ currency, symbol, setCurrency, format }}>
+    <CurrencyContext.Provider value={{ currency, symbol, setCurrency }}>
       {children}
     </CurrencyContext.Provider>
   );

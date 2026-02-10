@@ -2,10 +2,12 @@
 
 import React, { Suspense, useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Sidebar } from '../components/Sidebar';
+import { Sidebar } from '@/components/Sidebar';
 import { useLanguage } from '../contexts/LanguageContext';
-import { apiRequest } from '../contexts/AuthContext';
+import { apiRequest, useAuth } from '../contexts/AuthContext';
 import { useCurrency } from '../contexts/CurrencyContext';
+import { useRouteGuard } from '../guards/useRouteGuard';
+import { formatCurrency } from '@/lib/formatters';
 
 interface Invoice {
   id: number;
@@ -43,7 +45,9 @@ function InvoicesPageContent() {
   const focusId = searchParams.get('focus');
   const sourceParam = searchParams.get('source');
   const { t, direction, language } = useLanguage();
-  const { symbol } = useCurrency();
+  const { user, loading: authLoading, effectiveRole } = useAuth();
+  const { allowed } = useRouteGuard(user, authLoading, { feature: 'invoices', effectiveRole, showDenied: true });
+  const { symbol, currency } = useCurrency();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [business, setBusiness] = useState<Partial<Invoice> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -64,14 +68,13 @@ function InvoicesPageContent() {
   }, [sourceParam]);
 
   useEffect(() => {
-    const handler = () => {
-      loadInvoices();
-    };
+    if (!authLoading && !allowed) return;
+    const handler = () => loadInvoices();
     const delay = search.trim() ? 350 : 0;
     const timer = setTimeout(handler, delay);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceFilter, search]);
+  }, [authLoading, allowed, sourceFilter, search]);
 
   useEffect(() => {
     if (focusId && invoices.length > 0 && !focusHandledRef.current) {
@@ -207,8 +210,10 @@ function InvoicesPageContent() {
       const receiptWindow = window.open('', '_blank');
       if (!receiptWindow) return;
 
-      const duplicateLabel =
-        printCount && printCount > 1 ? `Duplicate Copy No. ${Math.max(1, printCount - 1)}` : '';
+      const printInfoLabel =
+        language === 'ar'
+          ? `تمت الطباعة ${printCount} مرات (هذه الطباعة رقم ${printCount})`
+          : `Printed ${printCount} times (this is print #${printCount})`;
 
       const itemsHtml = (items || [])
         .map(
@@ -219,7 +224,7 @@ function InvoicesPageContent() {
             <div class="item">
               <span class="item-name">${name}</span>
               <span class="item-qty">${Number(item.quantity || 0)}x</span>
-              <span class="item-price">${Number(totalPrice).toFixed(2)} ${symbol}</span>
+              <span class="item-price">${formatCurrency(Number(totalPrice || 0), language === 'ar' ? 'ar' : 'en', currency, symbol)}</span>
             </div>
           `;
           }
@@ -349,13 +354,19 @@ function InvoicesPageContent() {
                   ${business?.logo_url ? `<img src="${business.logo_url}" alt="Logo" style="height: 48px; margin-bottom: 8px;" />` : ''}
                   <h1>${business?.business_name || 'Crown Services'}</h1>
                   <p>${business?.activity_type || (language === 'ar' ? 'تاج الخدمات' : 'Services ERP')}</p>
-                  ${duplicateLabel ? `<div class="copy-label">${duplicateLabel}</div>` : ''}
+                  <div class="copy-label">${printInfoLabel}</div>
                 </div>
                 <div class="info">
                   <p>Invoice # / رقم الفاتورة: ${invoice.invoiceSource === 'online' ? `ON-${invoice.invoice_number}` : (invoice.invoice_serial || invoice.invoice_number || invoice.id)}</p>
                   <p>Date / التاريخ: ${new Date(invoice.created_at ?? Date.now()).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US')}</p>
                   <p>Cashier / الكاشير: ${invoice.cashier_name || 'N/A'}</p>
-                  <p>Customer / العميل: ${invoice.customer_name || (language === 'ar' ? 'عميل مباشر' : 'Walk-in')}</p>
+                  <p>Customer / العميل: ${
+                    invoice.invoiceSource === 'online'
+                      ? `${invoice.customer_name || (language === 'ar' ? 'عميل أونلاين' : 'Online Customer')} (${
+                          language === 'ar' ? 'أونلاين' : 'Online'
+                        })`
+                      : invoice.customer_name || (language === 'ar' ? 'عميل مباشر' : 'Direct Sale')
+                  }</p>
                   ${(invoice.customer_phone || invoice.phone) ? `<p>Phone / الهاتف: ${invoice.customer_phone || invoice.phone}</p>` : ''}
                   ${(invoice.customer_address || invoice.address) ? `<p>Address / العنوان: ${invoice.customer_address || invoice.address}</p>` : ''}
                   ${business?.address ? `<p>Shop Address: ${business.address}</p>` : ''}
@@ -365,13 +376,18 @@ function InvoicesPageContent() {
                   <div class="item" style="font-weight: 700;">
                     <span class="item-name">Item / الصنف</span>
                     <span class="item-qty">Qty / الكمية</span>
-                    <span class="item-price">Price / السعر</span>
+                  <span class="item-price">Price / السعر</span>
                   </div>
                   ${itemsHtml || ''}
                 </div>
                 <div class="total">
                   <span>Total / الإجمالي</span>
-                  <span>${Number(invoice.total_amount ?? invoice.total ?? 0).toFixed(2)} ${symbol}</span>
+                  <span>${formatCurrency(
+                    Number(invoice.total_amount ?? invoice.total ?? 0),
+                    language === 'ar' ? 'ar' : 'en',
+                    currency,
+                    symbol
+                  )}</span>
                 </div>
               </div>
               <div class="footer">
@@ -394,6 +410,8 @@ function InvoicesPageContent() {
       setPrintingId(null);
     }
   };
+
+  if (authLoading || !allowed) return null;
 
   return (
     <div className="min-h-screen bg-black text-white flex" dir={direction}>
@@ -509,20 +527,55 @@ function InvoicesPageContent() {
                               )}
                               {((invoice.print_count ?? invoice.printed_count ?? 0) >= 1) && (
                                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-500/20 border border-slate-500/40 text-slate-200">
-                                  {language === 'ar' ? `تمت الطباعة (${invoice.print_count ?? invoice.printed_count})` : `Printed #${invoice.print_count ?? invoice.printed_count}`}
+                                  {language === 'ar'
+                                    ? `تمت الطباعة ${invoice.print_count ?? invoice.printed_count} مرات (الطباعة #${invoice.print_count ?? invoice.printed_count})`
+                                    : `Printed ${invoice.print_count ?? invoice.printed_count} times (this is print #${invoice.print_count ?? invoice.printed_count})`}
                                 </span>
                               )}
                             </div>
                           </td>
                           <td className="py-2">
-                            <div>{invoice.customer_name || (language === 'ar' ? 'عميل مباشر' : 'Walk-in')}</div>
-                            <div className="text-xs text-slate-400">{invoice.customer_phone || ''}</div>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                  invoice.invoiceSource === 'online'
+                                    ? 'bg-fuchsia-500/15 text-fuchsia-300 border border-fuchsia-500/40'
+                                    : 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/40'
+                                }`}
+                              >
+                                {invoice.invoiceSource === 'online'
+                                  ? language === 'ar'
+                                    ? 'أونلاين'
+                                    : 'ONLINE'
+                                  : language === 'ar'
+                                  ? 'نقطة بيع'
+                                  : 'POS'}
+                              </span>
+                              <span>
+                                {invoice.invoiceSource === 'online'
+                                  ? `${invoice.customer_name || (language === 'ar' ? 'عميل أونلاين' : 'Online Customer')} (${
+                                      language === 'ar' ? 'أونلاين' : 'Online'
+                                    })`
+                                  : invoice.customer_name ||
+                                    (language === 'ar' ? 'عميل مباشر' : 'Walk-in Customer')}
+                              </span>
+                            </div>
+                            {(invoice.customer_phone || invoice.phone) && (
+                              <div className="text-xs text-slate-400">
+                                {invoice.customer_phone || invoice.phone}
+                              </div>
+                            )}
                           </td>
                           <td className="py-2">
                             {new Date(invoice.created_at ?? Date.now()).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US')}
                           </td>
                           <td className="py-2">
-                            {Number(invoice.total_amount ?? invoice.total ?? 0).toFixed(2)} {symbol}
+                            {formatCurrency(
+                              Number(invoice.total_amount ?? invoice.total ?? 0),
+                              language === 'ar' ? 'ar' : 'en',
+                              currency,
+                              symbol
+                            )}
                           </td>
                           <td className="py-2">
                             <button
@@ -581,8 +634,22 @@ function InvoicesPageContent() {
                                       <tr key={item.id || idx}>
                                         <td className="py-1">{name}</td>
                                         <td className="py-1">{item.quantity}</td>
-                                        <td className="py-1">{Number(unitPrice).toFixed(2)} {symbol}</td>
-                                        <td className="py-1">{Number(totalPrice).toFixed(2)} {symbol}</td>
+                                        <td className="py-1">
+                                          {formatCurrency(
+                                            Number(unitPrice),
+                                            language === 'ar' ? 'ar' : 'en',
+                                            currency,
+                                            symbol
+                                          )}
+                                        </td>
+                                        <td className="py-1">
+                                          {formatCurrency(
+                                            Number(totalPrice),
+                                            language === 'ar' ? 'ar' : 'en',
+                                            currency,
+                                            symbol
+                                          )}
+                                        </td>
                                       </tr>
                                     );})}
                                     {(itemsMap[invoice.id] || []).length === 0 && (

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import { ShoppingCart, Package, Star } from 'lucide-react';
 import { API_BASE_URL } from '../../api-config';
 
@@ -142,7 +143,7 @@ export default function StorefrontPage() {
             const inCart = cart.includes(product.id);
             return (
               <div key={product.id} className="neon-box rounded-xl p-6 hover:scale-105 transition-transform">
-                <div className="mb-4">
+                <Link href={`/storefront/${shopId}/product/${product.id}`} className="block mb-4 hover:opacity-90">
                   <div className="flex items-center justify-between mb-2">
                     {product.category_name_en && (
                       <span className="text-xs text-purple-400 uppercase">
@@ -155,7 +156,7 @@ export default function StorefrontPage() {
                     {language === 'ar' ? product.name_ar : product.name_en}
                   </h4>
                   <p className="text-sm text-gray-400">{product.brand}</p>
-                </div>
+                </Link>
 
                 <div className="flex items-center justify-between mt-4">
                   <span className="text-2xl font-bold text-cyan-400">

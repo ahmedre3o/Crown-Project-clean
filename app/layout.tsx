@@ -1,10 +1,11 @@
 import React from 'react';
 import './globals.css';
 import { Providers } from './providers';
+import { Toaster } from 'sonner';
 
 export const metadata = {
-  title: 'Crown Services ERP',
-  description: 'SaaS ERP system for Crown Services',
+  title: 'Crown Services',
+  description: 'SaaS system for Crown Services',
 };
 
 export default function RootLayout({
@@ -18,6 +19,7 @@ export default function RootLayout({
         <Providers>
           {children}
         </Providers>
+        <Toaster theme="dark" position="top-center" richColors />
       </body>
     </html>
   );

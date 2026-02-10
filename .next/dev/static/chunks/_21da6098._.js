@@ -1,0 +1,4644 @@
+(globalThis.TURBOPACK || (globalThis.TURBOPACK = [])).push([typeof document === "object" ? document.currentScript : undefined,
+"[project]/app/components/NeonCrownIcon.tsx [app-client] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "NeonCrownIcon",
+    ()=>NeonCrownIcon
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
+'use client';
+;
+function NeonCrownIcon({ className = 'h-5 w-5', size }) {
+    const s = size ?? 20;
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("svg", {
+        width: s,
+        height: s,
+        viewBox: "0 0 24 24",
+        fill: "none",
+        xmlns: "http://www.w3.org/2000/svg",
+        className: `text-cyan-200 ${className}`,
+        style: {
+            animation: 'crown-pulse 2s ease-in-out infinite'
+        },
+        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("path", {
+            d: "M2 20 L4 14 L8 16 L12 5 L16 16 L20 14 L22 20 L2 20 Z",
+            stroke: "currentColor",
+            strokeWidth: "1.5",
+            strokeLinejoin: "round",
+            fill: "none",
+            strokeLinecap: "round"
+        }, void 0, false, {
+            fileName: "[project]/app/components/NeonCrownIcon.tsx",
+            lineNumber: 21,
+            columnNumber: 7
+        }, this)
+    }, void 0, false, {
+        fileName: "[project]/app/components/NeonCrownIcon.tsx",
+        lineNumber: 9,
+        columnNumber: 5
+    }, this);
+}
+_c = NeonCrownIcon;
+var _c;
+__turbopack_context__.k.register(_c, "NeonCrownIcon");
+if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
+    __turbopack_context__.k.registerExports(__turbopack_context__.m, globalThis.$RefreshHelpers$);
+}
+}),
+"[project]/app/components/NotificationsBell.tsx [app-client] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "NotificationsBell",
+    ()=>NotificationsBell
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/client/app-dir/link.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/navigation.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$bell$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Bell$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/bell.js [app-client] (ecmascript) <export default as Bell>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$LanguageContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/contexts/LanguageContext.tsx [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/contexts/AuthContext.tsx [app-client] (ecmascript)");
+;
+var _s = __turbopack_context__.k.signature();
+'use client';
+;
+;
+;
+;
+;
+;
+function NotificationsBell() {
+    _s();
+    const { language } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$LanguageContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useLanguage"])();
+    const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"])();
+    const [unreadCount, setUnreadCount] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(0);
+    const [notifications, setNotifications] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])([]);
+    const [open, setOpen] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [toast, setToast] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
+    const [loadError, setLoadError] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const prevCountRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(0);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "NotificationsBell.useEffect": ()=>{
+            let alive = true;
+            const poll = {
+                "NotificationsBell.useEffect.poll": async ()=>{
+                    if (!alive) return;
+                    try {
+                        const res = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiRequest"])('/notifications/unread-count');
+                        const n = Number(res?.count ?? 0) || 0;
+                        if (n > prevCountRef.current && prevCountRef.current > 0) {
+                            setToast({
+                                msg: language === 'ar' ? 'نشاط جديد!' : 'New activity!'
+                            });
+                            setTimeout({
+                                "NotificationsBell.useEffect.poll": ()=>setToast(null)
+                            }["NotificationsBell.useEffect.poll"], 4000);
+                        }
+                        prevCountRef.current = n;
+                        setUnreadCount(n);
+                    } catch  {
+                    // ignore
+                    }
+                }
+            }["NotificationsBell.useEffect.poll"];
+            void poll();
+            const t = setInterval(poll, 10000);
+            return ({
+                "NotificationsBell.useEffect": ()=>{
+                    alive = false;
+                    clearInterval(t);
+                }
+            })["NotificationsBell.useEffect"];
+        }
+    }["NotificationsBell.useEffect"], [
+        language
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "NotificationsBell.useEffect": ()=>{
+            if (open) {
+                setLoadError(false);
+                (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiRequest"])('/notifications?limit=10').then({
+                    "NotificationsBell.useEffect": (res)=>{
+                        const items = Array.isArray(res?.items) ? res.items : Array.isArray(res) ? res : [];
+                        setNotifications(items);
+                        if (res?.ok === false) setLoadError(true);
+                    }
+                }["NotificationsBell.useEffect"]).catch({
+                    "NotificationsBell.useEffect": ()=>{
+                        setNotifications([]);
+                        setLoadError(true);
+                    }
+                }["NotificationsBell.useEffect"]);
+            }
+        }
+    }["NotificationsBell.useEffect"], [
+        open
+    ]);
+    const markRead = async (id, navTo)=>{
+        try {
+            await (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiRequest"])(`/notifications/${id}/read`, {
+                method: 'PATCH'
+            });
+            setNotifications((prev)=>prev.map((n)=>n.id === id ? {
+                        ...n,
+                        is_read: 1
+                    } : n));
+            setUnreadCount((c)=>Math.max(0, c - 1));
+            prevCountRef.current = Math.max(0, prevCountRef.current - 1);
+            if (navTo) {
+                router.push(navTo);
+                setOpen(false);
+            }
+        } catch  {
+        // ignore
+        }
+    };
+    const title = (n)=>(language === 'ar' ? n.title_ar || n.title_en : n.title_en || n.title_ar) || '';
+    const body = (n)=>(language === 'ar' ? n.body_ar || n.body_en : n.body_en || n.body_ar) || '';
+    const meta = (n)=>{
+        const m = n.meta;
+        if (typeof m === 'object' && m) {
+            return {
+                orderId: m.orderId != null ? Number(m.orderId) : undefined,
+                invoiceId: m.invoiceId != null ? Number(m.invoiceId) : m.saleId != null ? Number(m.saleId) : undefined
+            };
+        }
+        if (typeof m === 'string') try {
+            const p = JSON.parse(m);
+            return {
+                orderId: p?.orderId,
+                invoiceId: p?.invoiceId ?? p?.saleId
+            };
+        } catch  {
+            return {};
+        }
+        return {};
+    };
+    const getNavLink = (n)=>{
+        const { orderId, invoiceId } = meta(n);
+        if (orderId) return `/store-admin/orders?focus=${orderId}`;
+        if (invoiceId) return `/invoices?focus=${invoiceId}&source=${n.source === 'online' ? 'online' : 'pos'}`;
+        return null;
+    };
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Fragment"], {
+        children: [
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                className: "relative",
+                children: [
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                        onClick: ()=>setOpen((o)=>!o),
+                        className: "relative p-2 rounded-xl border border-cyan-500/30 text-cyan-200 hover:bg-cyan-500/10 transition",
+                        "aria-label": language === 'ar' ? 'الإشعارات' : 'Notifications',
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$bell$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Bell$3e$__["Bell"], {
+                                className: "h-5 w-5"
+                            }, void 0, false, {
+                                fileName: "[project]/app/components/NotificationsBell.tsx",
+                                lineNumber: 118,
+                                columnNumber: 11
+                            }, this),
+                            unreadCount > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                className: "absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1",
+                                children: unreadCount > 99 ? '99+' : unreadCount
+                            }, void 0, false, {
+                                fileName: "[project]/app/components/NotificationsBell.tsx",
+                                lineNumber: 120,
+                                columnNumber: 13
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/app/components/NotificationsBell.tsx",
+                        lineNumber: 113,
+                        columnNumber: 9
+                    }, this),
+                    open && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Fragment"], {
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "fixed inset-0 z-40",
+                                onClick: ()=>setOpen(false),
+                                "aria-hidden": "true"
+                            }, void 0, false, {
+                                fileName: "[project]/app/components/NotificationsBell.tsx",
+                                lineNumber: 127,
+                                columnNumber: 13
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "absolute top-full mt-2 right-0 z-50 w-80 max-h-80 overflow-y-auto rounded-xl border border-cyan-500/25 bg-[#0a0f18] shadow-[0_0_24px_rgba(34,211,238,0.2)]",
+                                dir: language === 'ar' ? 'rtl' : 'ltr',
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "px-4 py-3 border-b border-cyan-500/15 text-sm font-bold text-cyan-100",
+                                        children: language === 'ar' ? 'الإشعارات' : 'Notifications'
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/components/NotificationsBell.tsx",
+                                        lineNumber: 136,
+                                        columnNumber: 15
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "max-h-64 overflow-y-auto",
+                                        children: [
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
+                                                href: "/store-admin/notifications",
+                                                onClick: ()=>setOpen(false),
+                                                className: "block px-4 py-2 text-xs text-cyan-400 hover:text-cyan-200 hover:bg-cyan-500/5 border-b border-cyan-500/10",
+                                                children: language === 'ar' ? 'عرض كل الإشعارات' : 'View all notifications'
+                                            }, void 0, false, {
+                                                fileName: "[project]/app/components/NotificationsBell.tsx",
+                                                lineNumber: 140,
+                                                columnNumber: 17
+                                            }, this),
+                                            loadError ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                className: "px-4 py-6 text-amber-300 text-sm text-center",
+                                                children: language === 'ar' ? 'فشل تحميل الإشعارات' : 'Failed to load notifications'
+                                            }, void 0, false, {
+                                                fileName: "[project]/app/components/NotificationsBell.tsx",
+                                                lineNumber: 148,
+                                                columnNumber: 19
+                                            }, this) : notifications.length === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                className: "px-4 py-6 text-slate-400 text-sm text-center",
+                                                children: language === 'ar' ? 'لا توجد إشعارات' : 'No notifications'
+                                            }, void 0, false, {
+                                                fileName: "[project]/app/components/NotificationsBell.tsx",
+                                                lineNumber: 152,
+                                                columnNumber: 19
+                                            }, this) : notifications.map((n)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                    className: `w-full text-start px-4 py-3 border-b border-cyan-500/10 hover:bg-cyan-500/5 transition ${n.is_read ? 'text-slate-400' : 'text-slate-100 bg-cyan-500/5'}`,
+                                                    children: [
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                            onClick: ()=>markRead(n.id, getNavLink(n) || undefined),
+                                                            className: "w-full text-start",
+                                                            children: [
+                                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                                    className: "text-sm font-semibold",
+                                                                    children: title(n)
+                                                                }, void 0, false, {
+                                                                    fileName: "[project]/app/components/NotificationsBell.tsx",
+                                                                    lineNumber: 167,
+                                                                    columnNumber: 25
+                                                                }, this),
+                                                                body(n) ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                                    className: "text-xs text-slate-500 mt-1",
+                                                                    children: body(n)
+                                                                }, void 0, false, {
+                                                                    fileName: "[project]/app/components/NotificationsBell.tsx",
+                                                                    lineNumber: 168,
+                                                                    columnNumber: 36
+                                                                }, this) : null,
+                                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                                    className: "text-xs text-slate-500 mt-1",
+                                                                    children: new Date(n.created_at).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')
+                                                                }, void 0, false, {
+                                                                    fileName: "[project]/app/components/NotificationsBell.tsx",
+                                                                    lineNumber: 169,
+                                                                    columnNumber: 25
+                                                                }, this)
+                                                            ]
+                                                        }, void 0, true, {
+                                                            fileName: "[project]/app/components/NotificationsBell.tsx",
+                                                            lineNumber: 163,
+                                                            columnNumber: 23
+                                                        }, this),
+                                                        getNavLink(n) && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
+                                                            href: getNavLink(n),
+                                                            onClick: ()=>{
+                                                                setOpen(false);
+                                                            },
+                                                            className: "mt-2 inline-block text-xs text-cyan-300 hover:text-cyan-200 underline",
+                                                            children: meta(n).orderId ? language === 'ar' ? 'عرض الطلب' : 'View order' : language === 'ar' ? 'عرض الفاتورة' : 'View invoice'
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/app/components/NotificationsBell.tsx",
+                                                            lineNumber: 174,
+                                                            columnNumber: 25
+                                                        }, this)
+                                                    ]
+                                                }, n.id, true, {
+                                                    fileName: "[project]/app/components/NotificationsBell.tsx",
+                                                    lineNumber: 157,
+                                                    columnNumber: 21
+                                                }, this))
+                                        ]
+                                    }, void 0, true, {
+                                        fileName: "[project]/app/components/NotificationsBell.tsx",
+                                        lineNumber: 139,
+                                        columnNumber: 15
+                                    }, this)
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/app/components/NotificationsBell.tsx",
+                                lineNumber: 132,
+                                columnNumber: 13
+                            }, this)
+                        ]
+                    }, void 0, true)
+                ]
+            }, void 0, true, {
+                fileName: "[project]/app/components/NotificationsBell.tsx",
+                lineNumber: 112,
+                columnNumber: 7
+            }, this),
+            toast && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                className: "fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] flex items-center gap-3 px-4 py-3 rounded-xl border border-cyan-500/25 bg-black/90 backdrop-blur text-cyan-100 text-sm shadow-[0_0_24px_rgba(34,211,238,0.25)]",
+                children: [
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                        children: toast.msg
+                    }, void 0, false, {
+                        fileName: "[project]/app/components/NotificationsBell.tsx",
+                        lineNumber: 194,
+                        columnNumber: 11
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                        onClick: ()=>{
+                            router.push('/store-admin/notifications');
+                            setToast(null);
+                        },
+                        className: "px-3 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs",
+                        children: language === 'ar' ? 'فتح' : 'Open'
+                    }, void 0, false, {
+                        fileName: "[project]/app/components/NotificationsBell.tsx",
+                        lineNumber: 195,
+                        columnNumber: 11
+                    }, this)
+                ]
+            }, void 0, true, {
+                fileName: "[project]/app/components/NotificationsBell.tsx",
+                lineNumber: 193,
+                columnNumber: 9
+            }, this)
+        ]
+    }, void 0, true);
+}
+_s(NotificationsBell, "c+NcAhvPgN1WIaRhzGsohF18zvw=", false, function() {
+    return [
+        __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$LanguageContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useLanguage"],
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"]
+    ];
+});
+_c = NotificationsBell;
+var _c;
+__turbopack_context__.k.register(_c, "NotificationsBell");
+if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
+    __turbopack_context__.k.registerExports(__turbopack_context__.m, globalThis.$RefreshHelpers$);
+}
+}),
+"[project]/app/components/ShopSwitcher.tsx [app-client] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "ShopSwitcher",
+    ()=>ShopSwitcher,
+    "getActiveShopId",
+    ()=>getActiveShopId
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$shopping$2d$bag$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ShoppingBag$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/shopping-bag.js [app-client] (ecmascript) <export default as ShoppingBag>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$down$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronDown$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/chevron-down.js [app-client] (ecmascript) <export default as ChevronDown>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$LanguageContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/contexts/LanguageContext.tsx [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/contexts/AuthContext.tsx [app-client] (ecmascript)");
+;
+var _s = __turbopack_context__.k.signature();
+'use client';
+;
+;
+;
+;
+const STORAGE_KEY = 'crown-active-shop-id';
+function ShopSwitcher() {
+    _s();
+    const { language } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$LanguageContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useLanguage"])();
+    const [shops, setShops] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])([]);
+    const [activeShopId, setActiveShopId] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
+    const [open, setOpen] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [loading, setLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(true);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "ShopSwitcher.useEffect": ()=>{
+            if ("TURBOPACK compile-time falsy", 0) //TURBOPACK unreachable
+            ;
+            setActiveShopId(localStorage.getItem(STORAGE_KEY));
+            const handler = {
+                "ShopSwitcher.useEffect.handler": ()=>setActiveShopId(localStorage.getItem(STORAGE_KEY))
+            }["ShopSwitcher.useEffect.handler"];
+            window.addEventListener('crown-shop-changed', handler);
+            return ({
+                "ShopSwitcher.useEffect": ()=>window.removeEventListener('crown-shop-changed', handler)
+            })["ShopSwitcher.useEffect"];
+        }
+    }["ShopSwitcher.useEffect"], []);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "ShopSwitcher.useEffect": ()=>{
+            let cancelled = false;
+            ({
+                "ShopSwitcher.useEffect": async ()=>{
+                    try {
+                        const data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiRequest"])('/admin/shops');
+                        if (!cancelled && Array.isArray(data)) setShops(data);
+                    } catch  {
+                        if (!cancelled) setShops([]);
+                    } finally{
+                        if (!cancelled) setLoading(false);
+                    }
+                }
+            })["ShopSwitcher.useEffect"]();
+            return ({
+                "ShopSwitcher.useEffect": ()=>{
+                    cancelled = true;
+                }
+            })["ShopSwitcher.useEffect"];
+        }
+    }["ShopSwitcher.useEffect"], []);
+    const selectShop = (id)=>{
+        const idStr = String(id);
+        setActiveShopId(idStr);
+        if ("TURBOPACK compile-time truthy", 1) {
+            localStorage.setItem(STORAGE_KEY, idStr);
+        }
+        setOpen(false);
+        window.dispatchEvent(new Event('crown-shop-changed'));
+    };
+    const clearShop = ()=>{
+        setActiveShopId(null);
+        if ("TURBOPACK compile-time truthy", 1) {
+            localStorage.removeItem(STORAGE_KEY);
+        }
+        setOpen(false);
+        window.dispatchEvent(new Event('crown-shop-changed'));
+    };
+    const displayName = (s)=>s.business_name || s.name || s.domain || `#${s.id}`;
+    const activeShop = shops.find((s)=>String(s.id) === activeShopId);
+    if (loading || shops.length === 0) return null;
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+        className: "relative",
+        children: [
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                type: "button",
+                onClick: ()=>setOpen((v)=>!v),
+                className: "inline-flex items-center gap-1.5 rounded-full border border-cyan-500/30 bg-black/25 px-3 py-1.5 text-[11px] text-cyan-200 shadow-[0_0_14px_rgba(0,243,255,0.10)]",
+                children: [
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$shopping$2d$bag$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ShoppingBag$3e$__["ShoppingBag"], {
+                        className: "h-3.5 w-3.5"
+                    }, void 0, false, {
+                        fileName: "[project]/app/components/ShopSwitcher.tsx",
+                        lineNumber: 80,
+                        columnNumber: 9
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                        className: "max-w-[120px] truncate",
+                        children: activeShop ? displayName(activeShop) : language === 'ar' ? 'اختر المتجر' : 'Select shop'
+                    }, void 0, false, {
+                        fileName: "[project]/app/components/ShopSwitcher.tsx",
+                        lineNumber: 81,
+                        columnNumber: 9
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$down$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronDown$3e$__["ChevronDown"], {
+                        className: "h-3 w-3"
+                    }, void 0, false, {
+                        fileName: "[project]/app/components/ShopSwitcher.tsx",
+                        lineNumber: 88,
+                        columnNumber: 9
+                    }, this)
+                ]
+            }, void 0, true, {
+                fileName: "[project]/app/components/ShopSwitcher.tsx",
+                lineNumber: 75,
+                columnNumber: 7
+            }, this),
+            open && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Fragment"], {
+                children: [
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        className: "fixed inset-0 z-10",
+                        onClick: ()=>setOpen(false)
+                    }, void 0, false, {
+                        fileName: "[project]/app/components/ShopSwitcher.tsx",
+                        lineNumber: 92,
+                        columnNumber: 11
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        className: "absolute top-full left-0 mt-1 z-20 min-w-[180px] max-h-[220px] overflow-y-auto rounded-lg border border-cyan-500/30 bg-[#0b1220] py-1 shadow-xl",
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                type: "button",
+                                onClick: clearShop,
+                                className: `w-full text-left px-3 py-2 text-xs ${!activeShopId ? 'bg-cyan-500/20 text-cyan-200' : 'text-slate-300 hover:bg-cyan-500/10'}`,
+                                children: language === 'ar' ? '— بدون متجر —' : '— No shop —'
+                            }, void 0, false, {
+                                fileName: "[project]/app/components/ShopSwitcher.tsx",
+                                lineNumber: 94,
+                                columnNumber: 13
+                            }, this),
+                            shops.map((s)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                    type: "button",
+                                    onClick: ()=>selectShop(s.id),
+                                    className: `w-full text-left px-3 py-2 text-xs ${activeShopId === String(s.id) ? 'bg-cyan-500/20 text-cyan-200' : 'text-slate-300 hover:bg-cyan-500/10'}`,
+                                    children: displayName(s)
+                                }, s.id, false, {
+                                    fileName: "[project]/app/components/ShopSwitcher.tsx",
+                                    lineNumber: 102,
+                                    columnNumber: 15
+                                }, this))
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/app/components/ShopSwitcher.tsx",
+                        lineNumber: 93,
+                        columnNumber: 11
+                    }, this)
+                ]
+            }, void 0, true)
+        ]
+    }, void 0, true, {
+        fileName: "[project]/app/components/ShopSwitcher.tsx",
+        lineNumber: 74,
+        columnNumber: 5
+    }, this);
+}
+_s(ShopSwitcher, "+PqPyQo9JVTyPGFqHWzbd5z4lF4=", false, function() {
+    return [
+        __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$LanguageContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useLanguage"]
+    ];
+});
+_c = ShopSwitcher;
+function getActiveShopId() {
+    if ("TURBOPACK compile-time falsy", 0) //TURBOPACK unreachable
+    ;
+    return localStorage.getItem(STORAGE_KEY);
+}
+var _c;
+__turbopack_context__.k.register(_c, "ShopSwitcher");
+if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
+    __turbopack_context__.k.registerExports(__turbopack_context__.m, globalThis.$RefreshHelpers$);
+}
+}),
+"[project]/shared/plans.ts [app-client] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+/**
+ * Single source of truth for Crown ERP plans.
+ * Used by: Admin, Settings, Login, backend API, AI knowledge.
+ * All pricing, limits, and features must match exactly.
+ */ __turbopack_context__.s([
+    "PLANS",
+    ()=>PLANS,
+    "getPlanById",
+    ()=>getPlanById,
+    "getPlanCurrency",
+    ()=>getPlanCurrency,
+    "getPlanCurrencySymbol",
+    ()=>getPlanCurrencySymbol,
+    "getPlanFeaturesForBackend",
+    ()=>getPlanFeaturesForBackend,
+    "getPlanFeaturesForFrontend",
+    ()=>getPlanFeaturesForFrontend,
+    "getPlanPricing",
+    ()=>getPlanPricing,
+    "getPlanPricingByLanguage",
+    ()=>getPlanPricingByLanguage
+]);
+const PLANS = [
+    {
+        id: 'bronze',
+        nameAr: 'برونزي',
+        nameEn: 'Bronze',
+        totalUsers: 2,
+        additionalUsersLimit: 1,
+        features: {
+            pos: true,
+            manualEntry: true,
+            inventory: true,
+            excelImport: false,
+            onlineStore: false,
+            reports: false,
+            notifications: false,
+            ai: false,
+            branches: false
+        },
+        pricing: {
+            ar: {
+                monthly: 199,
+                quarterly: 540,
+                yearly: 1900
+            },
+            en: {
+                monthly: 5,
+                yearly: 50
+            }
+        },
+        pricingEGP: {
+            monthly: 199,
+            quarterly: 540,
+            yearly: 1900
+        },
+        pricingUSD: {
+            monthly: 5,
+            yearly: 50
+        },
+        displayFeatures: [
+            {
+                key: 'pos',
+                ar: 'نقطة البيع',
+                en: 'POS',
+                included: true
+            },
+            {
+                key: 'manual',
+                ar: 'إدخال يدوي',
+                en: 'Manual Entry',
+                included: true
+            },
+            {
+                key: 'inventory',
+                ar: 'مخزون أساسي',
+                en: 'Inventory basic',
+                included: true
+            },
+            {
+                key: 'online',
+                ar: 'متجر أونلاين',
+                en: 'Online Store',
+                included: false
+            },
+            {
+                key: 'ai',
+                ar: 'مساعد ذكاء اصطناعي',
+                en: 'AI Assistant',
+                included: false
+            },
+            {
+                key: 'reports',
+                ar: 'تقارير PDF/Excel',
+                en: 'Reports PDF/Excel',
+                included: false
+            }
+        ],
+        rolesAr: 'مالك + 1',
+        rolesEn: 'Owner + 1'
+    },
+    {
+        id: 'silver',
+        nameAr: 'فضي',
+        nameEn: 'Silver',
+        totalUsers: 5,
+        additionalUsersLimit: 4,
+        features: {
+            pos: true,
+            manualEntry: true,
+            inventory: true,
+            excelImport: true,
+            onlineStore: false,
+            reports: false,
+            notifications: false,
+            ai: false,
+            branches: false
+        },
+        pricing: {
+            ar: {
+                monthly: 349,
+                quarterly: 945,
+                yearly: 3350
+            },
+            en: {
+                monthly: 9,
+                yearly: 90
+            }
+        },
+        pricingEGP: {
+            monthly: 349,
+            quarterly: 945,
+            yearly: 3350
+        },
+        pricingUSD: {
+            monthly: 9,
+            yearly: 90
+        },
+        displayFeatures: [
+            {
+                key: 'pos',
+                ar: 'نقطة البيع',
+                en: 'POS',
+                included: true
+            },
+            {
+                key: 'manual',
+                ar: 'إدخال يدوي',
+                en: 'Manual Entry',
+                included: true
+            },
+            {
+                key: 'inventory',
+                ar: 'مخزون',
+                en: 'Inventory',
+                included: true
+            },
+            {
+                key: 'excel',
+                ar: 'استيراد CSV / Excel',
+                en: 'CSV / Excel import',
+                included: true
+            },
+            {
+                key: 'ai',
+                ar: 'مساعد ذكاء اصطناعي',
+                en: 'AI Assistant',
+                included: false
+            },
+            {
+                key: 'online',
+                ar: 'متجر أونلاين',
+                en: 'Online Store',
+                included: false
+            }
+        ],
+        rolesAr: 'مالك + 4',
+        rolesEn: 'Owner + 4'
+    },
+    {
+        id: 'gold',
+        nameAr: 'ذهبي',
+        nameEn: 'Gold',
+        totalUsers: 10,
+        additionalUsersLimit: 9,
+        features: {
+            pos: true,
+            manualEntry: true,
+            inventory: true,
+            excelImport: true,
+            onlineStore: true,
+            reports: true,
+            notifications: true,
+            ai: true,
+            branches: false
+        },
+        pricing: {
+            ar: {
+                monthly: 699,
+                quarterly: 1890,
+                yearly: 6700
+            },
+            en: {
+                monthly: 19,
+                yearly: 190
+            }
+        },
+        pricingEGP: {
+            monthly: 699,
+            quarterly: 1890,
+            yearly: 6700
+        },
+        pricingUSD: {
+            monthly: 19,
+            yearly: 190
+        },
+        displayFeatures: [
+            {
+                key: 'pos',
+                ar: 'نقطة البيع',
+                en: 'POS',
+                included: true
+            },
+            {
+                key: 'inventory',
+                ar: 'مخزون',
+                en: 'Inventory',
+                included: true
+            },
+            {
+                key: 'reports',
+                ar: 'تقارير PDF / Excel / CSV',
+                en: 'Reports PDF/Excel/CSV',
+                included: true
+            },
+            {
+                key: 'ai',
+                ar: 'مساعد ذكاء اصطناعي',
+                en: 'AI Assistant',
+                included: true
+            },
+            {
+                key: 'online',
+                ar: 'متجر أونلاين',
+                en: 'Online Store',
+                included: true
+            },
+            {
+                key: 'notifications',
+                ar: 'إشعارات',
+                en: 'Notifications',
+                included: true
+            }
+        ],
+        rolesAr: 'مالك + 9',
+        rolesEn: 'Owner + 9',
+        highlight: true
+    },
+    {
+        id: 'branches',
+        nameAr: 'فروع',
+        nameEn: 'Branches',
+        totalUsers: 30,
+        additionalUsersLimit: 29,
+        features: {
+            pos: true,
+            manualEntry: true,
+            inventory: true,
+            excelImport: true,
+            onlineStore: true,
+            reports: true,
+            notifications: true,
+            ai: true,
+            branches: true
+        },
+        pricing: {
+            ar: {
+                monthly: 1499,
+                quarterly: 4050,
+                yearly: 14400
+            },
+            en: {
+                monthly: 39,
+                yearly: 390
+            }
+        },
+        pricingEGP: {
+            monthly: 1499,
+            quarterly: 4050,
+            yearly: 14400
+        },
+        pricingUSD: {
+            monthly: 39,
+            yearly: 390
+        },
+        displayFeatures: [
+            {
+                key: 'branches',
+                ar: 'فروع غير محدودة',
+                en: 'Unlimited branches',
+                included: true
+            },
+            {
+                key: 'all',
+                ar: 'جميع مميزات الذهبي',
+                en: 'All Gold features',
+                included: true
+            },
+            {
+                key: 'control',
+                ar: 'تحكم على مستوى الفرع',
+                en: 'Branch-level control',
+                included: true
+            },
+            {
+                key: 'enterprise',
+                ar: 'إدارة على مستوى المؤسسة',
+                en: 'Enterprise-level management',
+                included: true
+            }
+        ],
+        rolesAr: 'مالك + 29',
+        rolesEn: 'Owner + 29'
+    }
+];
+const getPlanById = (id)=>PLANS.find((p)=>p.id === (id || 'bronze').toLowerCase());
+const getPlanPricing = (planId, currency)=>{
+    const plan = getPlanById(planId);
+    if (!plan) return null;
+    return currency === 'EGP' ? plan.pricingEGP : plan.pricingUSD;
+};
+const getPlanPricingByLanguage = (planId, lang)=>{
+    const plan = getPlanById(planId);
+    if (!plan) return null;
+    return plan.pricing[lang];
+};
+const getPlanCurrency = (lang)=>lang === 'ar' ? 'EGP' : 'USD';
+const getPlanCurrencySymbol = (lang)=>lang === 'ar' ? 'ج.م' : '$';
+const getPlanFeaturesForFrontend = (planId)=>{
+    const plan = getPlanById(planId);
+    if (!plan) {
+        return {
+            ai: false,
+            onlineStore: false,
+            excelImport: false,
+            manualEntry: true,
+            branches: false
+        };
+    }
+    return {
+        ai: plan.features.ai,
+        onlineStore: plan.features.onlineStore,
+        excelImport: plan.features.excelImport,
+        manualEntry: plan.features.manualEntry,
+        branches: plan.features.branches
+    };
+};
+const getPlanFeaturesForBackend = (planId)=>{
+    const plan = getPlanById(planId);
+    if (!plan) {
+        return {
+            userLimit: 2,
+            additionalUsersLimit: 1,
+            online: false,
+            reports_pdf: false,
+            reports_excel: false,
+            ai_assistant: false,
+            branches: false,
+            notifications: false,
+            slow_stock: false,
+            manual_entry: true
+        };
+    }
+    return {
+        userLimit: plan.totalUsers,
+        additionalUsersLimit: plan.additionalUsersLimit,
+        online: plan.features.onlineStore,
+        reports_pdf: plan.features.reports,
+        reports_excel: plan.features.reports,
+        ai_assistant: plan.features.ai,
+        branches: plan.features.branches,
+        notifications: plan.features.notifications,
+        slow_stock: plan.features.reports,
+        manual_entry: plan.features.manualEntry
+    };
+};
+if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
+    __turbopack_context__.k.registerExports(__turbopack_context__.m, globalThis.$RefreshHelpers$);
+}
+}),
+"[project]/app/permissions.ts [app-client] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+/**
+ * Single source of truth for role-based permissions and navigation.
+ * Use canAccess() and getAllowedNav() everywhere - never duplicate role logic.
+ */ __turbopack_context__.s([
+    "ROUTE_FEATURE_MAP",
+    ()=>ROUTE_FEATURE_MAP,
+    "SECTION_LABELS",
+    ()=>SECTION_LABELS,
+    "canAccess",
+    ()=>canAccess,
+    "canSeeDomainSection",
+    ()=>canSeeDomainSection,
+    "getAllowedNav",
+    ()=>getAllowedNav,
+    "getDefaultRedirect",
+    ()=>getDefaultRedirect,
+    "getPlanFeatures",
+    ()=>getPlanFeatures
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$shared$2f$plans$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/shared/plans.ts [app-client] (ecmascript)");
+;
+function getPlanFeatures(pkg = 'bronze') {
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$shared$2f$plans$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getPlanFeaturesForFrontend"])(pkg || 'bronze');
+}
+const ROUTE_FEATURE_MAP = {
+    '/dashboard': 'dashboard',
+    '/pos': 'pos',
+    '/inventory': 'inventory',
+    '/manual-entry': 'manual_entry',
+    '/excel-import': 'excel_import',
+    '/invoices': 'invoices',
+    '/settings': 'settings',
+    '/admin': 'admin',
+    '/admin/codes': 'admin_codes',
+    '/store-admin/reports': 'reports',
+    '/store-admin/orders': 'online_orders',
+    '/store-admin/payments': 'payments_admin',
+    '/store-admin/notifications': 'notifications',
+    '/store-admin/branches': 'branches',
+    '/store-admin/users': 'users',
+    '/store-admin/domains': 'domains',
+    '/store-admin/store': 'store_management',
+    '/store-admin/inventory/slow-moving': 'inventory_slow'
+};
+function getDefaultRedirect(role) {
+    if (!role) return '/login';
+    if (role === 'cashier') return '/pos';
+    if (role === 'warehouse') return '/inventory';
+    if (role === 'branch_manager' || role === 'multi_branch_manager') return '/pos';
+    return '/dashboard';
+}
+function canAccess(role, feature, planFeatures, _context) {
+    if (!role) return false;
+    // Super admin sees everything
+    if (role === 'super_admin') return true;
+    const { ai, onlineStore, excelImport, manualEntry, branches } = planFeatures;
+    switch(feature){
+        case 'dashboard':
+            return [
+                'shop_owner',
+                'multi_branch_manager'
+            ].includes(role);
+        case 'ai':
+            return ai && role === 'shop_owner'; // only owner; branch_manager, cashier NOT included
+        case 'pos':
+            return [
+                'shop_owner',
+                'branch_manager',
+                'multi_branch_manager',
+                'cashier'
+            ].includes(role);
+        case 'inventory':
+        case 'inventory_read':
+            return [
+                'shop_owner',
+                'branch_manager',
+                'multi_branch_manager',
+                'cashier',
+                'warehouse'
+            ].includes(role);
+        case 'inventory_edit':
+            return [
+                'shop_owner',
+                'warehouse'
+            ].includes(role);
+        case 'inventory_slow':
+            return [
+                'shop_owner',
+                'warehouse',
+                'branch_manager',
+                'multi_branch_manager'
+            ].includes(role);
+        case 'excel_import':
+            return excelImport && [
+                'shop_owner',
+                'warehouse'
+            ].includes(role);
+        case 'manual_entry':
+            return manualEntry && [
+                'shop_owner',
+                'warehouse'
+            ].includes(role);
+        case 'reports':
+            return [
+                'shop_owner',
+                'branch_manager',
+                'multi_branch_manager'
+            ].includes(role);
+        case 'reports_profit':
+            return role === 'shop_owner';
+        case 'invoices':
+            return [
+                'shop_owner',
+                'branch_manager',
+                'multi_branch_manager',
+                'cashier'
+            ].includes(role);
+        case 'online_orders':
+            return onlineStore && [
+                'shop_owner',
+                'branch_manager',
+                'multi_branch_manager',
+                'cashier'
+            ].includes(role);
+        case 'online_orders_read':
+            return onlineStore && [
+                'shop_owner',
+                'branch_manager',
+                'multi_branch_manager',
+                'cashier'
+            ].includes(role);
+        case 'payments_admin':
+            return [
+                'shop_owner',
+                'branch_manager',
+                'multi_branch_manager'
+            ].includes(role); // cashier, warehouse NO access
+        case 'notifications':
+            return onlineStore && [
+                'shop_owner',
+                'branch_manager',
+                'multi_branch_manager',
+                'cashier'
+            ].includes(role) || role === 'shop_owner';
+        case 'branches':
+            return role === 'shop_owner' || branches && [
+                'branch_manager',
+                'multi_branch_manager'
+            ].includes(role);
+        case 'users':
+            return [
+                'shop_owner',
+                'branch_manager',
+                'multi_branch_manager'
+            ].includes(role); // cashier, warehouse NO access
+        case 'settings':
+            return role === 'shop_owner';
+        case 'domains':
+        case 'domains_full':
+            return role === 'shop_owner' && onlineStore;
+        case 'store_management':
+        case 'store_preview':
+            return onlineStore && [
+                'shop_owner',
+                'branch_manager',
+                'cashier',
+                'multi_branch_manager'
+            ].includes(role); // warehouse NO access
+        case 'admin':
+        case 'admin_codes':
+            return role === 'super_admin';
+        case 'branch_availability':
+            return branches && [
+                'shop_owner',
+                'branch_manager',
+                'multi_branch_manager',
+                'cashier',
+                'warehouse'
+            ].includes(role);
+        default:
+            return false;
+    }
+}
+function canSeeDomainSection(role) {
+    return role === 'super_admin' || role === 'shop_owner';
+}
+function getAllowedNav(role, planFeatures, t, language) {
+    if (!role) return [];
+    const items = [];
+    const push = (item)=>{
+        if (canAccess(role, item.id, planFeatures)) {
+            items.push({
+                ...item,
+                label: t(item.labelKey) || item.labelKey
+            });
+        }
+    };
+    // Operations
+    if (canAccess(role, 'dashboard', planFeatures)) {
+        push({
+            id: 'dashboard',
+            href: '/dashboard',
+            labelKey: 'nav.dashboard',
+            icon: 'LayoutDashboard',
+            section: 'operations'
+        });
+    }
+    if (canAccess(role, 'ai', planFeatures)) {
+        items.push({
+            id: 'ai',
+            href: '/dashboard?ai=1',
+            labelKey: 'ai.title',
+            icon: 'MessageCircle',
+            section: 'operations',
+            glow: true,
+            label: t('ai.title') || 'AI'
+        });
+    }
+    if (canAccess(role, 'pos', planFeatures)) {
+        push({
+            id: 'pos',
+            href: '/pos',
+            labelKey: 'nav.pos',
+            icon: 'ShoppingCart',
+            section: 'operations'
+        });
+    }
+    // Inventory
+    if (canAccess(role, 'inventory', planFeatures)) {
+        push({
+            id: 'inventory',
+            href: '/inventory',
+            labelKey: 'nav.inventory',
+            icon: 'Package',
+            section: 'inventory'
+        });
+    }
+    if (canAccess(role, 'inventory_slow', planFeatures)) {
+        push({
+            id: 'inventory_slow',
+            href: '/store-admin/inventory/slow-moving',
+            labelKey: 'nav.slowMoving',
+            icon: 'AlertTriangle',
+            section: 'inventory'
+        });
+    }
+    if (canAccess(role, 'manual_entry', planFeatures)) {
+        push({
+            id: 'manual_entry',
+            href: '/manual-entry',
+            labelKey: 'nav.manualEntry',
+            icon: 'FilePlus2',
+            section: 'inventory'
+        });
+    }
+    if (canAccess(role, 'excel_import', planFeatures)) {
+        push({
+            id: 'excel_import',
+            href: '/excel-import',
+            labelKey: 'nav.excelImport',
+            icon: 'FileSpreadsheet',
+            section: 'inventory'
+        });
+    }
+    // Reports
+    if (canAccess(role, 'invoices', planFeatures)) {
+        push({
+            id: 'invoices',
+            href: '/invoices',
+            labelKey: 'nav.invoices',
+            icon: 'FileText',
+            section: 'reports'
+        });
+    }
+    if (canAccess(role, 'reports', planFeatures)) {
+        push({
+            id: 'reports',
+            href: '/store-admin/reports',
+            labelKey: 'nav.reports',
+            icon: 'BarChart2',
+            section: 'reports'
+        });
+    }
+    if (canAccess(role, 'online_orders', planFeatures)) {
+        push({
+            id: 'online_orders',
+            href: '/store-admin/orders',
+            labelKey: 'nav.onlineOrders',
+            icon: 'ShoppingBag',
+            section: 'reports'
+        });
+    }
+    if (canAccess(role, 'payments_admin', planFeatures)) {
+        push({
+            id: 'payments_admin',
+            href: '/store-admin/payments',
+            labelKey: 'nav.payments',
+            icon: 'CreditCard',
+            section: 'reports'
+        });
+    }
+    if (canAccess(role, 'notifications', planFeatures)) {
+        push({
+            id: 'notifications',
+            href: '/store-admin/notifications',
+            labelKey: 'nav.notifications',
+            icon: 'Bell',
+            section: 'reports'
+        });
+    }
+    // Admin (store-admin: branches, users, domains)
+    if (canAccess(role, 'branches', planFeatures)) {
+        push({
+            id: 'branches',
+            href: '/store-admin/branches',
+            labelKey: 'nav.branches',
+            icon: 'GitBranch',
+            section: 'admin'
+        });
+    }
+    if (canAccess(role, 'users', planFeatures)) {
+        push({
+            id: 'users',
+            href: '/store-admin/users',
+            labelKey: 'nav.users',
+            icon: 'Users',
+            section: 'admin'
+        });
+    }
+    if (canAccess(role, 'store_management', planFeatures)) {
+        push({
+            id: 'store_management',
+            href: '/store-admin/store',
+            labelKey: 'nav.storeAdmin',
+            icon: 'Shield',
+            section: 'admin'
+        });
+    }
+    if (canAccess(role, 'settings', planFeatures)) {
+        push({
+            id: 'settings',
+            href: '/settings',
+            labelKey: 'nav.settings',
+            icon: 'Settings',
+            section: 'admin'
+        });
+    }
+    // System (super_admin only)
+    if (canAccess(role, 'admin', planFeatures)) {
+        push({
+            id: 'admin',
+            href: '/admin',
+            labelKey: 'nav.admin',
+            icon: 'Shield',
+            section: 'system'
+        });
+    }
+    if (canAccess(role, 'admin_codes', planFeatures)) {
+        push({
+            id: 'admin_codes',
+            href: '/admin/codes',
+            labelKey: 'nav.codes',
+            icon: 'Key',
+            section: 'system'
+        });
+    }
+    return items;
+}
+const SECTION_LABELS = {
+    operations: {
+        en: 'Operations',
+        ar: 'العمليات'
+    },
+    inventory: {
+        en: 'Inventory',
+        ar: 'المخزون'
+    },
+    reports: {
+        en: 'Reports & Orders',
+        ar: 'التقارير والطلبات'
+    },
+    admin: {
+        en: 'Store Admin',
+        ar: 'إدارة المتجر'
+    },
+    system: {
+        en: 'System Admin',
+        ar: 'إدارة النظام'
+    }
+};
+if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
+    __turbopack_context__.k.registerExports(__turbopack_context__.m, globalThis.$RefreshHelpers$);
+}
+}),
+"[project]/app/components/Sidebar.tsx [app-client] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "Sidebar",
+    ()=>Sidebar
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/client/app-dir/link.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/navigation.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$bell$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Bell$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/bell.js [app-client] (ecmascript) <export default as Bell>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$clock$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Clock$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/clock.js [app-client] (ecmascript) <export default as Clock>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$layout$2d$dashboard$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__LayoutDashboard$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/layout-dashboard.js [app-client] (ecmascript) <export default as LayoutDashboard>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$shopping$2d$cart$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ShoppingCart$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/shopping-cart.js [app-client] (ecmascript) <export default as ShoppingCart>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$package$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Package$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/package.js [app-client] (ecmascript) <export default as Package>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$file$2d$spreadsheet$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__FileSpreadsheet$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/file-spreadsheet.js [app-client] (ecmascript) <export default as FileSpreadsheet>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$file$2d$text$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__FileText$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/file-text.js [app-client] (ecmascript) <export default as FileText>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$message$2d$circle$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__MessageCircle$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/message-circle.js [app-client] (ecmascript) <export default as MessageCircle>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$settings$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Settings$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/settings.js [app-client] (ecmascript) <export default as Settings>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$shield$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Shield$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/shield.js [app-client] (ecmascript) <export default as Shield>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$file$2d$plus$2d$2$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__FilePlus2$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/file-plus-2.js [app-client] (ecmascript) <export default as FilePlus2>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$log$2d$out$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__LogOut$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/log-out.js [app-client] (ecmascript) <export default as LogOut>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$menu$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Menu$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/menu.js [app-client] (ecmascript) <export default as Menu>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$left$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronLeft$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/chevron-left.js [app-client] (ecmascript) <export default as ChevronLeft>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$right$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronRight$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/chevron-right.js [app-client] (ecmascript) <export default as ChevronRight>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$shopping$2d$bag$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ShoppingBag$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/shopping-bag.js [app-client] (ecmascript) <export default as ShoppingBag>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chart$2d$no$2d$axes$2d$column$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__BarChart2$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/chart-no-axes-column.js [app-client] (ecmascript) <export default as BarChart2>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$triangle$2d$alert$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__AlertTriangle$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/triangle-alert.js [app-client] (ecmascript) <export default as AlertTriangle>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$git$2d$branch$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__GitBranch$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/git-branch.js [app-client] (ecmascript) <export default as GitBranch>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$down$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronDown$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/chevron-down.js [app-client] (ecmascript) <export default as ChevronDown>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$users$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Users$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/users.js [app-client] (ecmascript) <export default as Users>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$key$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Key$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/key.js [app-client] (ecmascript) <export default as Key>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$credit$2d$card$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__CreditCard$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/credit-card.js [app-client] (ecmascript) <export default as CreditCard>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$components$2f$NeonCrownIcon$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/components/NeonCrownIcon.tsx [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$LanguageContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/contexts/LanguageContext.tsx [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/contexts/AuthContext.tsx [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$BranchContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/contexts/BranchContext.tsx [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$components$2f$NotificationsBell$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/components/NotificationsBell.tsx [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$components$2f$ShopSwitcher$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/components/ShopSwitcher.tsx [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$permissions$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/permissions.ts [app-client] (ecmascript)");
+;
+var _s = __turbopack_context__.k.signature();
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+const ICON_MAP = {
+    LayoutDashboard: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$layout$2d$dashboard$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__LayoutDashboard$3e$__["LayoutDashboard"],
+    MessageCircle: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$message$2d$circle$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__MessageCircle$3e$__["MessageCircle"],
+    ShoppingCart: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$shopping$2d$cart$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ShoppingCart$3e$__["ShoppingCart"],
+    Package: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$package$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Package$3e$__["Package"],
+    AlertTriangle: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$triangle$2d$alert$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__AlertTriangle$3e$__["AlertTriangle"],
+    FilePlus2: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$file$2d$plus$2d$2$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__FilePlus2$3e$__["FilePlus2"],
+    FileSpreadsheet: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$file$2d$spreadsheet$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__FileSpreadsheet$3e$__["FileSpreadsheet"],
+    FileText: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$file$2d$text$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__FileText$3e$__["FileText"],
+    BarChart2: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chart$2d$no$2d$axes$2d$column$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__BarChart2$3e$__["BarChart2"],
+    ShoppingBag: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$shopping$2d$bag$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ShoppingBag$3e$__["ShoppingBag"],
+    CreditCard: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$credit$2d$card$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__CreditCard$3e$__["CreditCard"],
+    Bell: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$bell$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Bell$3e$__["Bell"],
+    GitBranch: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$git$2d$branch$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__GitBranch$3e$__["GitBranch"],
+    Users: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$users$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Users$3e$__["Users"],
+    Shield: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$shield$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Shield$3e$__["Shield"],
+    Settings: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$settings$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Settings$3e$__["Settings"],
+    Key: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$key$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Key$3e$__["Key"]
+};
+function Sidebar() {
+    _s();
+    const pathname = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["usePathname"])();
+    const { t, direction, language, setLanguage } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$LanguageContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useLanguage"])();
+    const { logout, user, effectiveRole } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"])();
+    const branchContext = (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$BranchContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useBranch"])();
+    const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"])();
+    const [open, setOpen] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [collapsed, setCollapsed] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [branchDropdownOpen, setBranchDropdownOpen] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [now, setNow] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])({
+        "Sidebar.useState": ()=>new Date()
+    }["Sidebar.useState"]);
+    const isRtl = direction === 'rtl';
+    const branches = branchContext?.branches ?? [];
+    const activeBranch = branchContext?.activeBranch ?? null;
+    const setActiveBranchId = branchContext?.setActiveBranchId;
+    const planFeatures = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
+        "Sidebar.useMemo[planFeatures]": ()=>(0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$permissions$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getPlanFeatures"])(user?.package)
+    }["Sidebar.useMemo[planFeatures]"], [
+        user?.package
+    ]);
+    const role = effectiveRole ?? user?.role;
+    const canSeeOnlineOrders = (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$permissions$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["canAccess"])(role, 'online_orders', planFeatures);
+    const canSeeSystemAdmin = (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$permissions$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["canAccess"])(role, 'admin', planFeatures);
+    const navItems = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
+        "Sidebar.useMemo[navItems]": ()=>(0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$permissions$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getAllowedNav"])(role, planFeatures, t, language)
+    }["Sidebar.useMemo[navItems]"], [
+        role,
+        planFeatures,
+        t,
+        language
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "Sidebar.useEffect": ()=>{
+            if ("TURBOPACK compile-time falsy", 0) //TURBOPACK unreachable
+            ;
+            const saved = localStorage.getItem('sidebar-collapsed') === 'true';
+            setCollapsed(saved);
+        }
+    }["Sidebar.useEffect"], []);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "Sidebar.useEffect": ()=>{
+            const interval = window.setInterval({
+                "Sidebar.useEffect.interval": ()=>setNow(new Date())
+            }["Sidebar.useEffect.interval"], 1000);
+            return ({
+                "Sidebar.useEffect": ()=>window.clearInterval(interval)
+            })["Sidebar.useEffect"];
+        }
+    }["Sidebar.useEffect"], []);
+    const toggleCollapsed = ()=>{
+        const next = !collapsed;
+        setCollapsed(next);
+        if ("TURBOPACK compile-time truthy", 1) {
+            localStorage.setItem('sidebar-collapsed', String(next));
+        }
+    };
+    const handleAiClick = ()=>{
+        try {
+            localStorage.setItem('crown-open-ai', 'true');
+        } catch  {
+        // ignore
+        }
+        if ("TURBOPACK compile-time truthy", 1) {
+            window.dispatchEvent(new Event('crown:open-ai'));
+        }
+    };
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Fragment"], {
+        children: [
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                onClick: ()=>setOpen(true),
+                className: `md:hidden fixed top-4 ${isRtl ? 'right-4' : 'left-4'} z-50 h-10 w-10 rounded-xl bg-cyan-600 text-white shadow-[0_0_16px_rgba(0,243,255,0.4)] flex items-center justify-center`,
+                "aria-label": "Open menu",
+                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$menu$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Menu$3e$__["Menu"], {
+                    className: "h-5 w-5"
+                }, void 0, false, {
+                    fileName: "[project]/app/components/Sidebar.tsx",
+                    lineNumber: 122,
+                    columnNumber: 9
+                }, this)
+            }, void 0, false, {
+                fileName: "[project]/app/components/Sidebar.tsx",
+                lineNumber: 117,
+                columnNumber: 7
+            }, this),
+            open && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                className: "fixed inset-0 z-40 bg-black/60 md:hidden",
+                onClick: ()=>setOpen(false)
+            }, void 0, false, {
+                fileName: "[project]/app/components/Sidebar.tsx",
+                lineNumber: 126,
+                columnNumber: 9
+            }, this),
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("aside", {
+                className: `fixed top-0 ${isRtl ? 'right-0' : 'left-0'} z-50 h-full bg-[#0a0f18] border-cyan-500/40 flex flex-col justify-between transition-transform duration-300 md:static md:translate-x-0 ${collapsed ? 'md:w-20' : 'md:w-64'} w-64 ${isRtl ? 'border-l' : 'border-r'} ${open ? 'translate-x-0' : isRtl ? 'translate-x-full' : '-translate-x-full'}`,
+                children: [
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: `border-b border-cyan-500/20 ${collapsed ? 'px-4 py-6' : 'px-6 py-6'}`,
+                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                    className: `flex ${collapsed ? 'justify-center' : 'items-start gap-3'}`,
+                                    children: [
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                            className: "h-10 w-10 rounded-xl border border-cyan-500/30 bg-black/30 flex items-center justify-center shadow-[0_0_18px_rgba(0,243,255,0.22)]",
+                                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$app$2f$components$2f$NeonCrownIcon$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["NeonCrownIcon"], {
+                                                size: 24
+                                            }, void 0, false, {
+                                                fileName: "[project]/app/components/Sidebar.tsx",
+                                                lineNumber: 144,
+                                                columnNumber: 17
+                                            }, this)
+                                        }, void 0, false, {
+                                            fileName: "[project]/app/components/Sidebar.tsx",
+                                            lineNumber: 143,
+                                            columnNumber: 15
+                                        }, this),
+                                        !collapsed && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                            className: "min-w-0 flex-1",
+                                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                className: "leading-none",
+                                                children: [
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                        className: "text-[12px] font-black tracking-[0.28em] uppercase text-fuchsia-200",
+                                                        children: [
+                                                            "CROWN ",
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                className: "text-slate-100",
+                                                                children: "SERVICES"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/app/components/Sidebar.tsx",
+                                                                lineNumber: 151,
+                                                                columnNumber: 29
+                                                            }, this)
+                                                        ]
+                                                    }, void 0, true, {
+                                                        fileName: "[project]/app/components/Sidebar.tsx",
+                                                        lineNumber: 150,
+                                                        columnNumber: 21
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                        className: "mt-3 flex flex-col items-start gap-2",
+                                                        children: [
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                                className: "flex items-center gap-2",
+                                                                children: [
+                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                                        className: "inline-flex items-center gap-2 rounded-full border border-cyan-500/30 bg-black/25 px-3 py-1.5 shadow-[0_0_14px_rgba(0,243,255,0.12)]",
+                                                                        children: [
+                                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                                className: "relative flex h-2 w-2",
+                                                                                children: [
+                                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                                        className: "animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-50"
+                                                                                    }, void 0, false, {
+                                                                                        fileName: "[project]/app/components/Sidebar.tsx",
+                                                                                        lineNumber: 158,
+                                                                                        columnNumber: 27
+                                                                                    }, this),
+                                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                                        className: "relative inline-flex rounded-full h-2 w-2 bg-cyan-300 shadow-[0_0_10px_rgba(0,243,255,0.65)]"
+                                                                                    }, void 0, false, {
+                                                                                        fileName: "[project]/app/components/Sidebar.tsx",
+                                                                                        lineNumber: 159,
+                                                                                        columnNumber: 27
+                                                                                    }, this)
+                                                                                ]
+                                                                            }, void 0, true, {
+                                                                                fileName: "[project]/app/components/Sidebar.tsx",
+                                                                                lineNumber: 157,
+                                                                                columnNumber: 25
+                                                                            }, this),
+                                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$clock$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Clock$3e$__["Clock"], {
+                                                                                className: "h-3.5 w-3.5 text-cyan-300"
+                                                                            }, void 0, false, {
+                                                                                fileName: "[project]/app/components/Sidebar.tsx",
+                                                                                lineNumber: 161,
+                                                                                columnNumber: 25
+                                                                            }, this),
+                                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                                className: "font-mono text-xs text-cyan-200",
+                                                                                children: now.toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US', {
+                                                                                    hour: '2-digit',
+                                                                                    minute: '2-digit'
+                                                                                })
+                                                                            }, void 0, false, {
+                                                                                fileName: "[project]/app/components/Sidebar.tsx",
+                                                                                lineNumber: 162,
+                                                                                columnNumber: 25
+                                                                            }, this)
+                                                                        ]
+                                                                    }, void 0, true, {
+                                                                        fileName: "[project]/app/components/Sidebar.tsx",
+                                                                        lineNumber: 156,
+                                                                        columnNumber: 25
+                                                                    }, this),
+                                                                    canSeeOnlineOrders && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$app$2f$components$2f$NotificationsBell$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["NotificationsBell"], {}, void 0, false, {
+                                                                        fileName: "[project]/app/components/Sidebar.tsx",
+                                                                        lineNumber: 169,
+                                                                        columnNumber: 48
+                                                                    }, this)
+                                                                ]
+                                                            }, void 0, true, {
+                                                                fileName: "[project]/app/components/Sidebar.tsx",
+                                                                lineNumber: 155,
+                                                                columnNumber: 23
+                                                            }, this),
+                                                            user?.role === 'super_admin' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$app$2f$components$2f$ShopSwitcher$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["ShopSwitcher"], {}, void 0, false, {
+                                                                fileName: "[project]/app/components/Sidebar.tsx",
+                                                                lineNumber: 173,
+                                                                columnNumber: 56
+                                                            }, this),
+                                                            branches.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                                className: "relative",
+                                                                children: [
+                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                                        type: "button",
+                                                                        onClick: ()=>setBranchDropdownOpen((v)=>!v),
+                                                                        className: "inline-flex items-center gap-1.5 rounded-full border border-cyan-500/30 bg-black/25 px-3 py-1.5 text-[11px] text-cyan-200",
+                                                                        children: [
+                                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$git$2d$branch$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__GitBranch$3e$__["GitBranch"], {
+                                                                                className: "h-3.5 w-3.5"
+                                                                            }, void 0, false, {
+                                                                                fileName: "[project]/app/components/Sidebar.tsx",
+                                                                                lineNumber: 182,
+                                                                                columnNumber: 29
+                                                                            }, this),
+                                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                                className: "max-w-[100px] truncate",
+                                                                                children: (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$BranchContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getBranchDisplayName"])(activeBranch, language)
+                                                                            }, void 0, false, {
+                                                                                fileName: "[project]/app/components/Sidebar.tsx",
+                                                                                lineNumber: 183,
+                                                                                columnNumber: 29
+                                                                            }, this),
+                                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$down$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronDown$3e$__["ChevronDown"], {
+                                                                                className: "h-3 w-3"
+                                                                            }, void 0, false, {
+                                                                                fileName: "[project]/app/components/Sidebar.tsx",
+                                                                                lineNumber: 184,
+                                                                                columnNumber: 29
+                                                                            }, this)
+                                                                        ]
+                                                                    }, void 0, true, {
+                                                                        fileName: "[project]/app/components/Sidebar.tsx",
+                                                                        lineNumber: 177,
+                                                                        columnNumber: 27
+                                                                    }, this),
+                                                                    branchDropdownOpen && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Fragment"], {
+                                                                        children: [
+                                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                                                className: "fixed inset-0 z-10",
+                                                                                onClick: ()=>setBranchDropdownOpen(false)
+                                                                            }, void 0, false, {
+                                                                                fileName: "[project]/app/components/Sidebar.tsx",
+                                                                                lineNumber: 188,
+                                                                                columnNumber: 31
+                                                                            }, this),
+                                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                                                className: "absolute top-full left-0 mt-1 z-20 min-w-[160px] rounded-lg border border-cyan-500/30 bg-[#0b1220] py-1 shadow-xl",
+                                                                                children: branches.map((b)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                                                        type: "button",
+                                                                                        onClick: ()=>{
+                                                                                            setActiveBranchId?.(b.id);
+                                                                                            setBranchDropdownOpen(false);
+                                                                                        },
+                                                                                        className: `w-full text-left px-3 py-2 text-xs ${activeBranch?.id === b.id ? 'bg-cyan-500/20 text-cyan-200' : 'text-slate-300 hover:bg-cyan-500/10'}`,
+                                                                                        children: (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$BranchContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getBranchDisplayName"])(b, language)
+                                                                                    }, b.id, false, {
+                                                                                        fileName: "[project]/app/components/Sidebar.tsx",
+                                                                                        lineNumber: 191,
+                                                                                        columnNumber: 35
+                                                                                    }, this))
+                                                                            }, void 0, false, {
+                                                                                fileName: "[project]/app/components/Sidebar.tsx",
+                                                                                lineNumber: 189,
+                                                                                columnNumber: 31
+                                                                            }, this)
+                                                                        ]
+                                                                    }, void 0, true)
+                                                                ]
+                                                            }, void 0, true, {
+                                                                fileName: "[project]/app/components/Sidebar.tsx",
+                                                                lineNumber: 176,
+                                                                columnNumber: 25
+                                                            }, this),
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                                className: "inline-flex items-center gap-1 rounded-full border border-cyan-500/30 bg-black/25 p-1 shadow-[0_0_14px_rgba(0,243,255,0.10)]",
+                                                                children: [
+                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                                        type: "button",
+                                                                        onClick: ()=>setLanguage('ar'),
+                                                                        className: `px-3 py-1 rounded-full text-[11px] font-extrabold transition ${language === 'ar' ? 'bg-cyan-400 text-black' : 'text-cyan-100 hover:bg-white/5'}`,
+                                                                        children: "AR"
+                                                                    }, void 0, false, {
+                                                                        fileName: "[project]/app/components/Sidebar.tsx",
+                                                                        lineNumber: 210,
+                                                                        columnNumber: 25
+                                                                    }, this),
+                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                                        type: "button",
+                                                                        onClick: ()=>setLanguage('en'),
+                                                                        className: `px-3 py-1 rounded-full text-[11px] font-extrabold transition ${language === 'en' ? 'bg-cyan-400 text-black' : 'text-cyan-100 hover:bg-white/5'}`,
+                                                                        children: "EN"
+                                                                    }, void 0, false, {
+                                                                        fileName: "[project]/app/components/Sidebar.tsx",
+                                                                        lineNumber: 219,
+                                                                        columnNumber: 25
+                                                                    }, this)
+                                                                ]
+                                                            }, void 0, true, {
+                                                                fileName: "[project]/app/components/Sidebar.tsx",
+                                                                lineNumber: 209,
+                                                                columnNumber: 23
+                                                            }, this)
+                                                        ]
+                                                    }, void 0, true, {
+                                                        fileName: "[project]/app/components/Sidebar.tsx",
+                                                        lineNumber: 153,
+                                                        columnNumber: 21
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/app/components/Sidebar.tsx",
+                                                lineNumber: 149,
+                                                columnNumber: 19
+                                            }, this)
+                                        }, void 0, false, {
+                                            fileName: "[project]/app/components/Sidebar.tsx",
+                                            lineNumber: 148,
+                                            columnNumber: 17
+                                        }, this)
+                                    ]
+                                }, void 0, true, {
+                                    fileName: "[project]/app/components/Sidebar.tsx",
+                                    lineNumber: 142,
+                                    columnNumber: 13
+                                }, this)
+                            }, void 0, false, {
+                                fileName: "[project]/app/components/Sidebar.tsx",
+                                lineNumber: 141,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "px-4 py-3 hidden md:flex items-center justify-between",
+                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                    onClick: toggleCollapsed,
+                                    className: "h-9 w-9 rounded-lg border border-cyan-500/30 text-cyan-300 flex items-center justify-center",
+                                    "aria-label": "Toggle sidebar size",
+                                    children: collapsed ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$right$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronRight$3e$__["ChevronRight"], {
+                                        className: "h-4 w-4"
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/components/Sidebar.tsx",
+                                        lineNumber: 242,
+                                        columnNumber: 28
+                                    }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$left$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronLeft$3e$__["ChevronLeft"], {
+                                        className: "h-4 w-4"
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/components/Sidebar.tsx",
+                                        lineNumber: 242,
+                                        columnNumber: 67
+                                    }, this)
+                                }, void 0, false, {
+                                    fileName: "[project]/app/components/Sidebar.tsx",
+                                    lineNumber: 237,
+                                    columnNumber: 13
+                                }, this)
+                            }, void 0, false, {
+                                fileName: "[project]/app/components/Sidebar.tsx",
+                                lineNumber: 236,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("nav", {
+                                className: "px-4 py-4 space-y-4",
+                                children: [
+                                    'operations',
+                                    'inventory',
+                                    'reports',
+                                    'admin',
+                                    'system'
+                                ].map((section)=>{
+                                    const items = navItems.filter((x)=>x.section === section);
+                                    if (items.length === 0) return null;
+                                    const sectionLabel = __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$permissions$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SECTION_LABELS"][section][language];
+                                    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        children: [
+                                            !collapsed && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                className: "mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500",
+                                                children: sectionLabel
+                                            }, void 0, false, {
+                                                fileName: "[project]/app/components/Sidebar.tsx",
+                                                lineNumber: 254,
+                                                columnNumber: 21
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                className: "space-y-2",
+                                                children: items.map((item)=>{
+                                                    const Icon = ICON_MAP[item.icon] ?? __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$package$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Package$3e$__["Package"];
+                                                    const active = pathname === item.href || item.href === '/dashboard?ai=1' && pathname === '/dashboard';
+                                                    const onClick = item.id === 'ai' ? handleAiClick : undefined;
+                                                    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
+                                                        href: item.href,
+                                                        onClick: ()=>{
+                                                            onClick?.();
+                                                            setOpen(false);
+                                                        },
+                                                        className: `flex items-center gap-3 px-4 py-3 rounded-xl transition ${item.glow ? 'bg-fuchsia-500/10 border border-fuchsia-500/40 text-fuchsia-200 shadow-[0_0_16px_rgba(236,72,153,0.35)] hover:bg-fuchsia-500/10' : active ? 'bg-cyan-500/10 border border-cyan-500/40 text-cyan-300 shadow-[0_0_14px_rgba(0,243,255,0.35)]' : 'text-slate-300 hover:text-cyan-300 hover:bg-cyan-500/10'}`,
+                                                        children: [
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(Icon, {
+                                                                className: `h-5 w-5 shrink-0 ${item.glow ? 'text-fuchsia-300' : 'text-cyan-300'}`
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/app/components/Sidebar.tsx",
+                                                                lineNumber: 279,
+                                                                columnNumber: 27
+                                                            }, this),
+                                                            !collapsed && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                className: "text-sm font-semibold",
+                                                                children: item.label
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/app/components/Sidebar.tsx",
+                                                                lineNumber: 280,
+                                                                columnNumber: 42
+                                                            }, this)
+                                                        ]
+                                                    }, item.href + item.id, true, {
+                                                        fileName: "[project]/app/components/Sidebar.tsx",
+                                                        lineNumber: 264,
+                                                        columnNumber: 25
+                                                    }, this);
+                                                })
+                                            }, void 0, false, {
+                                                fileName: "[project]/app/components/Sidebar.tsx",
+                                                lineNumber: 258,
+                                                columnNumber: 19
+                                            }, this)
+                                        ]
+                                    }, section, true, {
+                                        fileName: "[project]/app/components/Sidebar.tsx",
+                                        lineNumber: 252,
+                                        columnNumber: 17
+                                    }, this);
+                                })
+                            }, void 0, false, {
+                                fileName: "[project]/app/components/Sidebar.tsx",
+                                lineNumber: 246,
+                                columnNumber: 11
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/app/components/Sidebar.tsx",
+                        lineNumber: 139,
+                        columnNumber: 9
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        className: "px-4 pb-6 space-y-3",
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                onClick: ()=>{
+                                    logout();
+                                    router.replace('/login');
+                                },
+                                className: "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:text-cyan-300 hover:bg-cyan-500/10 transition border border-cyan-500/20",
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$log$2d$out$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__LogOut$3e$__["LogOut"], {
+                                        className: "h-5 w-5 text-cyan-300"
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/components/Sidebar.tsx",
+                                        lineNumber: 299,
+                                        columnNumber: 13
+                                    }, this),
+                                    !collapsed && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                        className: "text-sm font-semibold",
+                                        children: t('nav.logout')
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/components/Sidebar.tsx",
+                                        lineNumber: 300,
+                                        columnNumber: 28
+                                    }, this)
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/app/components/Sidebar.tsx",
+                                lineNumber: 292,
+                                columnNumber: 11
+                            }, this),
+                            !collapsed && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "text-xs text-slate-500 text-center",
+                                children: "Crown Services — By Ahmed 2025"
+                            }, void 0, false, {
+                                fileName: "[project]/app/components/Sidebar.tsx",
+                                lineNumber: 303,
+                                columnNumber: 13
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/app/components/Sidebar.tsx",
+                        lineNumber: 291,
+                        columnNumber: 9
+                    }, this)
+                ]
+            }, void 0, true, {
+                fileName: "[project]/app/components/Sidebar.tsx",
+                lineNumber: 132,
+                columnNumber: 7
+            }, this)
+        ]
+    }, void 0, true);
+}
+_s(Sidebar, "jdwmf2Q+a33+3j6AqRTcuEfw8VM=", false, function() {
+    return [
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["usePathname"],
+        __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$LanguageContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useLanguage"],
+        __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"],
+        __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$BranchContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useBranch"],
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"]
+    ];
+});
+_c = Sidebar;
+var _c;
+__turbopack_context__.k.register(_c, "Sidebar");
+if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
+    __turbopack_context__.k.registerExports(__turbopack_context__.m, globalThis.$RefreshHelpers$);
+}
+}),
+"[project]/app/guards/useRouteGuard.ts [app-client] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "getAccessDeniedMessage",
+    ()=>getAccessDeniedMessage,
+    "useRouteGuard",
+    ()=>useRouteGuard
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/navigation.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$permissions$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/permissions.ts [app-client] (ecmascript)");
+var _s = __turbopack_context__.k.signature();
+'use client';
+;
+;
+;
+const ACCESS_DENIED_MESSAGE_AR = 'ليس لديك صلاحية للوصول إلى هذه الصفحة.';
+const ACCESS_DENIED_MESSAGE_EN = "You don't have permission to access this page.";
+function getAccessDeniedMessage(lang = 'en') {
+    return lang === 'ar' ? ACCESS_DENIED_MESSAGE_AR : ACCESS_DENIED_MESSAGE_EN;
+}
+/**
+ * Resolve the feature for a pathname (handles partial matches for nested routes)
+ */ function resolveFeature(pathname) {
+    // Exact match first
+    if (__TURBOPACK__imported__module__$5b$project$5d2f$app$2f$permissions$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["ROUTE_FEATURE_MAP"][pathname]) return __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$permissions$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["ROUTE_FEATURE_MAP"][pathname];
+    // Nested routes: /store-admin/orders/123 -> online_orders, /inventory/import-fixes/1 -> excel_import
+    if (pathname.startsWith('/store-admin/orders')) return 'online_orders';
+    if (pathname.startsWith('/store-admin/payments')) return 'payments_admin';
+    if (pathname.startsWith('/store-admin/reports')) return 'reports';
+    if (pathname.startsWith('/store-admin/notifications')) return 'notifications';
+    if (pathname.startsWith('/store-admin/branches')) return 'branches';
+    if (pathname.startsWith('/store-admin/users')) return 'users';
+    if (pathname.startsWith('/store-admin/domains')) return 'domains';
+    if (pathname.startsWith('/store-admin/store')) return 'store_management';
+    if (pathname.startsWith('/store-admin/inventory')) return 'inventory_slow';
+    if (pathname.startsWith('/inventory/import-fixes')) return 'excel_import';
+    if (pathname.startsWith('/admin/codes')) return 'admin_codes';
+    if (pathname.startsWith('/admin')) return 'admin';
+    return __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$permissions$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["ROUTE_FEATURE_MAP"][pathname];
+}
+function useRouteGuard(user, loading, options = {}) {
+    _s();
+    const pathname = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["usePathname"])();
+    const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"])();
+    const { feature: explicitFeature, showDenied = false, effectiveRole: effectiveRoleOpt } = options;
+    const feature = explicitFeature ?? resolveFeature(pathname);
+    const planFeatures = (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$permissions$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getPlanFeatures"])(user?.package);
+    const role = effectiveRoleOpt !== undefined ? effectiveRoleOpt : user?.role;
+    const allowed = !!(role && feature && (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$permissions$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["canAccess"])(role, feature, planFeatures));
+    const redirect = (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$permissions$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getDefaultRedirect"])(role ?? null);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "useRouteGuard.useEffect": ()=>{
+            if (loading) return;
+            if (!user) {
+                router.replace('/login');
+                return;
+            }
+            if (!allowed) {
+                if (showDenied) {
+                    router.replace(`/access-denied?from=${encodeURIComponent(pathname)}`);
+                } else {
+                    router.replace(redirect);
+                }
+            }
+        }
+    }["useRouteGuard.useEffect"], [
+        loading,
+        user,
+        allowed,
+        redirect,
+        showDenied,
+        pathname,
+        router
+    ]);
+    return {
+        allowed,
+        redirect,
+        showDenied
+    };
+}
+_s(useRouteGuard, "qIbXzL/glMgPmW/TFWAi/FqCkIk=", false, function() {
+    return [
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["usePathname"],
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"]
+    ];
+});
+if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
+    __turbopack_context__.k.registerExports(__turbopack_context__.m, globalThis.$RefreshHelpers$);
+}
+}),
+"[project]/app/components/AIAssistant.tsx [app-client] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "AIAssistant",
+    ()=>AIAssistant
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$mic$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Mic$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/mic.js [app-client] (ecmascript) <export default as Mic>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$send$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Send$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/send.js [app-client] (ecmascript) <export default as Send>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$message$2d$circle$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__MessageCircle$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/message-circle.js [app-client] (ecmascript) <export default as MessageCircle>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$x$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__X$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/x.js [app-client] (ecmascript) <export default as X>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$copy$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Copy$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/copy.js [app-client] (ecmascript) <export default as Copy>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$volume$2d$2$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Volume2$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/volume-2.js [app-client] (ecmascript) <export default as Volume2>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$volume$2d$x$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__VolumeX$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/volume-x.js [app-client] (ecmascript) <export default as VolumeX>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$square$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Square$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/square.js [app-client] (ecmascript) <export default as Square>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$LanguageContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/contexts/LanguageContext.tsx [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$api$2d$config$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/api-config.ts [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/navigation.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/contexts/AuthContext.tsx [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$BranchContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/contexts/BranchContext.tsx [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$permissions$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/permissions.ts [app-client] (ecmascript)");
+;
+var _s = __turbopack_context__.k.signature();
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+const VOICE_STORAGE_KEY = 'crown-ai-voice-enabled';
+/** Strip markdown and bullets before display and TTS so voice never says "نجوم". */ function sanitizeAssistantText(text) {
+    if (!text || typeof text !== 'string') return '';
+    return text.replace(/\*\*|__|\*|`|#+\s?|>\s?|```/g, '').replace(/[•]+/g, '-').replace(/\s+/g, ' ').trim();
+}
+const AI_EXAMPLE_KEYS = [
+    'ai.example1',
+    'ai.example2',
+    'ai.example3',
+    'ai.example4'
+];
+const AI_QUICK_KEYS = [
+    'ai.quick1',
+    'ai.quick2',
+    'ai.quick3',
+    'ai.quick4'
+];
+function AIAssistant() {
+    _s();
+    const { t, direction, language } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$LanguageContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useLanguage"])();
+    const pathname = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["usePathname"])();
+    const { user, effectiveRole } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"])();
+    const branchCtx = (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$BranchContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useBranch"])();
+    const planFeatures = (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$permissions$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getPlanFeatures"])(user?.package);
+    const lang = language === 'ar' ? 'ar' : 'en';
+    const [open, setOpen] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [input, setInput] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])('');
+    const [messages, setMessages] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])([]);
+    const [loading, setLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [listening, setListening] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [uploadingVoice, setUploadingVoice] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [copyToast, setCopyToast] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [errorToast, setErrorToast] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
+    const [transcribeError, setTranscribeError] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [voiceEnabled, setVoiceEnabled] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [isPlaying, setIsPlaying] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [aiMode, setAiMode] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])('unknown');
+    const recognitionRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
+    const textareaRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
+    const sendMessageRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])({
+        "AIAssistant.useRef[sendMessageRef]": ()=>Promise.resolve()
+    }["AIAssistant.useRef[sendMessageRef]"]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "AIAssistant.useEffect": ()=>{
+            if ("TURBOPACK compile-time falsy", 0) //TURBOPACK unreachable
+            ;
+            const handler = {
+                "AIAssistant.useEffect.handler": ()=>setOpen(true)
+            }["AIAssistant.useEffect.handler"];
+            window.addEventListener('crown:open-ai', handler);
+            try {
+                if (localStorage.getItem('crown-open-ai') === 'true') {
+                    localStorage.removeItem('crown-open-ai');
+                    setOpen(true);
+                }
+                const v = localStorage.getItem(VOICE_STORAGE_KEY);
+                setVoiceEnabled(v === 'true');
+            } catch  {
+            // ignore
+            }
+            return ({
+                "AIAssistant.useEffect": ()=>window.removeEventListener('crown:open-ai', handler)
+            })["AIAssistant.useEffect"];
+        }
+    }["AIAssistant.useEffect"], []);
+    const toggleVoice = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+        "AIAssistant.useCallback[toggleVoice]": ()=>{
+            const next = !voiceEnabled;
+            setVoiceEnabled(next);
+            if ("TURBOPACK compile-time truthy", 1) {
+                localStorage.setItem(VOICE_STORAGE_KEY, String(next));
+                if (!next && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+                setIsPlaying(false);
+            }
+        }
+    }["AIAssistant.useCallback[toggleVoice]"], [
+        voiceEnabled
+    ]);
+    const stopVoice = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+        "AIAssistant.useCallback[stopVoice]": ()=>{
+            if (("TURBOPACK compile-time value", "object") !== 'undefined' && 'speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                setIsPlaying(false);
+            }
+        }
+    }["AIAssistant.useCallback[stopVoice]"], []);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "AIAssistant.useEffect": ()=>{
+            if ("TURBOPACK compile-time falsy", 0) //TURBOPACK unreachable
+            ;
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) return;
+            const recognition = new SpeechRecognition();
+            recognition.lang = lang === 'en' ? 'en-US' : 'ar-EG';
+            recognition.interimResults = false;
+            recognition.onresult = ({
+                "AIAssistant.useEffect": (event)=>{
+                    const text = (event.results[0]?.[0]?.transcript ?? '').trim();
+                    setInput(text);
+                    setListening(false);
+                    if (text) sendMessageRef.current(text, true);
+                    else setTranscribeError(true);
+                }
+            })["AIAssistant.useEffect"];
+            recognition.onerror = ({
+                "AIAssistant.useEffect": ()=>{
+                    setListening(false);
+                    setTranscribeError(true);
+                }
+            })["AIAssistant.useEffect"];
+            recognition.onend = ({
+                "AIAssistant.useEffect": ()=>setListening(false)
+            })["AIAssistant.useEffect"];
+            recognitionRef.current = recognition;
+        }
+    }["AIAssistant.useEffect"], [
+        lang
+    ]);
+    // Fetch AI status when the assistant is opened
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "AIAssistant.useEffect": ()=>{
+            if (!open) return;
+            ({
+                "AIAssistant.useEffect": async ()=>{
+                    try {
+                        const token = ("TURBOPACK compile-time truthy", 1) ? localStorage.getItem('token') : "TURBOPACK unreachable";
+                        const resp = await fetch(`${__TURBOPACK__imported__module__$5b$project$5d2f$app$2f$api$2d$config$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["API_BASE_URL"]}/ai/status`, {
+                            method: 'GET',
+                            credentials: 'include',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                ...token ? {
+                                    Authorization: `Bearer ${token}`
+                                } : {}
+                            }
+                        });
+                        const json = await resp.json().catch({
+                            "AIAssistant.useEffect": ()=>({})
+                        }["AIAssistant.useEffect"]);
+                        if (json && (json.mode === 'cloud' || json.mode === 'offline')) {
+                            setAiMode(json.mode);
+                        } else {
+                            setAiMode('unknown');
+                        }
+                    } catch  {
+                        setAiMode('offline');
+                    }
+                }
+            })["AIAssistant.useEffect"]();
+        }
+    }["AIAssistant.useEffect"], [
+        open
+    ]);
+    const sendMessage = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+        "AIAssistant.useCallback[sendMessage]": async (text, fromVoice = false)=>{
+            const trimmed = typeof text === 'string' ? text.trim() : '';
+            if (!trimmed) return;
+            setMessages({
+                "AIAssistant.useCallback[sendMessage]": (prev)=>[
+                        ...prev,
+                        {
+                            role: 'user',
+                            content: trimmed
+                        }
+                    ]
+            }["AIAssistant.useCallback[sendMessage]"]);
+            setInput('');
+            setLoading(true);
+            if (fromVoice) setUploadingVoice(true);
+            setErrorToast(null);
+            try {
+                const token = ("TURBOPACK compile-time truthy", 1) ? localStorage.getItem('token') : "TURBOPACK unreachable";
+                const history = messages.slice(-16).map({
+                    "AIAssistant.useCallback[sendMessage].history": (m)=>({
+                            role: m.role,
+                            content: m.content
+                        })
+                }["AIAssistant.useCallback[sendMessage].history"]);
+                const u = user;
+                const shopId = u?.shop_id ?? u?.shopId ?? (("TURBOPACK compile-time truthy", 1) ? localStorage.getItem('crown-active-shop-id') : "TURBOPACK unreachable");
+                const branchId = ("TURBOPACK compile-time value", "object") !== 'undefined' && shopId ? localStorage.getItem(`crown-active-branch-${shopId}`) : null;
+                const context = {
+                    userId: u?.id ?? u?.userId,
+                    shopId: shopId ?? undefined,
+                    branchId: branchId ?? undefined,
+                    pathname: pathname ?? '',
+                    effectiveRole: effectiveRole ?? user?.role,
+                    planFeatures,
+                    lang
+                };
+                const response = await fetch(`${__TURBOPACK__imported__module__$5b$project$5d2f$app$2f$api$2d$config$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["API_BASE_URL"]}/chat`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...token ? {
+                            Authorization: `Bearer ${token}`
+                        } : {}
+                    },
+                    body: JSON.stringify({
+                        message: trimmed,
+                        lang,
+                        context,
+                        history
+                    })
+                });
+                const data = await response.json().catch({
+                    "AIAssistant.useCallback[sendMessage]": ()=>({})
+                }["AIAssistant.useCallback[sendMessage]"]);
+                const isAiUnavailable = data && data.ok === false && data.error === 'AI_UNAVAILABLE';
+                const preferredMessage = lang === 'ar' ? data?.message_ar || data?.messageAr || data?.message : data?.message_en || data?.messageEn || data?.message;
+                const isOfflineMode = data && data.mode === 'offline';
+                if (isOfflineMode) {
+                    const statusMsg = preferredMessage || (lang === 'ar' ? 'المساعد السحابي غير متاح حالياً، سيتم استخدام المساعدة المحلية.' : 'AI cloud unavailable, using local help.');
+                    const answerText = data?.answer || preferredMessage || (lang === 'ar' ? 'يمكنك متابعة العمل، وسوف أساعدك بالشرح من داخل النظام بدون اتصال بسحابة AI.' : 'You can keep working; I will help using local in-app guidance without cloud AI.');
+                    setAiMode('offline');
+                    setErrorToast(null);
+                    setMessages({
+                        "AIAssistant.useCallback[sendMessage]": (prev)=>[
+                                ...prev,
+                                {
+                                    role: 'assistant',
+                                    content: statusMsg
+                                },
+                                {
+                                    role: 'assistant',
+                                    content: answerText
+                                }
+                            ]
+                    }["AIAssistant.useCallback[sendMessage]"]);
+                    return;
+                }
+                if (!response.ok || data?.ok === false) {
+                    const fallback = lang === 'ar' ? isAiUnavailable ? 'المساعد غير متاح حالياً. يرجى إعداد مفتاح AI صحيح في الخادم.' : 'فشل الاتصال بالمساعد' : isAiUnavailable ? 'AI is temporarily unavailable. Please configure a valid AI API key on the server.' : 'Failed to reach assistant';
+                    const errMsg = preferredMessage || data?.error || fallback;
+                    setErrorToast(errMsg);
+                    setMessages({
+                        "AIAssistant.useCallback[sendMessage]": (prev)=>[
+                                ...prev,
+                                {
+                                    role: 'assistant',
+                                    content: errMsg
+                                }
+                            ]
+                    }["AIAssistant.useCallback[sendMessage]"]);
+                    return;
+                }
+                const reply = data?.reply ?? data?.message ?? data?.text ?? '';
+                if (reply) {
+                    setMessages({
+                        "AIAssistant.useCallback[sendMessage]": (prev)=>[
+                                ...prev,
+                                {
+                                    role: 'assistant',
+                                    content: reply
+                                }
+                            ]
+                    }["AIAssistant.useCallback[sendMessage]"]);
+                    setAiMode('cloud');
+                }
+                const voiceOn = ("TURBOPACK compile-time value", "object") !== 'undefined' && localStorage.getItem(VOICE_STORAGE_KEY) === 'true';
+                if (reply && ("TURBOPACK compile-time value", "object") !== 'undefined' && 'speechSynthesis' in window && voiceOn) {
+                    try {
+                        window.speechSynthesis.cancel();
+                        const cleanReply = sanitizeAssistantText(reply);
+                        if (!cleanReply) return;
+                        setIsPlaying(true);
+                        const utter = new SpeechSynthesisUtterance(cleanReply);
+                        const ttsLang = data?.ttsLang || (data?.lang === 'ar' ? 'ar-EG' : 'en-US');
+                        utter.lang = ttsLang;
+                        const voices = window.speechSynthesis.getVoices?.() || [];
+                        const preferred = voices.find({
+                            "AIAssistant.useCallback[sendMessage]": (v)=>v.lang === ttsLang
+                        }["AIAssistant.useCallback[sendMessage]"]) || voices.find({
+                            "AIAssistant.useCallback[sendMessage]": (v)=>v.lang?.startsWith(ttsLang.split('-')[0])
+                        }["AIAssistant.useCallback[sendMessage]"]);
+                        if (preferred) utter.voice = preferred;
+                        utter.onend = ({
+                            "AIAssistant.useCallback[sendMessage]": ()=>setIsPlaying(false)
+                        })["AIAssistant.useCallback[sendMessage]"];
+                        utter.onerror = ({
+                            "AIAssistant.useCallback[sendMessage]": ()=>setIsPlaying(false)
+                        })["AIAssistant.useCallback[sendMessage]"];
+                        window.speechSynthesis.speak(utter);
+                    } catch  {
+                        setIsPlaying(false);
+                    }
+                }
+            } catch (_err) {
+                const errMsg = lang === 'ar' ? 'حدث خطأ أثناء الاتصال بالمساعد.' : 'An error occurred while contacting the assistant.';
+                setErrorToast(errMsg);
+                setMessages({
+                    "AIAssistant.useCallback[sendMessage]": (prev)=>[
+                            ...prev,
+                            {
+                                role: 'assistant',
+                                content: errMsg
+                            }
+                        ]
+                }["AIAssistant.useCallback[sendMessage]"]);
+            } finally{
+                setLoading(false);
+                setUploadingVoice(false);
+            }
+        }
+    }["AIAssistant.useCallback[sendMessage]"], [
+        lang,
+        messages,
+        pathname,
+        user,
+        effectiveRole,
+        planFeatures
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "AIAssistant.useEffect": ()=>{
+            sendMessageRef.current = sendMessage;
+        }
+    }["AIAssistant.useEffect"], [
+        sendMessage
+    ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "AIAssistant.useEffect": ()=>{
+            if (!transcribeError) return;
+            const t = setTimeout({
+                "AIAssistant.useEffect.t": ()=>setTranscribeError(false)
+            }["AIAssistant.useEffect.t"], 2500);
+            return ({
+                "AIAssistant.useEffect": ()=>clearTimeout(t)
+            })["AIAssistant.useEffect"];
+        }
+    }["AIAssistant.useEffect"], [
+        transcribeError
+    ]);
+    const handleKeyDown = (e)=>{
+        if (e.nativeEvent.isComposing) return;
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage(input);
+        }
+    };
+    const copyReply = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+        "AIAssistant.useCallback[copyReply]": (content)=>{
+            if (typeof navigator?.clipboard?.writeText === 'function') {
+                navigator.clipboard.writeText(content);
+                setCopyToast(true);
+                setTimeout({
+                    "AIAssistant.useCallback[copyReply]": ()=>setCopyToast(false)
+                }["AIAssistant.useCallback[copyReply]"], 1500);
+            }
+        }
+    }["AIAssistant.useCallback[copyReply]"], []);
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Fragment"], {
+        children: [
+            !open && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                onClick: ()=>setOpen(true),
+                className: "fixed bottom-6 left-6 z-50 h-14 w-14 rounded-full bg-cyan-600 text-white shadow-[0_0_20px_rgba(0,243,255,0.5)] flex items-center justify-center",
+                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$message$2d$circle$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__MessageCircle$3e$__["MessageCircle"], {
+                    className: "h-6 w-6"
+                }, void 0, false, {
+                    fileName: "[project]/app/components/AIAssistant.tsx",
+                    lineNumber: 302,
+                    columnNumber: 11
+                }, this)
+            }, void 0, false, {
+                fileName: "[project]/app/components/AIAssistant.tsx",
+                lineNumber: 298,
+                columnNumber: 9
+            }, this),
+            open && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                className: "fixed bottom-6 left-6 z-50 w-96 max-w-[90vw] bg-[#0b1220] border border-cyan-500/40 rounded-2xl shadow-[0_0_25px_rgba(0,243,255,0.35)] flex flex-col max-h-[85vh]",
+                dir: direction,
+                children: [
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        className: "flex items-center justify-between px-4 py-3 border-b border-cyan-500/20 shrink-0",
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "flex flex-col gap-0.5",
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "flex items-center gap-2 text-cyan-300 font-semibold",
+                                        children: [
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$message$2d$circle$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__MessageCircle$3e$__["MessageCircle"], {
+                                                className: "h-4 w-4"
+                                            }, void 0, false, {
+                                                fileName: "[project]/app/components/AIAssistant.tsx",
+                                                lineNumber: 314,
+                                                columnNumber: 17
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                children: t('ai.title')
+                                            }, void 0, false, {
+                                                fileName: "[project]/app/components/AIAssistant.tsx",
+                                                lineNumber: 315,
+                                                columnNumber: 17
+                                            }, this)
+                                        ]
+                                    }, void 0, true, {
+                                        fileName: "[project]/app/components/AIAssistant.tsx",
+                                        lineNumber: 313,
+                                        columnNumber: 15
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                        className: "text-xs text-cyan-300/70",
+                                        children: t('ai.subtitle')
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/components/AIAssistant.tsx",
+                                        lineNumber: 317,
+                                        columnNumber: 15
+                                    }, this),
+                                    aiMode !== 'unknown' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                        className: `mt-0.5 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] ${aiMode === 'cloud' ? 'bg-emerald-500/15 text-emerald-200 border border-emerald-500/40' : 'bg-amber-500/15 text-amber-200 border border-amber-500/40'}`,
+                                        children: aiMode === 'cloud' ? language === 'ar' ? 'وضع السحابة (Gemini)' : 'Cloud AI (Gemini)' : language === 'ar' ? 'وضع مساعدة محلية (بدون سحابة)' : 'Offline Help Mode'
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/components/AIAssistant.tsx",
+                                        lineNumber: 319,
+                                        columnNumber: 17
+                                    }, this)
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/app/components/AIAssistant.tsx",
+                                lineNumber: 312,
+                                columnNumber: 13
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "flex items-center gap-1",
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                        type: "button",
+                                        onClick: toggleVoice,
+                                        title: voiceEnabled ? language === 'ar' ? 'إيقاف الصوت' : 'Voice Off' : language === 'ar' ? 'تشغيل الصوت' : 'Voice On',
+                                        className: `p-1.5 rounded-lg border ${voiceEnabled ? 'border-cyan-500/50 bg-cyan-500/20 text-cyan-200' : 'border-cyan-500/20 text-cyan-500/70 hover:text-cyan-300'}`,
+                                        children: voiceEnabled ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$volume$2d$2$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Volume2$3e$__["Volume2"], {
+                                            className: "h-4 w-4"
+                                        }, void 0, false, {
+                                            fileName: "[project]/app/components/AIAssistant.tsx",
+                                            lineNumber: 347,
+                                            columnNumber: 33
+                                        }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$volume$2d$x$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__VolumeX$3e$__["VolumeX"], {
+                                            className: "h-4 w-4"
+                                        }, void 0, false, {
+                                            fileName: "[project]/app/components/AIAssistant.tsx",
+                                            lineNumber: 347,
+                                            columnNumber: 67
+                                        }, this)
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/components/AIAssistant.tsx",
+                                        lineNumber: 337,
+                                        columnNumber: 15
+                                    }, this),
+                                    isPlaying && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                        type: "button",
+                                        onClick: stopVoice,
+                                        title: language === 'ar' ? 'إيقاف' : 'Stop',
+                                        className: "p-1.5 rounded-lg border border-red-500/40 bg-red-500/20 text-red-200 hover:bg-red-500/30",
+                                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$square$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Square$3e$__["Square"], {
+                                            className: "h-4 w-4"
+                                        }, void 0, false, {
+                                            fileName: "[project]/app/components/AIAssistant.tsx",
+                                            lineNumber: 356,
+                                            columnNumber: 19
+                                        }, this)
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/components/AIAssistant.tsx",
+                                        lineNumber: 350,
+                                        columnNumber: 17
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                        onClick: ()=>setOpen(false),
+                                        className: "text-cyan-300 hover:text-white",
+                                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$x$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__X$3e$__["X"], {
+                                            className: "h-4 w-4"
+                                        }, void 0, false, {
+                                            fileName: "[project]/app/components/AIAssistant.tsx",
+                                            lineNumber: 360,
+                                            columnNumber: 17
+                                        }, this)
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/components/AIAssistant.tsx",
+                                        lineNumber: 359,
+                                        columnNumber: 15
+                                    }, this)
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/app/components/AIAssistant.tsx",
+                                lineNumber: 336,
+                                columnNumber: 13
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/app/components/AIAssistant.tsx",
+                        lineNumber: 311,
+                        columnNumber: 11
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        className: "p-4 space-y-3 max-h-72 overflow-y-auto shrink min-h-0",
+                        children: [
+                            messages.length === 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "space-y-2",
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                        className: "text-xs text-cyan-300/80 font-medium",
+                                        children: t('ai.examples')
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/components/AIAssistant.tsx",
+                                        lineNumber: 368,
+                                        columnNumber: 17
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "flex flex-col gap-1.5",
+                                        children: AI_EXAMPLE_KEYS.map((key)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                type: "button",
+                                                onClick: ()=>setInput(t(key)),
+                                                className: "text-left text-sm px-3 py-2 rounded-xl border border-cyan-500/25 bg-cyan-500/5 text-slate-200 hover:bg-cyan-500/15 hover:border-cyan-500/40",
+                                                children: t(key)
+                                            }, key, false, {
+                                                fileName: "[project]/app/components/AIAssistant.tsx",
+                                                lineNumber: 371,
+                                                columnNumber: 21
+                                            }, this))
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/components/AIAssistant.tsx",
+                                        lineNumber: 369,
+                                        columnNumber: 17
+                                    }, this)
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/app/components/AIAssistant.tsx",
+                                lineNumber: 367,
+                                columnNumber: 15
+                            }, this),
+                            messages.map((m, idx)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                    className: `text-sm px-3 py-2 rounded-xl ${m.role === 'user' ? 'bg-cyan-500/20 text-cyan-100 border border-cyan-500/30' : 'bg-fuchsia-500/10 text-slate-200 border border-fuchsia-500/30'}`,
+                                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "flex items-start justify-between gap-2",
+                                        children: [
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                className: "flex-1 whitespace-pre-wrap",
+                                                children: m.role === 'assistant' ? sanitizeAssistantText(m.content) || m.content : m.content
+                                            }, void 0, false, {
+                                                fileName: "[project]/app/components/AIAssistant.tsx",
+                                                lineNumber: 393,
+                                                columnNumber: 19
+                                            }, this),
+                                            m.role === 'assistant' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                type: "button",
+                                                onClick: ()=>copyReply(sanitizeAssistantText(m.content) || m.content),
+                                                className: "shrink-0 p-1 rounded text-cyan-300 hover:bg-cyan-500/20",
+                                                title: t('ai.copy'),
+                                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$copy$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Copy$3e$__["Copy"], {
+                                                    className: "h-3.5 w-3.5"
+                                                }, void 0, false, {
+                                                    fileName: "[project]/app/components/AIAssistant.tsx",
+                                                    lineNumber: 403,
+                                                    columnNumber: 23
+                                                }, this)
+                                            }, void 0, false, {
+                                                fileName: "[project]/app/components/AIAssistant.tsx",
+                                                lineNumber: 397,
+                                                columnNumber: 21
+                                            }, this)
+                                        ]
+                                    }, void 0, true, {
+                                        fileName: "[project]/app/components/AIAssistant.tsx",
+                                        lineNumber: 392,
+                                        columnNumber: 17
+                                    }, this)
+                                }, `msg-${idx}-${m.role}`, false, {
+                                    fileName: "[project]/app/components/AIAssistant.tsx",
+                                    lineNumber: 384,
+                                    columnNumber: 15
+                                }, this)),
+                            loading && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "text-xs text-cyan-300",
+                                children: uploadingVoice ? t('ai.uploading') : '...'
+                            }, void 0, false, {
+                                fileName: "[project]/app/components/AIAssistant.tsx",
+                                lineNumber: 410,
+                                columnNumber: 15
+                            }, this),
+                            copyToast && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "fixed bottom-24 left-8 px-3 py-2 rounded-lg bg-cyan-600 text-white text-xs z-50 shadow-lg",
+                                children: t('ai.copied')
+                            }, void 0, false, {
+                                fileName: "[project]/app/components/AIAssistant.tsx",
+                                lineNumber: 415,
+                                columnNumber: 15
+                            }, this),
+                            transcribeError && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "fixed bottom-24 left-8 px-3 py-2 rounded-lg bg-amber-600 text-white text-xs z-50 shadow-lg",
+                                children: t('ai.transcribeError')
+                            }, void 0, false, {
+                                fileName: "[project]/app/components/AIAssistant.tsx",
+                                lineNumber: 420,
+                                columnNumber: 15
+                            }, this),
+                            errorToast && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "text-xs text-red-300 px-2 py-1 rounded bg-red-500/10",
+                                children: errorToast
+                            }, void 0, false, {
+                                fileName: "[project]/app/components/AIAssistant.tsx",
+                                lineNumber: 425,
+                                columnNumber: 15
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/app/components/AIAssistant.tsx",
+                        lineNumber: 365,
+                        columnNumber: 11
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        className: "p-3 border-t border-cyan-500/20 shrink-0 space-y-2",
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "flex flex-wrap gap-1.5",
+                                children: AI_QUICK_KEYS.map((key)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                        type: "button",
+                                        onClick: ()=>sendMessage(t(key)),
+                                        disabled: loading,
+                                        className: "text-xs px-2.5 py-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-50",
+                                        children: t(key)
+                                    }, key, false, {
+                                        fileName: "[project]/app/components/AIAssistant.tsx",
+                                        lineNumber: 434,
+                                        columnNumber: 17
+                                    }, this))
+                            }, void 0, false, {
+                                fileName: "[project]/app/components/AIAssistant.tsx",
+                                lineNumber: 432,
+                                columnNumber: 13
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "flex items-end gap-2",
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                        type: "button",
+                                        onClick: ()=>{
+                                            if (!recognitionRef.current || listening) return;
+                                            setTranscribeError(false);
+                                            try {
+                                                recognitionRef.current.stop();
+                                            } catch  {
+                                            // ignore
+                                            }
+                                            setListening(true);
+                                            try {
+                                                recognitionRef.current.start();
+                                            } catch  {
+                                                setListening(false);
+                                            }
+                                        },
+                                        className: `h-10 w-10 rounded-xl flex items-center justify-center border border-cyan-500/30 shrink-0 ${listening ? 'bg-red-500/30 text-red-100' : 'text-cyan-300'}`,
+                                        title: listening ? t('ai.stop') : t('ai.voice'),
+                                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$mic$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Mic$3e$__["Mic"], {
+                                            className: "h-4 w-4"
+                                        }, void 0, false, {
+                                            fileName: "[project]/app/components/AIAssistant.tsx",
+                                            lineNumber: 468,
+                                            columnNumber: 15
+                                        }, this)
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/components/AIAssistant.tsx",
+                                        lineNumber: 446,
+                                        columnNumber: 13
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("textarea", {
+                                        ref: textareaRef,
+                                        value: input,
+                                        onChange: (e)=>setInput(e.target.value),
+                                        onKeyDown: handleKeyDown,
+                                        placeholder: t('ai.placeholder'),
+                                        rows: 1,
+                                        className: "flex-1 min-h-[40px] max-h-24 resize-none bg-[#0f172a] border border-cyan-500/20 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-400"
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/components/AIAssistant.tsx",
+                                        lineNumber: 470,
+                                        columnNumber: 13
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                        type: "button",
+                                        onClick: ()=>sendMessage(input),
+                                        disabled: loading,
+                                        className: "h-10 px-4 rounded-xl bg-cyan-600 text-white flex items-center gap-2 shrink-0 disabled:opacity-50",
+                                        children: [
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$send$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Send$3e$__["Send"], {
+                                                className: "h-4 w-4"
+                                            }, void 0, false, {
+                                                fileName: "[project]/app/components/AIAssistant.tsx",
+                                                lineNumber: 485,
+                                                columnNumber: 15
+                                            }, this),
+                                            t('ai.send')
+                                        ]
+                                    }, void 0, true, {
+                                        fileName: "[project]/app/components/AIAssistant.tsx",
+                                        lineNumber: 479,
+                                        columnNumber: 13
+                                    }, this)
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/app/components/AIAssistant.tsx",
+                                lineNumber: 445,
+                                columnNumber: 13
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/app/components/AIAssistant.tsx",
+                        lineNumber: 431,
+                        columnNumber: 11
+                    }, this)
+                ]
+            }, void 0, true, {
+                fileName: "[project]/app/components/AIAssistant.tsx",
+                lineNumber: 307,
+                columnNumber: 9
+            }, this)
+        ]
+    }, void 0, true);
+}
+_s(AIAssistant, "U+iBbeLCvqtaFw1w3iP60mGlFng=", false, function() {
+    return [
+        __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$LanguageContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useLanguage"],
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["usePathname"],
+        __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"],
+        __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$BranchContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useBranch"]
+    ];
+});
+_c = AIAssistant;
+var _c;
+__turbopack_context__.k.register(_c, "AIAssistant");
+if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
+    __turbopack_context__.k.registerExports(__turbopack_context__.m, globalThis.$RefreshHelpers$);
+}
+}),
+"[project]/app/components/BarcodeScanner.tsx [app-client] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "BarcodeScanner",
+    ()=>BarcodeScanner
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
+;
+var _s = __turbopack_context__.k.signature();
+'use client';
+;
+const BARCODE_FORMATS = [
+    'ean_13',
+    'ean_8',
+    'code_128',
+    'code_39',
+    'upc_a',
+    'upc_e',
+    'qr_code'
+];
+const CAMERA_NEEDS_HTTPS_AR = 'الكاميرا تحتاج HTTPS أو متصفح يدعم المسح. افتح الموقع على https أو استخدم Chrome على الموبايل.';
+const CAMERA_NEEDS_HTTPS_EN = 'Camera requires HTTPS or a browser that supports scanning. Open the site over https or use Chrome on mobile.';
+function BarcodeScanner({ open, onClose, onDetected, onError, language = 'en', closeLabel, manualEntryLabel }) {
+    _s();
+    const videoRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
+    const streamRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
+    const [error, setError] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
+    const zxingReaderRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
+    const isSecureContext = ("TURBOPACK compile-time value", "object") !== 'undefined' && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const cameraUnavailableMessage = language === 'ar' ? CAMERA_NEEDS_HTTPS_AR : CAMERA_NEEDS_HTTPS_EN;
+    const closeText = closeLabel ?? (language === 'ar' ? 'إغلاق' : 'Close');
+    const manualText = manualEntryLabel ?? (language === 'ar' ? 'إدخال يدوي' : 'Manual entry');
+    const stopStream = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+        "BarcodeScanner.useCallback[stopStream]": ()=>{
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach({
+                    "BarcodeScanner.useCallback[stopStream]": (t)=>t.stop()
+                }["BarcodeScanner.useCallback[stopStream]"]);
+                streamRef.current = null;
+            }
+            if (videoRef.current) {
+                videoRef.current.srcObject = null;
+            }
+        }
+    }["BarcodeScanner.useCallback[stopStream]"], []);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "BarcodeScanner.useEffect": ()=>{
+            if (!open) return;
+            let active = true;
+            const start = {
+                "BarcodeScanner.useEffect.start": async ()=>{
+                    setError(null);
+                    if (!isSecureContext) {
+                        setError(cameraUnavailableMessage);
+                        onError?.(cameraUnavailableMessage);
+                        return;
+                    }
+                    const Detector = window.BarcodeDetector;
+                    if (Detector) {
+                        try {
+                            const stream = await navigator.mediaDevices.getUserMedia({
+                                video: {
+                                    facingMode: 'environment'
+                                }
+                            });
+                            if (!active) {
+                                stream.getTracks().forEach({
+                                    "BarcodeScanner.useEffect.start": (t)=>t.stop()
+                                }["BarcodeScanner.useEffect.start"]);
+                                return;
+                            }
+                            streamRef.current = stream;
+                            if (videoRef.current) {
+                                videoRef.current.srcObject = stream;
+                                await videoRef.current.play();
+                            }
+                            const detector = new Detector({
+                                formats: [
+                                    ...BARCODE_FORMATS
+                                ]
+                            });
+                            const scan = {
+                                "BarcodeScanner.useEffect.start.scan": async ()=>{
+                                    if (!active || !videoRef.current) return;
+                                    try {
+                                        const barcodes = await detector.detect(videoRef.current);
+                                        if (barcodes.length > 0) {
+                                            onDetected(barcodes[0].rawValue);
+                                            onClose();
+                                            return;
+                                        }
+                                    } catch  {
+                                    // ignore single-frame errors
+                                    }
+                                    if (active) requestAnimationFrame(scan);
+                                }
+                            }["BarcodeScanner.useEffect.start.scan"];
+                            requestAnimationFrame(scan);
+                        } catch (err) {
+                            const msg = err?.message || 'Camera access denied';
+                            setError(msg);
+                            onError?.(msg);
+                        }
+                        return;
+                    }
+                    // Fallback: dynamic import @zxing/browser (only when user clicked scan)
+                    const ZXING_MSG_AR = 'ميزة المسح بالكاميرا تحتاج تثبيت ZXing أو متصفح يدعم BarcodeDetector. استخدم الإدخال اليدوي أو جهاز باركود.';
+                    const ZXING_MSG_EN = 'Camera scanning requires ZXing or BarcodeDetector support. Use manual entry or a barcode gun.';
+                    try {
+                        const { BrowserMultiFormatReader } = await __turbopack_context__.A("[project]/node_modules/@zxing/browser/esm/index.js [app-client] (ecmascript, async loader)");
+                        const reader = new BrowserMultiFormatReader();
+                        zxingReaderRef.current = reader;
+                        const stream = await navigator.mediaDevices.getUserMedia({
+                            video: {
+                                facingMode: 'environment'
+                            }
+                        });
+                        if (!active) {
+                            stream.getTracks().forEach({
+                                "BarcodeScanner.useEffect.start": (t)=>t.stop()
+                            }["BarcodeScanner.useEffect.start"]);
+                            return;
+                        }
+                        streamRef.current = stream;
+                        if (videoRef.current) {
+                            videoRef.current.srcObject = stream;
+                            await videoRef.current.play();
+                        }
+                        const tryDecode = {
+                            "BarcodeScanner.useEffect.start.tryDecode": ()=>{
+                                if (!active || !videoRef.current) return;
+                                reader.decodeFromVideoElement(videoRef.current, {
+                                    "BarcodeScanner.useEffect.start.tryDecode": (err, result)=>{
+                                        if (!active) return;
+                                        if (result?.getText()) {
+                                            onDetected(result.getText());
+                                            onClose();
+                                            return;
+                                        }
+                                        if (active) setTimeout(tryDecode, 250);
+                                    }
+                                }["BarcodeScanner.useEffect.start.tryDecode"]);
+                            }
+                        }["BarcodeScanner.useEffect.start.tryDecode"];
+                        setTimeout(tryDecode, 500);
+                    } catch (err) {
+                        const isModuleMissing = err?.message?.includes?.('Cannot find module') || err?.message?.includes?.('@zxing/browser') || err?.code === 'MODULE_NOT_FOUND';
+                        const msg = isModuleMissing ? language === 'ar' ? ZXING_MSG_AR : ZXING_MSG_EN : err?.message || 'Camera or scanner not available';
+                        setError(msg);
+                        onError?.(msg);
+                    }
+                }
+            }["BarcodeScanner.useEffect.start"];
+            start();
+            return ({
+                "BarcodeScanner.useEffect": ()=>{
+                    active = false;
+                    stopStream();
+                    if (zxingReaderRef.current && videoRef.current) {
+                        try {
+                            zxingReaderRef.current.reset();
+                        } catch  {
+                        // ignore
+                        }
+                    }
+                }
+            })["BarcodeScanner.useEffect"];
+        }
+    }["BarcodeScanner.useEffect"], [
+        open,
+        isSecureContext,
+        language,
+        onClose,
+        onDetected,
+        onError,
+        cameraUnavailableMessage,
+        stopStream
+    ]);
+    if (!open) return null;
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+        className: "fixed inset-0 z-50 flex items-center justify-center bg-black/80",
+        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+            className: "w-full max-w-md rounded-2xl border border-cyan-500/30 bg-[#0b1220] p-4",
+            children: [
+                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                    className: "flex items-center justify-between mb-3",
+                    children: [
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h3", {
+                            className: "text-cyan-200 font-semibold",
+                            children: language === 'ar' ? 'مسح الباركود' : 'Scan Barcode'
+                        }, void 0, false, {
+                            fileName: "[project]/app/components/BarcodeScanner.tsx",
+                            lineNumber: 177,
+                            columnNumber: 11
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                            type: "button",
+                            onClick: onClose,
+                            className: "text-slate-300 hover:text-white",
+                            children: "✕"
+                        }, void 0, false, {
+                            fileName: "[project]/app/components/BarcodeScanner.tsx",
+                            lineNumber: 178,
+                            columnNumber: 11
+                        }, this)
+                    ]
+                }, void 0, true, {
+                    fileName: "[project]/app/components/BarcodeScanner.tsx",
+                    lineNumber: 176,
+                    columnNumber: 9
+                }, this),
+                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                    className: "relative overflow-hidden rounded-xl border border-cyan-500/20",
+                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("video", {
+                        ref: videoRef,
+                        className: "h-72 w-full object-cover",
+                        muted: true,
+                        playsInline: true
+                    }, void 0, false, {
+                        fileName: "[project]/app/components/BarcodeScanner.tsx",
+                        lineNumber: 183,
+                        columnNumber: 11
+                    }, this)
+                }, void 0, false, {
+                    fileName: "[project]/app/components/BarcodeScanner.tsx",
+                    lineNumber: 182,
+                    columnNumber: 9
+                }, this),
+                error && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                    className: "mt-3 text-sm text-red-300",
+                    children: error
+                }, void 0, false, {
+                    fileName: "[project]/app/components/BarcodeScanner.tsx",
+                    lineNumber: 185,
+                    columnNumber: 19
+                }, this),
+                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                    className: "mt-3 text-xs text-slate-400",
+                    children: language === 'ar' ? 'وجّه الكود داخل الإطار. يمكنك أيضاً استخدام إدخال يدوي.' : 'Align the code inside the frame. You can also use manual entry.'
+                }, void 0, false, {
+                    fileName: "[project]/app/components/BarcodeScanner.tsx",
+                    lineNumber: 186,
+                    columnNumber: 9
+                }, this),
+                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                    className: "mt-3 flex gap-2",
+                    children: [
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                            type: "button",
+                            onClick: onClose,
+                            className: "flex-1 py-2 rounded-lg border border-cyan-500/40 text-cyan-300 text-sm hover:bg-cyan-500/10",
+                            children: closeText
+                        }, void 0, false, {
+                            fileName: "[project]/app/components/BarcodeScanner.tsx",
+                            lineNumber: 190,
+                            columnNumber: 11
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                            type: "button",
+                            onClick: ()=>{
+                                onClose();
+                            },
+                            className: "flex-1 py-2 rounded-lg border border-slate-500/40 text-slate-300 text-sm hover:bg-slate-500/10",
+                            children: manualText
+                        }, void 0, false, {
+                            fileName: "[project]/app/components/BarcodeScanner.tsx",
+                            lineNumber: 197,
+                            columnNumber: 11
+                        }, this)
+                    ]
+                }, void 0, true, {
+                    fileName: "[project]/app/components/BarcodeScanner.tsx",
+                    lineNumber: 189,
+                    columnNumber: 9
+                }, this)
+            ]
+        }, void 0, true, {
+            fileName: "[project]/app/components/BarcodeScanner.tsx",
+            lineNumber: 175,
+            columnNumber: 7
+        }, this)
+    }, void 0, false, {
+        fileName: "[project]/app/components/BarcodeScanner.tsx",
+        lineNumber: 174,
+        columnNumber: 5
+    }, this);
+}
+_s(BarcodeScanner, "WD/AZweLlhHMB2MLTfpnO2PB1qY=");
+_c = BarcodeScanner;
+var _c;
+__turbopack_context__.k.register(_c, "BarcodeScanner");
+if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
+    __turbopack_context__.k.registerExports(__turbopack_context__.m, globalThis.$RefreshHelpers$);
+}
+}),
+"[project]/app/inventory/page.tsx [app-client] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "default",
+    ()=>InventoryPage
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$components$2f$Sidebar$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/components/Sidebar.tsx [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$LanguageContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/contexts/LanguageContext.tsx [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/contexts/AuthContext.tsx [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$guards$2f$useRouteGuard$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/guards/useRouteGuard.ts [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$CurrencyContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/contexts/CurrencyContext.tsx [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$permissions$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/permissions.ts [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$components$2f$AIAssistant$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/components/AIAssistant.tsx [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$components$2f$BarcodeScanner$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/components/BarcodeScanner.tsx [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$image$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Image$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/image.js [app-client] (ecmascript) <export default as Image>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$pencil$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Pencil$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/pencil.js [app-client] (ecmascript) <export default as Pencil>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$map$2d$pin$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__MapPin$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/map-pin.js [app-client] (ecmascript) <export default as MapPin>");
+;
+var _s = __turbopack_context__.k.signature();
+'use client';
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+const emptyForm = {
+    nameEn: '',
+    nameAr: '',
+    brand: '',
+    sku: '',
+    barcode: '',
+    qrCode: '',
+    imageUrl: '',
+    buyPrice: '',
+    sellPrice: '',
+    stockQuantity: '',
+    minStockLevel: '',
+    descriptionShort: '',
+    descriptionLong: '',
+    warrantyText: '',
+    returnPolicyText: '',
+    specs: [],
+    galleryUrls: []
+};
+function InventoryPage() {
+    _s();
+    const { t, direction, language } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$LanguageContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useLanguage"])();
+    const { user, loading: authLoading, effectiveRole } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"])();
+    const { allowed } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$guards$2f$useRouteGuard$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouteGuard"])(user, authLoading, {
+        feature: 'inventory',
+        effectiveRole
+    });
+    const { symbol } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$CurrencyContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCurrency"])();
+    const planFeatures = (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$permissions$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getPlanFeatures"])(user?.package);
+    const canEditInventory = (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$permissions$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["canAccess"])(effectiveRole, 'inventory_edit', planFeatures);
+    const canViewAvailability = (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$permissions$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["canAccess"])(effectiveRole, 'branch_availability', planFeatures);
+    const [products, setProducts] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])([]);
+    const [loading, setLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(true);
+    const [error, setError] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
+    const [search, setSearch] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])('');
+    const [showForm, setShowForm] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [saving, setSaving] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [form, setForm] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(emptyForm);
+    const [scannerOpen, setScannerOpen] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [editingId, setEditingId] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
+    const [selectedIds, setSelectedIds] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(new Set());
+    const [showBulkDeleteModal, setShowBulkDeleteModal] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [showDeleteLastImportModal, setShowDeleteLastImportModal] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [lastBatch, setLastBatch] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
+    const [bulkDeleting, setBulkDeleting] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [deleteLastImportLoading, setDeleteLastImportLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [toast, setToast] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
+    const [availabilityModal, setAvailabilityModal] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
+    const [availabilityData, setAvailabilityData] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
+    const showToast = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+        "InventoryPage.useCallback[showToast]": (msg, type = 'success')=>{
+            setToast({
+                msg,
+                type
+            });
+            setTimeout({
+                "InventoryPage.useCallback[showToast]": ()=>setToast(null)
+            }["InventoryPage.useCallback[showToast]"], 4000);
+        }
+    }["InventoryPage.useCallback[showToast]"], []);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "InventoryPage.useEffect": ()=>{
+            loadProducts();
+        }
+    }["InventoryPage.useEffect"], []);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "InventoryPage.useEffect": ()=>{
+            const onProductsImported = {
+                "InventoryPage.useEffect.onProductsImported": ()=>loadProducts()
+            }["InventoryPage.useEffect.onProductsImported"];
+            window.addEventListener('products-imported', onProductsImported);
+            return ({
+                "InventoryPage.useEffect": ()=>window.removeEventListener('products-imported', onProductsImported)
+            })["InventoryPage.useEffect"];
+        }
+    }["InventoryPage.useEffect"], []);
+    const loadProducts = async ()=>{
+        try {
+            setLoading(true);
+            setError(null);
+            const data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiRequest"])('/products');
+            setProducts(data);
+        } catch (err) {
+            setError(err.message || 'Failed to load products');
+        } finally{
+            setLoading(false);
+        }
+    };
+    const openAvailabilityModal = async (product)=>{
+        setAvailabilityModal({
+            productId: product.id,
+            productName: language === 'ar' ? product.name_ar : product.name_en
+        });
+        setAvailabilityData(null);
+        try {
+            const data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiRequest"])(`/admin/inventory/availability?productId=${product.id}`);
+            setAvailabilityData({
+                branches: (data.branches || []).map((b)=>({
+                        branchNameAr: b.branchNameAr || b.branchName || b.name,
+                        branchNameEn: b.branchNameEn || b.branchName || b.name,
+                        qty: b.qty || 0
+                    }))
+            });
+        } catch  {
+            setAvailabilityData({
+                branches: []
+            });
+        }
+    };
+    const filteredProducts = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
+        "InventoryPage.useMemo[filteredProducts]": ()=>{
+            const query = search.trim().toLowerCase();
+            if (!query) return products;
+            return products.filter({
+                "InventoryPage.useMemo[filteredProducts]": (product)=>{
+                    return product.name_en.toLowerCase().includes(query) || product.name_ar.toLowerCase().includes(query) || (product.sku || '').toLowerCase().includes(query) || (product.barcode || '').toLowerCase().includes(query);
+                }
+            }["InventoryPage.useMemo[filteredProducts]"]);
+        }
+    }["InventoryPage.useMemo[filteredProducts]"], [
+        products,
+        search
+    ]);
+    const handleSave = async ()=>{
+        setError(null);
+        if (!form.nameEn) {
+            setError(language === 'ar' ? 'يرجى إدخال اسم المنتج' : 'Name is required.');
+            return;
+        }
+        try {
+            setSaving(true);
+            const payload = {
+                nameEn: form.nameEn,
+                nameAr: form.nameAr || form.nameEn,
+                brand: form.brand,
+                sku: form.sku,
+                barcode: form.barcode,
+                qrCode: form.qrCode,
+                buyPrice: parseFloat(form.buyPrice || '0'),
+                sellPrice: form.sellPrice ? parseFloat(form.sellPrice) : undefined,
+                stockQuantity: parseInt(form.stockQuantity || '0', 10),
+                minStockLevel: parseInt(form.minStockLevel || '5', 10),
+                imageUrl: form.imageUrl,
+                descriptionShort: form.descriptionShort || undefined,
+                descriptionLong: form.descriptionLong || undefined,
+                warrantyText: form.warrantyText || undefined,
+                returnPolicyText: form.returnPolicyText || undefined,
+                specs: form.specs?.length ? form.specs : undefined,
+                galleryUrls: form.galleryUrls?.length ? form.galleryUrls : undefined
+            };
+            if (editingId) {
+                await (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiRequest"])(`/products/${editingId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(payload)
+                });
+            } else {
+                await (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiRequest"])('/products', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+            }
+            setForm(emptyForm);
+            setEditingId(null);
+            setShowForm(false);
+            await loadProducts();
+        } catch (err) {
+            setError(err.message || 'Failed to save product');
+        } finally{
+            setSaving(false);
+        }
+    };
+    const openEdit = (product)=>{
+        setEditingId(product.id);
+        const p = product;
+        let specs = [];
+        try {
+            if (p.specs_json) specs = Array.isArray(JSON.parse(p.specs_json)) ? JSON.parse(p.specs_json) : [];
+            else if (typeof p.specs_json === 'object' && Array.isArray(p.specs_json)) specs = p.specs_json;
+        } catch  {}
+        let galleryUrls = [];
+        try {
+            if (p.gallery_urls_json) galleryUrls = Array.isArray(JSON.parse(p.gallery_urls_json)) ? JSON.parse(p.gallery_urls_json) : [];
+            else if (Array.isArray(p.gallery_urls_json)) galleryUrls = p.gallery_urls_json;
+        } catch  {}
+        setForm({
+            ...emptyForm,
+            nameEn: product.name_en,
+            nameAr: product.name_ar,
+            brand: product.brand || '',
+            sku: product.sku || '',
+            barcode: product.barcode || '',
+            qrCode: product.qr_code || '',
+            imageUrl: product.image_url || '',
+            buyPrice: String(product.buy_price ?? ''),
+            sellPrice: String(product.sell_price ?? ''),
+            stockQuantity: String(product.stock_quantity ?? ''),
+            minStockLevel: String(product.min_stock_level ?? ''),
+            descriptionShort: p.description_short || '',
+            descriptionLong: p.description_long || '',
+            warrantyText: p.warranty_text || '',
+            returnPolicyText: p.return_policy_text || '',
+            specs,
+            galleryUrls
+        });
+        setShowForm(true);
+    };
+    const toggleSelect = (id)=>{
+        setSelectedIds((prev)=>{
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+    const selectAllOnPage = ()=>{
+        const ids = filteredProducts.map((p)=>p.id);
+        setSelectedIds((prev)=>{
+            const next = new Set(prev);
+            ids.forEach((id)=>next.add(id));
+            return next;
+        });
+    };
+    const clearSelection = ()=>setSelectedIds(new Set());
+    const handleBulkDelete = async ()=>{
+        if (selectedIds.size === 0) {
+            showToast(language === 'ar' ? 'لم يتم تحديد أي صنف' : 'No products selected', 'error');
+            return;
+        }
+        const ids = Array.from(selectedIds);
+        console.log('bulk delete ids:', ids);
+        setBulkDeleting(true);
+        setError(null);
+        try {
+            const res = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiRequest"])('/products/bulk-delete', {
+                method: 'POST',
+                body: JSON.stringify({
+                    ids
+                })
+            });
+            const count = res?.deletedCount ?? 0;
+            showToast(language === 'ar' ? `تم حذف ${count} صنف بنجاح` : `${count} products deleted`, 'success');
+            setSelectedIds(new Set());
+            setShowBulkDeleteModal(false);
+            await loadProducts();
+        } catch (err) {
+            const msg = err?.message || (language === 'ar' ? 'فشل الحذف' : 'Delete failed');
+            showToast(language === 'ar' && msg.includes('Invalid') ? 'لم يتم تحديد أي صنف' : msg, 'error');
+        } finally{
+            setBulkDeleting(false);
+        }
+    };
+    const fetchLastBatch = async ()=>{
+        setDeleteLastImportLoading(true);
+        try {
+            const data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiRequest"])('/products/import/last');
+            if (data?.batchId) {
+                setLastBatch({
+                    batchId: data.batchId,
+                    fileName: data.fileName || '',
+                    createdAt: data.createdAt || '',
+                    importedCount: data.importedCount ?? 0
+                });
+                setShowDeleteLastImportModal(true);
+            } else {
+                showToast(language === 'ar' ? 'لا يوجد استيراد سابق' : 'No previous import', 'error');
+            }
+        } catch (err) {
+            const msg = err?.message || '';
+            showToast(language === 'ar' ? msg.includes('No import batch') ? 'لا يوجد استيراد سابق' : msg || 'فشل التحميل' : msg || 'Load failed', 'error');
+        } finally{
+            setDeleteLastImportLoading(false);
+        }
+    };
+    const handleUndoLastImport = async ()=>{
+        if (!lastBatch?.batchId) return;
+        setDeleteLastImportLoading(true);
+        setError(null);
+        try {
+            const res = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiRequest"])('/products/import/rollback', {
+                method: 'POST',
+                body: JSON.stringify({
+                    batchId: lastBatch.batchId,
+                    confirm: true
+                })
+            });
+            const count = res?.deletedCount ?? 0;
+            showToast(language === 'ar' ? `تم التراجع عن الاستيراد وحذف ${count} صنف` : `Rollback complete. ${count} products removed.`, 'success');
+            setShowDeleteLastImportModal(false);
+            setLastBatch(null);
+            setSelectedIds(new Set());
+            await loadProducts();
+        } catch (err) {
+            showToast(err?.message || (language === 'ar' ? 'فشل التراجع' : 'Rollback failed'), 'error');
+        } finally{
+            setDeleteLastImportLoading(false);
+        }
+    };
+    const selectedCount = selectedIds.size;
+    const allOnPageSelected = filteredProducts.length > 0 && filteredProducts.every((p)=>selectedIds.has(p.id));
+    if (authLoading || !allowed) return null;
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+        className: "min-h-screen bg-black text-white flex",
+        dir: direction,
+        children: [
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$app$2f$components$2f$Sidebar$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Sidebar"], {}, void 0, false, {
+                fileName: "[project]/app/inventory/page.tsx",
+                lineNumber: 326,
+                columnNumber: 7
+            }, this),
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                className: "flex-1 p-8 pt-20 md:pt-8 overflow-y-auto",
+                children: [
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
+                        className: "text-2xl font-bold text-cyan-200 mb-6",
+                        children: t('inventory.title')
+                    }, void 0, false, {
+                        fileName: "[project]/app/inventory/page.tsx",
+                        lineNumber: 328,
+                        columnNumber: 9
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        className: "neon-card rounded-xl p-6",
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "flex flex-wrap items-center justify-between gap-4 mb-4",
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "flex items-center gap-2",
+                                        children: canEditInventory && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Fragment"], {
+                                            children: [
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                    onClick: ()=>setShowForm(true),
+                                                    className: "px-4 py-2 rounded-lg bg-cyan-600 text-white font-semibold",
+                                                    children: t('inventory.addProduct')
+                                                }, void 0, false, {
+                                                    fileName: "[project]/app/inventory/page.tsx",
+                                                    lineNumber: 334,
+                                                    columnNumber: 19
+                                                }, this),
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                    type: "button",
+                                                    onClick: fetchLastBatch,
+                                                    disabled: deleteLastImportLoading,
+                                                    className: "px-4 py-2 rounded-lg border border-amber-500/50 text-amber-200 hover:bg-amber-500/10 text-sm disabled:opacity-50",
+                                                    children: deleteLastImportLoading ? language === 'ar' ? 'جاري التحميل...' : 'Loading...' : language === 'ar' ? 'التراجع عن آخر استيراد' : 'Undo last import'
+                                                }, void 0, false, {
+                                                    fileName: "[project]/app/inventory/page.tsx",
+                                                    lineNumber: 340,
+                                                    columnNumber: 19
+                                                }, this)
+                                            ]
+                                        }, void 0, true)
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/inventory/page.tsx",
+                                        lineNumber: 331,
+                                        columnNumber: 13
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "flex items-center gap-2",
+                                        children: [
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                className: "bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm w-64",
+                                                placeholder: t('inventory.search'),
+                                                value: search,
+                                                onChange: (e)=>setSearch(e.target.value)
+                                            }, void 0, false, {
+                                                fileName: "[project]/app/inventory/page.tsx",
+                                                lineNumber: 354,
+                                                columnNumber: 15
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                type: "button",
+                                                onClick: ()=>setScannerOpen(true),
+                                                className: "px-3 py-2 rounded-lg border border-cyan-500/40 text-cyan-300 text-xs",
+                                                children: language === 'ar' ? 'مسح' : 'Scan'
+                                            }, void 0, false, {
+                                                fileName: "[project]/app/inventory/page.tsx",
+                                                lineNumber: 360,
+                                                columnNumber: 15
+                                            }, this)
+                                        ]
+                                    }, void 0, true, {
+                                        fileName: "[project]/app/inventory/page.tsx",
+                                        lineNumber: 353,
+                                        columnNumber: 13
+                                    }, this)
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/app/inventory/page.tsx",
+                                lineNumber: 330,
+                                columnNumber: 11
+                            }, this),
+                            canEditInventory && selectedCount > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "flex items-center gap-3 mb-4 p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/30",
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                        className: "text-cyan-200 text-sm",
+                                        children: language === 'ar' ? `${selectedCount} صنف محدد` : `${selectedCount} selected`
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/inventory/page.tsx",
+                                        lineNumber: 371,
+                                        columnNumber: 15
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                        type: "button",
+                                        onClick: ()=>setShowBulkDeleteModal(true),
+                                        disabled: bulkDeleting,
+                                        className: "px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium disabled:opacity-50",
+                                        children: language === 'ar' ? `حذف المحدد (${selectedCount})` : `Delete selected (${selectedCount})`
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/inventory/page.tsx",
+                                        lineNumber: 374,
+                                        columnNumber: 15
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                        type: "button",
+                                        onClick: clearSelection,
+                                        className: "px-4 py-2 rounded-lg border border-slate-500 text-slate-300 text-sm",
+                                        children: language === 'ar' ? 'إلغاء التحديد' : 'Clear selection'
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/inventory/page.tsx",
+                                        lineNumber: 382,
+                                        columnNumber: 15
+                                    }, this)
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/app/inventory/page.tsx",
+                                lineNumber: 370,
+                                columnNumber: 13
+                            }, this),
+                            error && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "mb-4 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200",
+                                children: error
+                            }, void 0, false, {
+                                fileName: "[project]/app/inventory/page.tsx",
+                                lineNumber: 392,
+                                columnNumber: 13
+                            }, this),
+                            toast && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: `mb-4 rounded-lg p-3 text-sm ${toast.type === 'success' ? 'bg-green-500/20 text-green-200 border border-green-500/40' : 'bg-red-500/20 text-red-200 border border-red-500/40'}`,
+                                children: toast.msg
+                            }, void 0, false, {
+                                fileName: "[project]/app/inventory/page.tsx",
+                                lineNumber: 397,
+                                columnNumber: 13
+                            }, this),
+                            loading ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "text-sm text-slate-300",
+                                children: t('common.loading')
+                            }, void 0, false, {
+                                fileName: "[project]/app/inventory/page.tsx",
+                                lineNumber: 404,
+                                columnNumber: 13
+                            }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "overflow-x-auto",
+                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("table", {
+                                    className: "w-full text-sm",
+                                    children: [
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("thead", {
+                                            className: "text-cyan-400 border-b border-cyan-500/20",
+                                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("tr", {
+                                                children: [
+                                                    canEditInventory && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("th", {
+                                                        className: "py-2 pr-2 w-10",
+                                                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                            type: "checkbox",
+                                                            checked: allOnPageSelected,
+                                                            onChange: (e)=>e.target.checked ? selectAllOnPage() : clearSelection(),
+                                                            className: "rounded border-cyan-500/50 bg-slate-800"
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/app/inventory/page.tsx",
+                                                            lineNumber: 412,
+                                                            columnNumber: 25
+                                                        }, this)
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/app/inventory/page.tsx",
+                                                        lineNumber: 411,
+                                                        columnNumber: 23
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("th", {
+                                                        className: "py-2 text-left",
+                                                        children: t('inventory.productName')
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/app/inventory/page.tsx",
+                                                        lineNumber: 420,
+                                                        columnNumber: 21
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("th", {
+                                                        className: "py-2 text-left",
+                                                        children: "SKU"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/app/inventory/page.tsx",
+                                                        lineNumber: 421,
+                                                        columnNumber: 21
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("th", {
+                                                        className: "py-2 text-left",
+                                                        children: "Barcode"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/app/inventory/page.tsx",
+                                                        lineNumber: 422,
+                                                        columnNumber: 21
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("th", {
+                                                        className: "py-2 text-left",
+                                                        children: t('inventory.stock')
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/app/inventory/page.tsx",
+                                                        lineNumber: 423,
+                                                        columnNumber: 21
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("th", {
+                                                        className: "py-2 text-left",
+                                                        children: t('inventory.sellPrice')
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/app/inventory/page.tsx",
+                                                        lineNumber: 424,
+                                                        columnNumber: 21
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("th", {
+                                                        className: "py-2 text-left",
+                                                        children: t('inventory.buyPrice')
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/app/inventory/page.tsx",
+                                                        lineNumber: 425,
+                                                        columnNumber: 21
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("th", {
+                                                        className: "py-2 text-left",
+                                                        children: t('inventory.productImage') || 'Image'
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/app/inventory/page.tsx",
+                                                        lineNumber: 426,
+                                                        columnNumber: 21
+                                                    }, this),
+                                                    canViewAvailability && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("th", {
+                                                        className: "py-2 text-left",
+                                                        children: language === 'ar' ? 'التوفر' : 'Availability'
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/app/inventory/page.tsx",
+                                                        lineNumber: 427,
+                                                        columnNumber: 45
+                                                    }, this),
+                                                    canEditInventory && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("th", {
+                                                        className: "py-2 text-left",
+                                                        children: t('common.edit')
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/app/inventory/page.tsx",
+                                                        lineNumber: 428,
+                                                        columnNumber: 42
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/app/inventory/page.tsx",
+                                                lineNumber: 409,
+                                                columnNumber: 19
+                                            }, this)
+                                        }, void 0, false, {
+                                            fileName: "[project]/app/inventory/page.tsx",
+                                            lineNumber: 408,
+                                            columnNumber: 17
+                                        }, this),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("tbody", {
+                                            className: "text-slate-200",
+                                            children: filteredProducts.length === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("tr", {
+                                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("td", {
+                                                    colSpan: (canEditInventory ? 1 : 0) + (canViewAvailability ? 1 : 0) + 8,
+                                                    className: "py-4 text-center text-slate-500",
+                                                    children: language === 'ar' ? 'لا توجد منتجات' : 'No products found'
+                                                }, void 0, false, {
+                                                    fileName: "[project]/app/inventory/page.tsx",
+                                                    lineNumber: 434,
+                                                    columnNumber: 23
+                                                }, this)
+                                            }, void 0, false, {
+                                                fileName: "[project]/app/inventory/page.tsx",
+                                                lineNumber: 433,
+                                                columnNumber: 21
+                                            }, this) : filteredProducts.map((product)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("tr", {
+                                                    className: "border-b border-cyan-500/10",
+                                                    children: [
+                                                        canEditInventory && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("td", {
+                                                            className: "py-2 pr-2",
+                                                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                                type: "checkbox",
+                                                                checked: selectedIds.has(product.id),
+                                                                onChange: ()=>toggleSelect(product.id),
+                                                                className: "rounded border-cyan-500/50 bg-slate-800"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/app/inventory/page.tsx",
+                                                                lineNumber: 443,
+                                                                columnNumber: 29
+                                                            }, this)
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/app/inventory/page.tsx",
+                                                            lineNumber: 442,
+                                                            columnNumber: 27
+                                                        }, this),
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("td", {
+                                                            className: "py-2",
+                                                            children: [
+                                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                                    className: "font-semibold text-white",
+                                                                    children: language === 'ar' ? product.name_ar : product.name_en
+                                                                }, void 0, false, {
+                                                                    fileName: "[project]/app/inventory/page.tsx",
+                                                                    lineNumber: 452,
+                                                                    columnNumber: 27
+                                                                }, this),
+                                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                                    className: "text-xs text-slate-400",
+                                                                    children: product.brand || '—'
+                                                                }, void 0, false, {
+                                                                    fileName: "[project]/app/inventory/page.tsx",
+                                                                    lineNumber: 455,
+                                                                    columnNumber: 27
+                                                                }, this)
+                                                            ]
+                                                        }, void 0, true, {
+                                                            fileName: "[project]/app/inventory/page.tsx",
+                                                            lineNumber: 451,
+                                                            columnNumber: 25
+                                                        }, this),
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("td", {
+                                                            className: "py-2",
+                                                            children: product.sku || '—'
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/app/inventory/page.tsx",
+                                                            lineNumber: 459,
+                                                            columnNumber: 25
+                                                        }, this),
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("td", {
+                                                            className: "py-2",
+                                                            children: product.barcode || '—'
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/app/inventory/page.tsx",
+                                                            lineNumber: 460,
+                                                            columnNumber: 25
+                                                        }, this),
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("td", {
+                                                            className: "py-2",
+                                                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                className: product.stock_quantity <= product.min_stock_level ? 'text-red-400' : 'text-green-400',
+                                                                children: product.stock_quantity
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/app/inventory/page.tsx",
+                                                                lineNumber: 462,
+                                                                columnNumber: 27
+                                                            }, this)
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/app/inventory/page.tsx",
+                                                            lineNumber: 461,
+                                                            columnNumber: 25
+                                                        }, this),
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("td", {
+                                                            className: "py-2",
+                                                            children: [
+                                                                Number(product.sell_price || 0).toFixed(2),
+                                                                " ",
+                                                                symbol
+                                                            ]
+                                                        }, void 0, true, {
+                                                            fileName: "[project]/app/inventory/page.tsx",
+                                                            lineNumber: 466,
+                                                            columnNumber: 25
+                                                        }, this),
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("td", {
+                                                            className: "py-2",
+                                                            children: [
+                                                                Number(product.buy_price || 0).toFixed(2),
+                                                                " ",
+                                                                symbol
+                                                            ]
+                                                        }, void 0, true, {
+                                                            fileName: "[project]/app/inventory/page.tsx",
+                                                            lineNumber: 469,
+                                                            columnNumber: 25
+                                                        }, this),
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("td", {
+                                                            className: "py-2",
+                                                            children: product.image_url ? // eslint-disable-next-line @next/next/no-img-element
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
+                                                                src: product.image_url,
+                                                                alt: product.name_en,
+                                                                className: "h-10 w-10 rounded-md object-cover border border-cyan-500/20"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/app/inventory/page.tsx",
+                                                                lineNumber: 475,
+                                                                columnNumber: 29
+                                                            }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                                className: "h-10 w-10 rounded-md border border-cyan-500/20 flex items-center justify-center text-cyan-300/60",
+                                                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$image$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Image$3e$__["Image"], {
+                                                                    className: "h-4 w-4"
+                                                                }, void 0, false, {
+                                                                    fileName: "[project]/app/inventory/page.tsx",
+                                                                    lineNumber: 482,
+                                                                    columnNumber: 31
+                                                                }, this)
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/app/inventory/page.tsx",
+                                                                lineNumber: 481,
+                                                                columnNumber: 29
+                                                            }, this)
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/app/inventory/page.tsx",
+                                                            lineNumber: 472,
+                                                            columnNumber: 25
+                                                        }, this),
+                                                        canViewAvailability && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("td", {
+                                                            className: "py-2",
+                                                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                                type: "button",
+                                                                onClick: ()=>openAvailabilityModal(product),
+                                                                className: "inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200",
+                                                                children: [
+                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$map$2d$pin$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__MapPin$3e$__["MapPin"], {
+                                                                        className: "h-4 w-4"
+                                                                    }, void 0, false, {
+                                                                        fileName: "[project]/app/inventory/page.tsx",
+                                                                        lineNumber: 493,
+                                                                        columnNumber: 31
+                                                                    }, this),
+                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                        className: "text-xs",
+                                                                        children: language === 'ar' ? 'توفر في فروع أخرى' : 'Available in other branches'
+                                                                    }, void 0, false, {
+                                                                        fileName: "[project]/app/inventory/page.tsx",
+                                                                        lineNumber: 494,
+                                                                        columnNumber: 31
+                                                                    }, this)
+                                                                ]
+                                                            }, void 0, true, {
+                                                                fileName: "[project]/app/inventory/page.tsx",
+                                                                lineNumber: 488,
+                                                                columnNumber: 29
+                                                            }, this)
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/app/inventory/page.tsx",
+                                                            lineNumber: 487,
+                                                            columnNumber: 27
+                                                        }, this),
+                                                        canEditInventory && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("td", {
+                                                            className: "py-2",
+                                                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                                type: "button",
+                                                                onClick: ()=>openEdit(product),
+                                                                className: "inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200",
+                                                                children: [
+                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$pencil$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Pencil$3e$__["Pencil"], {
+                                                                        className: "h-4 w-4"
+                                                                    }, void 0, false, {
+                                                                        fileName: "[project]/app/inventory/page.tsx",
+                                                                        lineNumber: 505,
+                                                                        columnNumber: 31
+                                                                    }, this),
+                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                        className: "text-xs",
+                                                                        children: t('common.edit')
+                                                                    }, void 0, false, {
+                                                                        fileName: "[project]/app/inventory/page.tsx",
+                                                                        lineNumber: 506,
+                                                                        columnNumber: 31
+                                                                    }, this)
+                                                                ]
+                                                            }, void 0, true, {
+                                                                fileName: "[project]/app/inventory/page.tsx",
+                                                                lineNumber: 500,
+                                                                columnNumber: 29
+                                                            }, this)
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/app/inventory/page.tsx",
+                                                            lineNumber: 499,
+                                                            columnNumber: 27
+                                                        }, this)
+                                                    ]
+                                                }, product.id, true, {
+                                                    fileName: "[project]/app/inventory/page.tsx",
+                                                    lineNumber: 440,
+                                                    columnNumber: 23
+                                                }, this))
+                                        }, void 0, false, {
+                                            fileName: "[project]/app/inventory/page.tsx",
+                                            lineNumber: 431,
+                                            columnNumber: 17
+                                        }, this)
+                                    ]
+                                }, void 0, true, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 407,
+                                    columnNumber: 15
+                                }, this)
+                            }, void 0, false, {
+                                fileName: "[project]/app/inventory/page.tsx",
+                                lineNumber: 406,
+                                columnNumber: 13
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/app/inventory/page.tsx",
+                        lineNumber: 329,
+                        columnNumber: 9
+                    }, this)
+                ]
+            }, void 0, true, {
+                fileName: "[project]/app/inventory/page.tsx",
+                lineNumber: 327,
+                columnNumber: 7
+            }, this),
+            showForm && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                className: "fixed inset-0 z-50 flex items-center justify-center bg-black/70",
+                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                    className: "w-full max-w-2xl rounded-2xl bg-[#0b1220] border border-cyan-500/30 p-6",
+                    children: [
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                            className: "flex items-center justify-between mb-4",
+                            children: [
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
+                                    className: "text-lg font-bold text-cyan-200",
+                                    children: editingId ? language === 'ar' ? 'تعديل المنتج' : 'Edit Product' : t('inventory.addProduct')
+                                }, void 0, false, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 524,
+                                    columnNumber: 15
+                                }, this),
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                    onClick: ()=>setShowForm(false),
+                                    className: "text-slate-400 hover:text-white",
+                                    children: "✕"
+                                }, void 0, false, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 527,
+                                    columnNumber: 15
+                                }, this)
+                            ]
+                        }, void 0, true, {
+                            fileName: "[project]/app/inventory/page.tsx",
+                            lineNumber: 523,
+                            columnNumber: 13
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                            className: "grid grid-cols-1 md:grid-cols-2 gap-4",
+                            children: [
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                    className: "bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm",
+                                    placeholder: t('inventory.productName'),
+                                    value: form.nameEn,
+                                    onChange: (e)=>setForm((prev)=>({
+                                                ...prev,
+                                                nameEn: e.target.value
+                                            }))
+                                }, void 0, false, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 532,
+                                    columnNumber: 15
+                                }, this),
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                    className: "bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm",
+                                    placeholder: `${t('inventory.productName')} (AR)`,
+                                    value: form.nameAr,
+                                    onChange: (e)=>setForm((prev)=>({
+                                                ...prev,
+                                                nameAr: e.target.value
+                                            }))
+                                }, void 0, false, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 538,
+                                    columnNumber: 15
+                                }, this),
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                    className: "bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm",
+                                    placeholder: t('inventory.brand'),
+                                    value: form.brand,
+                                    onChange: (e)=>setForm((prev)=>({
+                                                ...prev,
+                                                brand: e.target.value
+                                            }))
+                                }, void 0, false, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 544,
+                                    columnNumber: 15
+                                }, this),
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                    className: "bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm",
+                                    placeholder: "SKU",
+                                    value: form.sku,
+                                    onChange: (e)=>setForm((prev)=>({
+                                                ...prev,
+                                                sku: e.target.value
+                                            }))
+                                }, void 0, false, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 550,
+                                    columnNumber: 15
+                                }, this),
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                    className: "bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm",
+                                    placeholder: "Barcode",
+                                    value: form.barcode,
+                                    onChange: (e)=>setForm((prev)=>({
+                                                ...prev,
+                                                barcode: e.target.value
+                                            }))
+                                }, void 0, false, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 556,
+                                    columnNumber: 15
+                                }, this),
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                    className: "bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm",
+                                    placeholder: "QR Code",
+                                    value: form.qrCode,
+                                    onChange: (e)=>setForm((prev)=>({
+                                                ...prev,
+                                                qrCode: e.target.value
+                                            }))
+                                }, void 0, false, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 562,
+                                    columnNumber: 15
+                                }, this),
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                    className: "bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm",
+                                    placeholder: t('inventory.productImage') || 'Image URL',
+                                    value: form.imageUrl,
+                                    onChange: (e)=>setForm((prev)=>({
+                                                ...prev,
+                                                imageUrl: e.target.value
+                                            }))
+                                }, void 0, false, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 568,
+                                    columnNumber: 15
+                                }, this),
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                    className: "bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm",
+                                    placeholder: t('inventory.buyPrice'),
+                                    value: form.buyPrice,
+                                    onChange: (e)=>setForm((prev)=>({
+                                                ...prev,
+                                                buyPrice: e.target.value
+                                            }))
+                                }, void 0, false, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 574,
+                                    columnNumber: 15
+                                }, this),
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                    className: "bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm",
+                                    placeholder: t('inventory.sellPrice'),
+                                    value: form.sellPrice,
+                                    onChange: (e)=>setForm((prev)=>({
+                                                ...prev,
+                                                sellPrice: e.target.value
+                                            }))
+                                }, void 0, false, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 580,
+                                    columnNumber: 15
+                                }, this),
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                    className: "bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm",
+                                    placeholder: t('inventory.stock'),
+                                    value: form.stockQuantity,
+                                    onChange: (e)=>setForm((prev)=>({
+                                                ...prev,
+                                                stockQuantity: e.target.value
+                                            }))
+                                }, void 0, false, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 586,
+                                    columnNumber: 15
+                                }, this),
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                    className: "bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm",
+                                    placeholder: t('inventory.minStock'),
+                                    value: form.minStockLevel,
+                                    onChange: (e)=>setForm((prev)=>({
+                                                ...prev,
+                                                minStockLevel: e.target.value
+                                            }))
+                                }, void 0, false, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 592,
+                                    columnNumber: 15
+                                }, this)
+                            ]
+                        }, void 0, true, {
+                            fileName: "[project]/app/inventory/page.tsx",
+                            lineNumber: 531,
+                            columnNumber: 13
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                            className: "mt-6 border-t border-cyan-500/20 pt-6",
+                            children: [
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h3", {
+                                    className: "text-sm font-bold text-cyan-300 mb-3",
+                                    children: language === 'ar' ? 'تفاصيل المتجر الأونلاين' : 'Online store details'
+                                }, void 0, false, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 602,
+                                    columnNumber: 15
+                                }, this),
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                    className: "space-y-4",
+                                    children: [
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("textarea", {
+                                            className: "w-full bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm",
+                                            placeholder: language === 'ar' ? 'وصف قصير' : 'Short description',
+                                            rows: 2,
+                                            value: form.descriptionShort,
+                                            onChange: (e)=>setForm((prev)=>({
+                                                        ...prev,
+                                                        descriptionShort: e.target.value
+                                                    }))
+                                        }, void 0, false, {
+                                            fileName: "[project]/app/inventory/page.tsx",
+                                            lineNumber: 604,
+                                            columnNumber: 17
+                                        }, this),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("textarea", {
+                                            className: "w-full bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm",
+                                            placeholder: language === 'ar' ? 'وصف طويل' : 'Long description',
+                                            rows: 4,
+                                            value: form.descriptionLong,
+                                            onChange: (e)=>setForm((prev)=>({
+                                                        ...prev,
+                                                        descriptionLong: e.target.value
+                                                    }))
+                                        }, void 0, false, {
+                                            fileName: "[project]/app/inventory/page.tsx",
+                                            lineNumber: 611,
+                                            columnNumber: 17
+                                        }, this),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                            children: [
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                    className: "text-xs text-slate-400 mb-1",
+                                                    children: language === 'ar' ? 'المواصفات (مفتاح / قيمة)' : 'Specs (key / value)'
+                                                }, void 0, false, {
+                                                    fileName: "[project]/app/inventory/page.tsx",
+                                                    lineNumber: 619,
+                                                    columnNumber: 19
+                                                }, this),
+                                                form.specs.map((s, i)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                        className: "flex gap-2 mb-2",
+                                                        children: [
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                                className: "flex-1 bg-[#0f172a] border border-cyan-500/20 rounded px-2 py-1.5 text-sm",
+                                                                placeholder: "Key",
+                                                                value: s.key,
+                                                                onChange: (e)=>setForm((prev)=>({
+                                                                            ...prev,
+                                                                            specs: prev.specs.map((sp, j)=>j === i ? {
+                                                                                    ...sp,
+                                                                                    key: e.target.value
+                                                                                } : sp)
+                                                                        }))
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/app/inventory/page.tsx",
+                                                                lineNumber: 622,
+                                                                columnNumber: 23
+                                                            }, this),
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                                className: "flex-1 bg-[#0f172a] border border-cyan-500/20 rounded px-2 py-1.5 text-sm",
+                                                                placeholder: "Value",
+                                                                value: s.value,
+                                                                onChange: (e)=>setForm((prev)=>({
+                                                                            ...prev,
+                                                                            specs: prev.specs.map((sp, j)=>j === i ? {
+                                                                                    ...sp,
+                                                                                    value: e.target.value
+                                                                                } : sp)
+                                                                        }))
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/app/inventory/page.tsx",
+                                                                lineNumber: 631,
+                                                                columnNumber: 23
+                                                            }, this),
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                                type: "button",
+                                                                onClick: ()=>setForm((prev)=>({
+                                                                            ...prev,
+                                                                            specs: prev.specs.filter((_, j)=>j !== i)
+                                                                        })),
+                                                                className: "px-2 text-red-400",
+                                                                children: "×"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/app/inventory/page.tsx",
+                                                                lineNumber: 640,
+                                                                columnNumber: 23
+                                                            }, this)
+                                                        ]
+                                                    }, i, true, {
+                                                        fileName: "[project]/app/inventory/page.tsx",
+                                                        lineNumber: 621,
+                                                        columnNumber: 21
+                                                    }, this)),
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                    type: "button",
+                                                    onClick: ()=>setForm((prev)=>({
+                                                                ...prev,
+                                                                specs: [
+                                                                    ...prev.specs,
+                                                                    {
+                                                                        key: '',
+                                                                        value: ''
+                                                                    }
+                                                                ]
+                                                            })),
+                                                    className: "text-xs text-cyan-400 hover:text-cyan-300",
+                                                    children: language === 'ar' ? '+ إضافة مواصفة' : '+ Add spec'
+                                                }, void 0, false, {
+                                                    fileName: "[project]/app/inventory/page.tsx",
+                                                    lineNumber: 649,
+                                                    columnNumber: 19
+                                                }, this)
+                                            ]
+                                        }, void 0, true, {
+                                            fileName: "[project]/app/inventory/page.tsx",
+                                            lineNumber: 618,
+                                            columnNumber: 17
+                                        }, this),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                            className: "w-full bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm",
+                                            placeholder: language === 'ar' ? 'نص الضمان' : 'Warranty text',
+                                            value: form.warrantyText,
+                                            onChange: (e)=>setForm((prev)=>({
+                                                        ...prev,
+                                                        warrantyText: e.target.value
+                                                    }))
+                                        }, void 0, false, {
+                                            fileName: "[project]/app/inventory/page.tsx",
+                                            lineNumber: 657,
+                                            columnNumber: 17
+                                        }, this),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("textarea", {
+                                            className: "w-full bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm",
+                                            placeholder: language === 'ar' ? 'سياسة الإرجاع' : 'Return policy',
+                                            rows: 2,
+                                            value: form.returnPolicyText,
+                                            onChange: (e)=>setForm((prev)=>({
+                                                        ...prev,
+                                                        returnPolicyText: e.target.value
+                                                    }))
+                                        }, void 0, false, {
+                                            fileName: "[project]/app/inventory/page.tsx",
+                                            lineNumber: 663,
+                                            columnNumber: 17
+                                        }, this),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                            children: [
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                    className: "text-xs text-slate-400 mb-1",
+                                                    children: language === 'ar' ? 'روابط معرض الصور (كل سطر رابط)' : 'Gallery image URLs (one per line)'
+                                                }, void 0, false, {
+                                                    fileName: "[project]/app/inventory/page.tsx",
+                                                    lineNumber: 671,
+                                                    columnNumber: 19
+                                                }, this),
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("textarea", {
+                                                    className: "w-full bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm",
+                                                    placeholder: "https://...",
+                                                    rows: 2,
+                                                    value: form.galleryUrls.join('\n'),
+                                                    onChange: (e)=>setForm((prev)=>({
+                                                                ...prev,
+                                                                galleryUrls: e.target.value.split('\n').map((s)=>s.trim()).filter(Boolean)
+                                                            }))
+                                                }, void 0, false, {
+                                                    fileName: "[project]/app/inventory/page.tsx",
+                                                    lineNumber: 672,
+                                                    columnNumber: 19
+                                                }, this)
+                                            ]
+                                        }, void 0, true, {
+                                            fileName: "[project]/app/inventory/page.tsx",
+                                            lineNumber: 670,
+                                            columnNumber: 17
+                                        }, this)
+                                    ]
+                                }, void 0, true, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 603,
+                                    columnNumber: 15
+                                }, this)
+                            ]
+                        }, void 0, true, {
+                            fileName: "[project]/app/inventory/page.tsx",
+                            lineNumber: 601,
+                            columnNumber: 13
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                            className: "mt-6 flex justify-end gap-3",
+                            children: [
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                    onClick: ()=>{
+                                        setShowForm(false);
+                                        setEditingId(null);
+                                    },
+                                    className: "px-4 py-2 rounded-lg border border-cyan-500/40 text-cyan-300",
+                                    children: t('common.cancel')
+                                }, void 0, false, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 684,
+                                    columnNumber: 15
+                                }, this),
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                    onClick: handleSave,
+                                    disabled: saving,
+                                    className: "px-4 py-2 rounded-lg bg-cyan-600 text-white font-semibold",
+                                    children: saving ? t('common.loading') : t('common.save')
+                                }, void 0, false, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 693,
+                                    columnNumber: 15
+                                }, this)
+                            ]
+                        }, void 0, true, {
+                            fileName: "[project]/app/inventory/page.tsx",
+                            lineNumber: 683,
+                            columnNumber: 13
+                        }, this)
+                    ]
+                }, void 0, true, {
+                    fileName: "[project]/app/inventory/page.tsx",
+                    lineNumber: 522,
+                    columnNumber: 11
+                }, this)
+            }, void 0, false, {
+                fileName: "[project]/app/inventory/page.tsx",
+                lineNumber: 521,
+                columnNumber: 9
+            }, this),
+            showBulkDeleteModal && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                className: "fixed inset-0 z-50 flex items-center justify-center bg-black/70",
+                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                    className: "w-full max-w-md rounded-2xl bg-[#0b1220] border border-cyan-500/30 p-6",
+                    children: [
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
+                            className: "text-lg font-bold text-cyan-200 mb-2",
+                            children: language === 'ar' ? 'تأكيد الحذف' : 'Confirm delete'
+                        }, void 0, false, {
+                            fileName: "[project]/app/inventory/page.tsx",
+                            lineNumber: 708,
+                            columnNumber: 13
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                            className: "text-slate-300 text-sm mb-6",
+                            children: language === 'ar' ? `هل أنت متأكد من حذف ${selectedCount} صنف؟ لا يمكن التراجع.` : `Are you sure you want to delete ${selectedCount} item(s)? This cannot be undone.`
+                        }, void 0, false, {
+                            fileName: "[project]/app/inventory/page.tsx",
+                            lineNumber: 711,
+                            columnNumber: 13
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                            className: "flex justify-end gap-3",
+                            children: [
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                    onClick: ()=>setShowBulkDeleteModal(false),
+                                    className: "px-4 py-2 rounded-lg border border-slate-500 text-slate-300",
+                                    children: language === 'ar' ? 'إلغاء' : 'Cancel'
+                                }, void 0, false, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 717,
+                                    columnNumber: 15
+                                }, this),
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                    onClick: handleBulkDelete,
+                                    disabled: bulkDeleting,
+                                    className: "px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-semibold disabled:opacity-50",
+                                    children: bulkDeleting ? language === 'ar' ? 'جاري الحذف...' : 'Deleting...' : language === 'ar' ? 'حذف' : 'Delete'
+                                }, void 0, false, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 723,
+                                    columnNumber: 15
+                                }, this)
+                            ]
+                        }, void 0, true, {
+                            fileName: "[project]/app/inventory/page.tsx",
+                            lineNumber: 716,
+                            columnNumber: 13
+                        }, this)
+                    ]
+                }, void 0, true, {
+                    fileName: "[project]/app/inventory/page.tsx",
+                    lineNumber: 707,
+                    columnNumber: 11
+                }, this)
+            }, void 0, false, {
+                fileName: "[project]/app/inventory/page.tsx",
+                lineNumber: 706,
+                columnNumber: 9
+            }, this),
+            showDeleteLastImportModal && lastBatch && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                className: "fixed inset-0 z-50 flex items-center justify-center bg-black/70",
+                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                    className: "w-full max-w-md rounded-2xl bg-[#0b1220] border border-cyan-500/30 p-6",
+                    children: [
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
+                            className: "text-lg font-bold text-cyan-200 mb-2",
+                            children: language === 'ar' ? 'التراجع عن آخر استيراد' : 'Undo last import'
+                        }, void 0, false, {
+                            fileName: "[project]/app/inventory/page.tsx",
+                            lineNumber: 738,
+                            columnNumber: 13
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                            className: "text-slate-300 text-sm mb-6",
+                            children: language === 'ar' ? `هل تريد التراجع عن آخر استيراد؟ سيتم حذف ${lastBatch.importedCount ?? 0} صنف تم إدخالهم بتاريخ ${lastBatch.createdAt ? new Date(lastBatch.createdAt).toLocaleDateString('ar-SA') : '—'}.` : `Undo last import? This will remove ${lastBatch.importedCount ?? 0} products imported on ${lastBatch.createdAt ? new Date(lastBatch.createdAt).toLocaleDateString() : '—'}.`
+                        }, void 0, false, {
+                            fileName: "[project]/app/inventory/page.tsx",
+                            lineNumber: 741,
+                            columnNumber: 13
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                            className: "flex justify-end gap-3",
+                            children: [
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                    onClick: ()=>{
+                                        setShowDeleteLastImportModal(false);
+                                        setLastBatch(null);
+                                    },
+                                    disabled: deleteLastImportLoading,
+                                    className: "px-4 py-2 rounded-lg border border-slate-500 text-slate-300 disabled:opacity-50",
+                                    children: language === 'ar' ? 'إلغاء' : 'Cancel'
+                                }, void 0, false, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 747,
+                                    columnNumber: 15
+                                }, this),
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                    onClick: handleUndoLastImport,
+                                    disabled: deleteLastImportLoading,
+                                    className: "px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold disabled:opacity-50",
+                                    children: deleteLastImportLoading ? language === 'ar' ? 'جاري التراجع...' : 'Rolling back...' : language === 'ar' ? 'تراجع' : 'Undo'
+                                }, void 0, false, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 754,
+                                    columnNumber: 15
+                                }, this)
+                            ]
+                        }, void 0, true, {
+                            fileName: "[project]/app/inventory/page.tsx",
+                            lineNumber: 746,
+                            columnNumber: 13
+                        }, this)
+                    ]
+                }, void 0, true, {
+                    fileName: "[project]/app/inventory/page.tsx",
+                    lineNumber: 737,
+                    columnNumber: 11
+                }, this)
+            }, void 0, false, {
+                fileName: "[project]/app/inventory/page.tsx",
+                lineNumber: 736,
+                columnNumber: 9
+            }, this),
+            availabilityModal && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                className: "fixed inset-0 z-50 flex items-center justify-center bg-black/70",
+                onClick: ()=>setAvailabilityModal(null),
+                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                    className: "w-full max-w-md rounded-2xl bg-[#0b1220] border border-cyan-500/30 p-6 shadow-xl",
+                    onClick: (e)=>e.stopPropagation(),
+                    children: [
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                            className: "flex justify-between items-center mb-4",
+                            children: [
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h3", {
+                                    className: "text-lg font-bold text-cyan-200",
+                                    children: language === 'ar' ? 'توفر في فروع أخرى' : 'Available in other branches'
+                                }, void 0, false, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 773,
+                                    columnNumber: 15
+                                }, this),
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                    onClick: ()=>setAvailabilityModal(null),
+                                    className: "text-slate-400 hover:text-white",
+                                    children: "×"
+                                }, void 0, false, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 776,
+                                    columnNumber: 15
+                                }, this)
+                            ]
+                        }, void 0, true, {
+                            fileName: "[project]/app/inventory/page.tsx",
+                            lineNumber: 772,
+                            columnNumber: 13
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                            className: "text-sm text-slate-300 mb-4 truncate",
+                            title: availabilityModal.productName,
+                            children: availabilityModal.productName
+                        }, void 0, false, {
+                            fileName: "[project]/app/inventory/page.tsx",
+                            lineNumber: 778,
+                            columnNumber: 13
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                            className: "space-y-2 max-h-48 overflow-y-auto",
+                            children: availabilityData ? availabilityData.branches.length === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                className: "text-slate-500 text-sm",
+                                children: language === 'ar' ? 'لا توجد بيانات' : 'No data'
+                            }, void 0, false, {
+                                fileName: "[project]/app/inventory/page.tsx",
+                                lineNumber: 782,
+                                columnNumber: 19
+                            }, this) : availabilityData.branches.map((b, i)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                    className: "flex justify-between py-2 border-b border-cyan-500/10",
+                                    children: [
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                            className: "text-slate-200",
+                                            children: language === 'ar' ? b.branchNameAr : b.branchNameEn
+                                        }, void 0, false, {
+                                            fileName: "[project]/app/inventory/page.tsx",
+                                            lineNumber: 786,
+                                            columnNumber: 23
+                                        }, this),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                            className: "font-bold text-cyan-300",
+                                            children: b.qty
+                                        }, void 0, false, {
+                                            fileName: "[project]/app/inventory/page.tsx",
+                                            lineNumber: 787,
+                                            columnNumber: 23
+                                        }, this)
+                                    ]
+                                }, i, true, {
+                                    fileName: "[project]/app/inventory/page.tsx",
+                                    lineNumber: 785,
+                                    columnNumber: 21
+                                }, this)) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                className: "text-slate-500 text-sm",
+                                children: language === 'ar' ? 'جاري التحميل...' : 'Loading...'
+                            }, void 0, false, {
+                                fileName: "[project]/app/inventory/page.tsx",
+                                lineNumber: 792,
+                                columnNumber: 17
+                            }, this)
+                        }, void 0, false, {
+                            fileName: "[project]/app/inventory/page.tsx",
+                            lineNumber: 779,
+                            columnNumber: 13
+                        }, this)
+                    ]
+                }, void 0, true, {
+                    fileName: "[project]/app/inventory/page.tsx",
+                    lineNumber: 768,
+                    columnNumber: 11
+                }, this)
+            }, void 0, false, {
+                fileName: "[project]/app/inventory/page.tsx",
+                lineNumber: 767,
+                columnNumber: 9
+            }, this),
+            (0, __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$permissions$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["canAccess"])(effectiveRole, 'ai', planFeatures) && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$app$2f$components$2f$AIAssistant$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["AIAssistant"], {}, void 0, false, {
+                fileName: "[project]/app/inventory/page.tsx",
+                lineNumber: 799,
+                columnNumber: 63
+            }, this),
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$app$2f$components$2f$BarcodeScanner$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["BarcodeScanner"], {
+                open: scannerOpen,
+                onClose: ()=>setScannerOpen(false),
+                onDetected: (value)=>setSearch(value)
+            }, void 0, false, {
+                fileName: "[project]/app/inventory/page.tsx",
+                lineNumber: 801,
+                columnNumber: 7
+            }, this)
+        ]
+    }, void 0, true, {
+        fileName: "[project]/app/inventory/page.tsx",
+        lineNumber: 325,
+        columnNumber: 5
+    }, this);
+}
+_s(InventoryPage, "h0FXA5tAKLQxTwI9aI69TWZg2Bc=", false, function() {
+    return [
+        __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$LanguageContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useLanguage"],
+        __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"],
+        __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$guards$2f$useRouteGuard$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouteGuard"],
+        __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$contexts$2f$CurrencyContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCurrency"]
+    ];
+});
+_c = InventoryPage;
+var _c;
+__turbopack_context__.k.register(_c, "InventoryPage");
+if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
+    __turbopack_context__.k.registerExports(__turbopack_context__.m, globalThis.$RefreshHelpers$);
+}
+}),
+]);
+
+//# sourceMappingURL=_21da6098._.js.map

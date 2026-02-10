@@ -5,6 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import { Package, MapPin, Phone, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { API_BASE_URL } from '../api-config';
 import Link from 'next/link';
+import { useCurrency } from '../contexts/CurrencyContext';
+import { formatCurrency } from '@/lib/formatters';
 
 interface TrackData {
   orderId: number;
@@ -37,6 +39,7 @@ function TrackPageContent() {
   const code = searchParams.get('code') || '';
   const phone = searchParams.get('phone') || '';
   const [lang, setLang] = useState<'ar' | 'en'>('ar');
+  const { currency, symbol } = useCurrency();
   const [data, setData] = useState<TrackData | null>(null);
   const [shop, setShop] = useState<ShopContext | null>(null);
   const [loading, setLoading] = useState(true);
@@ -190,7 +193,7 @@ function TrackPageContent() {
                   {new Date(data.createdAt).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US')}
                 </div>
                 <div className="font-bold text-cyan-200">
-                  {lang === 'ar' ? 'الإجمالي' : 'Total'}: {data.total.toFixed(2)} {data.currency}
+                  {lang === 'ar' ? 'الإجمالي' : 'Total'}: {formatCurrency(data.total, lang === 'ar' ? 'ar' : 'en', currency, symbol)}
                 </div>
               </div>
             </div>
@@ -206,7 +209,7 @@ function TrackPageContent() {
                       {item.name} x {item.quantity}
                     </span>
                     <span className="text-cyan-200">
-                      {item.subtotal.toFixed(2)} {data.currency}
+                      {formatCurrency(item.subtotal, lang === 'ar' ? 'ar' : 'en', currency, symbol)}
                     </span>
                   </div>
                 ))}

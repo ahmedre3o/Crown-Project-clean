@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { Readable } from 'stream';
 import { pool, testConnection, initializeDatabase } from './db';
+import type { RowDataPacket } from 'mysql2/promise';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
@@ -18,6 +19,9 @@ import csvParser from 'csv-parser';
 const upload = multer({ storage: multer.memoryStorage() });
 import { GoogleGenAI } from '@google/genai';
 import { domainToASCII } from 'url';
+import { loadSystemKnowledge } from './loadKnowledge';
+import { getLocalHelp } from './localHelp';
+import { getPlanFeaturesForBackend, PLANS } from '../shared/plans';
 
 declare global {
   namespace Express {
@@ -35,6 +39,14 @@ dotenv.config({ path: rootEnvPath });
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Dev-only request logger to confirm active routes and hits
+if (process.env.NODE_ENV !== 'production') {
+  app.use((req, _res, next) => {
+    console.log('[REQ]', req.method, req.url);
+    next();
+  });
+}
 // Public APIs (storefront) must be accessible from any domain
 app.use(
   '/api/public',
@@ -61,8 +73,28 @@ app.use((req, res, next) => {
   return cors({ origin: 'http://localhost:3000', credentials: true })(req, res, next);
 });
 
+app.get('/api/plans', (req: Request, res: Response) => {
+  const lang = (req.query.lang === 'en' ? 'en' : 'ar') as 'ar' | 'en';
+  const plans = PLANS.map((p) => ({
+    ...p,
+    pricingForLang: p.pricing[lang],
+    currency: lang === 'ar' ? 'EGP' : 'USD',
+    currencySymbol: lang === 'ar' ? 'ج.م' : '$',
+  }));
+  res.json(plans);
+});
+
 app.get('/api/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok' });
+});
+
+app.get('/api/health/db', async (_req: Request, res: Response) => {
+  try {
+    await pool.execute('SELECT 1 as ok');
+    res.status(200).json({ status: 'ok', db: 'connected' });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', db: 'disconnected', message: error?.message ?? 'Database check failed' });
+  }
 });
 
 // TEMPORARY: remove after setup
@@ -72,7 +104,7 @@ app.get('/api/setup-admin', async (_req: Request, res: Response) => {
     try {
       await connection.beginTransaction();
 
-      const [existingUsers] = await connection.execute('SELECT id FROM users WHERE username = ?', ['admin@crown.com']);
+      const [existingUsers] = await connection.execute('SELECT id FROM users WHERE email = ?', ['admin@crown.com']);
       if ((existingUsers as any[]).length > 0) {
         await connection.rollback();
         return res.json({ message: 'Admin already exists' });
@@ -86,8 +118,8 @@ app.get('/api/setup-admin', async (_req: Request, res: Response) => {
 
       const hashedPassword = await bcrypt.hash('password123', 10);
       const [userResult] = await connection.execute(
-        'INSERT INTO users (username, password, role, package, shop_id) VALUES (?, ?, ?, ?, ?)',
-        ['admin@crown.com', hashedPassword, 'super_admin', 'gold', shopInsert.insertId]
+        'INSERT INTO users (email, password, is_admin, is_super_admin, is_active, role, created_at, shop_id) VALUES (?, ?, 1, 1, 1, ?, NOW(), ?)',
+        ['admin@crown.com', hashedPassword, 'super_admin', shopInsert.insertId]
       );
       const userInsert = userResult as any;
 
@@ -110,7 +142,11 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const JWT_SECRET = process.env.JWT_SECRET || 'crown-services-secret-key-2026';
 const PORT = parseInt(process.env.PORT || '5001', 10);
 
-console.log('AI API KEY:', GEMINI_API_KEY ? 'LOADED' : 'MISSING');
+// Masked Gemini key log (no full key ever printed)
+if (process.env.NODE_ENV !== 'production') {
+  const len = GEMINI_API_KEY ? GEMINI_API_KEY.length : 0;
+  console.log('Gemini key loaded:', GEMINI_API_KEY ? `yes (len=${len})` : 'no');
+}
 const genAI = (() => {
   if (!GEMINI_API_KEY) return null;
   try {
@@ -124,42 +160,54 @@ const genAI = (() => {
 // NOTE: Available models for the stable v1 endpoint can vary by API.
 // We default to a fast model that is currently available in `models.list()`.
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
-const DEFAULT_ADMIN_HASH = '$2a$10$CB6YvQC5O/sk9D2ZpgZYBuNGPMOn/2vAGylpa5edvWivtld0h1wQW';
+
+type AiStatus = { ok: boolean; mode: 'cloud' | 'offline'; reason?: string };
+let aiStatusCache: { value: AiStatus; ts: number } | null = null;
+
+const SUPER_ADMIN_EMAIL = 'admin@crown.com';
+const SUPER_ADMIN_PASSWORD = 'password123';
 
 const ensureSuperAdmin = async () => {
-  const connection = await pool.getConnection();
+  let connection;
   try {
+    connection = await pool.getConnection();
     await connection.beginTransaction();
 
-    const [userRows] = await connection.execute('SELECT * FROM users WHERE username = ?', ['admin@crown.com']);
-    let adminUser = (userRows as any[])[0];
+    // اعتمد على الأعمدة الحالية في جدول users بدون فرض وجود password_hash / is_admin / is_super_admin
+    const [userRows] = await connection.execute(
+      'SELECT id, password FROM users WHERE email = ? OR username = ?',
+      [SUPER_ADMIN_EMAIL, SUPER_ADMIN_EMAIL]
+    );
+    const existing = (userRows as any[])[0];
 
-    if (!adminUser) {
-      const [userResult] = await connection.execute(
-        'INSERT INTO users (username, password, role, package, shop_id) VALUES (?, ?, ?, ?, ?)',
-        ['admin@crown.com', DEFAULT_ADMIN_HASH, 'super_admin', 'gold', null]
-      );
-      const userInsert = userResult as any;
-      adminUser = { id: userInsert.insertId };
-    }
-
-    const [shopRows] = await connection.execute('SELECT * FROM shops WHERE id = 1');
-    if ((shopRows as any[]).length === 0) {
+    if (!existing) {
+      const hashed = await bcrypt.hash(SUPER_ADMIN_PASSWORD, 10);
       await connection.execute(
-        `INSERT INTO shops (id, name, business_name, owner_name, activity_type, address, contact_email, contact_phone, owner_id, package)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [1, 'Crown Headquarters', 'Crown Headquarters', 'Crown Admin', 'Headquarters', null, 'admin@crown.com', null, adminUser.id, 'gold']
+        `INSERT INTO users (username, email, password, role, created_at)
+         VALUES (?, ?, ?, 'super_admin', NOW())`,
+        [SUPER_ADMIN_EMAIL, SUPER_ADMIN_EMAIL, hashed]
       );
+      console.log('✅ SUPER ADMIN READY (created)');
+    } else {
+      const forceReset = process.env.FORCE_SUPER_ADMIN_RESET === 'true';
+      if (forceReset) {
+        const hashed = await bcrypt.hash(SUPER_ADMIN_PASSWORD, 10);
+        await connection.execute(
+          'UPDATE users SET role = ?, password = ? WHERE id = ?',
+          ['super_admin', hashed, existing.id]
+        );
+      } else {
+        await connection.execute('UPDATE users SET role = ? WHERE id = ?', ['super_admin', existing.id]);
+      }
+      console.log('✅ SUPER ADMIN READY (updated)');
     }
 
-    await connection.execute('UPDATE users SET shop_id = ? WHERE username = ?', [1, 'admin@crown.com']);
     await connection.commit();
-    console.log('✅ SUPER ADMIN READY');
   } catch (error) {
-    await connection.rollback();
+    if (connection) await connection.rollback().catch(() => {});
     console.error('❌ Failed to ensure super admin:', (error as any).message);
   } finally {
-    connection.release();
+    if (connection) connection.release();
   }
 };
 
@@ -216,6 +264,16 @@ const authenticateToken = async (req: any, res: Response, next: any) => {
   }
 };
 
+function getOne(v: unknown): string | undefined {
+  if (typeof v === 'string') return v;
+  if (Array.isArray(v)) return typeof v[0] === 'string' ? v[0] : undefined;
+  return undefined;
+}
+
+function mustOne(v: unknown, fallback = ''): string {
+  return getOne(v) ?? fallback;
+}
+
 const resolveShopId = (req: any) => {
   const headerShop = req.headers['x-shop-id'];
   const headerShopId = Array.isArray(headerShop) ? headerShop[0] : headerShop;
@@ -224,6 +282,115 @@ const resolveShopId = (req: any) => {
     return req.query.shopId || req.body?.shopId || headerParsed || null;
   }
   return req.user?.shop_id || req.user?.shopId || headerParsed || null;
+};
+
+/** Resolve active branch: x-branch-id header or body.branchId. Returns null if not sent; caller may use shop default. */
+const resolveBranchId = (req: any): number | null => {
+  const raw =
+    req.headers['x-branch-id'] ?? req.body?.branchId ?? req.query?.branchId;
+  const id = Array.isArray(raw) ? Number(raw[0]) : Number(raw);
+  return Number.isFinite(id) && id > 0 ? id : null;
+};
+
+/**
+ * Resolve or auto-create a shop for the current user.
+ * - If user already has shop_id and shop exists -> returns it.
+ * - If not, creates a new shop, links it to the user and ensures a base subscription.
+ * - In dev, super_admin gets gold lifetime by default.
+ */
+const resolveOrCreateShopForUser = async (user: any): Promise<number> => {
+  if (!user?.id) {
+    throw new Error('USER_REQUIRED');
+  }
+
+  let existingShopId: number | null =
+    (user.shop_id as number | undefined) ??
+    (user.shopId as number | undefined) ??
+    null;
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    if (existingShopId) {
+      const [rows] = await conn.execute('SELECT id FROM shops WHERE id = ?', [existingShopId]);
+      if ((rows as any[]).length > 0) {
+        await conn.commit();
+        return existingShopId;
+      }
+    }
+
+    const planName: string = user.role === 'super_admin' ? 'gold' : 'bronze';
+    const displayName =
+      user.role === 'super_admin'
+        ? 'Crown Admin Shop'
+        : String(user.email || user.username || 'Crown Shop');
+
+    const [insertShop] = await conn.execute(
+      `INSERT INTO shops (
+        name,
+        business_name,
+        owner_name,
+        activity_type,
+        address,
+        contact_email,
+        contact_phone,
+        country_name,
+        currency_code,
+        currency_symbol,
+        plan_type,
+        is_active,
+        logo_url,
+        owner_id,
+        package
+      ) VALUES (?, NULL, ?, NULL, NULL, ?, NULL, NULL, NULL, NULL, ?, 1, NULL, ?, ?)`,
+      [
+        displayName,
+        displayName,
+        user.email || null,
+        planName,
+        user.id,
+        planName,
+      ]
+    );
+    const newShopId = Number((insertShop as any).insertId || 0);
+
+    await conn.execute('UPDATE users SET shop_id = ?, package = ? WHERE id = ?', [
+      newShopId,
+      planName,
+      user.id,
+    ]);
+
+    await conn.commit();
+
+    // Ensure a base subscription (best-effort, ignore failures)
+    try {
+      await subscriptionStackActivation(
+        newShopId,
+        planName,
+        process.env.NODE_ENV !== 'production' ? 'lifetime' : 'yearly',
+        'AUTO_INIT',
+        user.id
+      );
+    } catch {
+      // non-fatal in dev/prod; shop itself is created and linked
+    }
+
+    return newShopId;
+  } catch (error) {
+    await conn.rollback().catch(() => {});
+    throw error;
+  } finally {
+    conn.release();
+  }
+};
+
+/** For branch_manager: return assigned branch ids. For multi_branch_manager: null (all branches). Others: null. */
+const getBranchManagerBranchIds = async (req: any): Promise<number[] | null> => {
+  if (req.user?.role !== 'branch_manager' || !req.user?.id) return null;
+  const [rows] = await pool.execute('SELECT branch_id FROM user_branch_assignments WHERE user_id = ?', [req.user.id]);
+  const ids = (rows as any[]).map((r) => Number(r.branch_id)).filter((n) => Number.isFinite(n) && n > 0);
+  return ids.length > 0 ? ids : null;
 };
 
 // ========== DOMAIN RESOLUTION + VERIFICATION ==========
@@ -439,8 +606,54 @@ app.get('/api/models', authenticateToken, requireRole('super_admin'), async (req
   }
 });
 
+// Lightweight AI health / status endpoint (with 60s cache)
+app.get('/api/ai/status', authenticateToken, requirePackageFeature('ai'), async (req: any, res: Response) => {
+  try {
+    if (!GEMINI_API_KEY || !genAI) {
+      const status: AiStatus = { ok: false, mode: 'offline', reason: 'AI_DISABLED' };
+      aiStatusCache = { value: status, ts: Date.now() };
+      return res.json(status);
+    }
+
+    const now = Date.now();
+    if (aiStatusCache && now - aiStatusCache.ts < 60_000) {
+      return res.json(aiStatusCache.value);
+    }
+
+    let status: AiStatus;
+    try {
+      // Use models.list as a very light validation of the client/key.
+      const pager = genAI.models.list();
+      let hasAny = false;
+      for await (const _model of pager as any) {
+        hasAny = true;
+        break;
+      }
+      status = hasAny
+        ? { ok: true, mode: 'cloud' }
+        : { ok: false, mode: 'offline', reason: 'NO_MODELS' };
+    } catch (error: any) {
+      const isKeyError =
+        error?.status === 400 ||
+        error?.status === 401 ||
+        error?.status === 403 ||
+        (typeof error?.message === 'string' && /api[_-]?key|unauthorized|invalid/i.test(error.message));
+      status = isKeyError
+        ? { ok: false, mode: 'offline', reason: 'API_KEY_INVALID' }
+        : { ok: false, mode: 'offline', reason: 'PROVIDER_ERROR' };
+    }
+
+    aiStatusCache = { value: status, ts: now };
+    res.json(status);
+  } catch (error: any) {
+    const fallback: AiStatus = { ok: false, mode: 'offline', reason: 'STATUS_ERROR' };
+    aiStatusCache = { value: fallback, ts: Date.now() };
+    res.json(fallback);
+  }
+});
+
 // Middleware for package-based access control
-const requirePackageFeature = (feature: 'qr' | 'pos' | 'dashboard' | 'excel' | 'ai' | 'storefront') => {
+function requirePackageFeature(feature: 'qr' | 'pos' | 'dashboard' | 'excel' | 'ai' | 'storefront') {
   return (req: any, res: Response, next: any) => {
     if (!req.user) {
       return res.status(401).json({ error: 'Authentication required' });
@@ -450,8 +663,8 @@ const requirePackageFeature = (feature: 'qr' | 'pos' | 'dashboard' | 'excel' | '
       return next();
     }
 
-    const plan = (req.user.package || 'bronze') as 'bronze' | 'silver' | 'gold';
-    const config = tierFeatures[plan] || tierFeatures.bronze;
+    const plan = String(req.user.package || 'bronze').toLowerCase();
+    const config = getTierConfig(plan);
 
     const allowed =
       feature === 'pos'
@@ -461,11 +674,11 @@ const requirePackageFeature = (feature: 'qr' | 'pos' | 'dashboard' | 'excel' | '
         : feature === 'excel'
         ? Boolean(config.excelImport)
         : feature === 'ai'
-        ? Boolean(config.voiceAssistant)
+        ? ['gold', 'branches'].includes(plan)
         : feature === 'qr'
         ? Boolean(config.qrCode || config.barcode)
         : feature === 'storefront'
-        ? plan === 'gold'
+        ? ['gold', 'branches'].includes(plan)
         : false;
 
     if (!allowed) {
@@ -474,47 +687,71 @@ const requirePackageFeature = (feature: 'qr' | 'pos' | 'dashboard' | 'excel' | '
 
     return next();
   };
-};
+}
 
 const tierFeatures = {
-  bronze: {
-    maxProducts: 500,
-    barcode: false,
-    qrCode: false,
-    pharmacyExpiry: false,
-    reports: false,
-    voiceAssistant: false,
-    excelImport: false,
-  },
-  silver: {
-    maxProducts: null,
-    barcode: true,
-    qrCode: true,
-    pharmacyExpiry: true,
-    reports: true,
-    voiceAssistant: false,
-    excelImport: false,
-  },
-  gold: {
-    maxProducts: null,
-    barcode: true,
-    qrCode: true,
-    pharmacyExpiry: true,
-    reports: true,
-    voiceAssistant: true,
-    excelImport: true,
-  },
+  bronze: { maxProducts: 500, barcode: true, qrCode: false, pharmacyExpiry: false, reports: true, voiceAssistant: false, excelImport: false },
+  silver: { maxProducts: 3000, barcode: true, qrCode: true, pharmacyExpiry: true, reports: true, voiceAssistant: false, excelImport: true },
+  gold: { maxProducts: 20000, barcode: true, qrCode: true, pharmacyExpiry: true, reports: true, voiceAssistant: true, excelImport: true },
+  branches: { maxProducts: null, barcode: true, qrCode: true, pharmacyExpiry: true, reports: true, voiceAssistant: true, excelImport: true },
 } as const;
+
+type TierName = keyof typeof tierFeatures;
+function getTierConfig(tier: string): (typeof tierFeatures)[TierName] {
+  const key = (tier in tierFeatures ? tier : 'bronze') as TierName;
+  return tierFeatures[key];
+}
+
+function getPlanFeatures(plan: string) {
+  return getPlanFeaturesForBackend(plan);
+}
 
 const getShopTier = async (shopId: number) => {
   const [shops] = await pool.execute('SELECT package FROM shops WHERE id = ?', [shopId]);
   const shopArray = shops as any[];
-  return (shopArray[0]?.package || 'bronze') as 'bronze' | 'silver' | 'gold';
+  return String(shopArray[0]?.package || 'bronze').toLowerCase();
+};
+
+/** Compute effective plan + features for a user (role + subscriptions). */
+const getEffectivePlanForUser = async (user: any): Promise<{ planId: string; features: any }> => {
+  // Super admin: always treated as gold (full features)
+  if (user?.role === 'super_admin') {
+    const gold = PLANS.find((p) => p.id === 'gold')!;
+    return { planId: gold.id, features: gold.features };
+  }
+
+  const shopId: number | null =
+    (user?.shop_id as number | undefined) ??
+    (user?.shopId as number | undefined) ??
+    null;
+
+  if (!shopId) {
+    const bronze = PLANS.find((p) => p.id === 'bronze')!;
+    return { planId: bronze.id, features: bronze.features };
+  }
+
+  try {
+    const [rows] = await pool.execute(
+      'SELECT plan_name, expires_at FROM subscriptions WHERE shop_id = ? LIMIT 1',
+      [shopId]
+    );
+    const sub = (rows as any[])[0];
+    let planName = String(sub?.plan_name || 'bronze').toLowerCase();
+    const expiresAt = sub?.expires_at ? new Date(sub.expires_at) : null;
+    if (expiresAt && expiresAt.getTime() < Date.now()) {
+      planName = 'bronze';
+    }
+    const cfg = PLANS.find((p) => p.id === planName) || PLANS.find((p) => p.id === 'bronze')!;
+    return { planId: cfg.id, features: cfg.features };
+  } catch {
+    const bronze = PLANS.find((p) => p.id === 'bronze')!;
+    return { planId: bronze.id, features: bronze.features };
+  }
 };
 
 const enforceProductLimit = async (shopId: number, incomingCount: number) => {
   const tier = await getShopTier(shopId);
-  const config = tierFeatures[tier];
+  const config = getTierConfig(tier);
   if (config.maxProducts === null) return { allowed: true, remaining: null, tier };
 
   const [counts] = await pool.execute('SELECT COUNT(*) as count FROM products WHERE shop_id = ?', [shopId]);
@@ -565,6 +802,24 @@ const detectUserLanguage = (text: string): 'ar' | 'en' => {
 const getTtsLocaleForLang = (lang: 'ar' | 'en') => {
   return lang === 'ar' ? 'ar-EG' : 'en-US';
 };
+
+/** Strip Markdown from assistant reply so users never see ** or ### etc.; also remove bullets that cause "نجوم" in TTS. */
+function sanitizeReply(text: string): string {
+  if (!text || typeof text !== 'string') return '';
+  let s = text
+    .replace(/\*\*|__/g, '')
+    .replace(/~~/g, '')
+    .replace(/`/g, '')
+    .replace(/\*+/g, '')
+    .replace(/^#{1,6}\s*/gm, '')
+    .replace(/^>\s?/gm, '')
+    .replace(/```/g, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[•]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return s;
+}
 
 const normalizeNumber = (value?: string | number | null) => {
   if (value === null || value === undefined) return null;
@@ -1123,39 +1378,27 @@ const enforcePlanLimits = async (shopId: number, requestedRole: string) => {
     throw new Error('Shop not found');
   }
 
-  const plan = shopArray[0].package as 'bronze' | 'silver' | 'gold';
+  const plan = String(shopArray[0].package || 'bronze').toLowerCase();
+  const planConfig = getPlanFeatures(plan);
+  const additionalLimit = (planConfig as any).additionalUsersLimit ?? planConfig.userLimit ?? 4;
+
   const [counts] = await pool.execute(
-    'SELECT role, COUNT(*) as count FROM users WHERE shop_id = ? GROUP BY role',
+    "SELECT COUNT(*) as total FROM users WHERE shop_id = ? AND role != 'shop_owner'",
     [shopId]
   );
-  const countArray = counts as any[];
-  const roleCounts = countArray.reduce<Record<string, number>>((acc, row) => {
-    acc[row.role] = row.count;
-    return acc;
-  }, {});
-
-  if (plan === 'bronze') {
-    if (requestedRole === 'warehouse') {
-      throw new Error('Bronze plan does not allow warehouse users');
-    }
-    if (requestedRole === 'shop_owner' && (roleCounts.shop_owner || 0) >= 1) {
-      throw new Error('Bronze plan allows only 1 owner');
-    }
-    if (requestedRole === 'cashier' && (roleCounts.cashier || 0) >= 1) {
-      throw new Error('Bronze plan allows only 1 cashier');
-    }
+  const additionalUsersCount = Number((counts as any[])[0]?.total || 0);
+  if (additionalUsersCount >= additionalLimit) {
+    const err = new Error('PLAN_USER_LIMIT_REACHED') as any;
+    err.message_ar = 'لقد وصلت للحد الأقصى لعدد المستخدمين في باقتك. قم بالترقية أو احذف مستخدمًا.';
+    err.message_en = "You have reached your plan's user limit. Upgrade your plan or remove a user.";
+    throw err;
   }
 
-  if (plan === 'silver') {
-    if (requestedRole === 'shop_owner' && (roleCounts.shop_owner || 0) >= 1) {
-      throw new Error('Silver plan allows only 1 owner');
-    }
-    if (requestedRole === 'cashier' && (roleCounts.cashier || 0) >= 1) {
-      throw new Error('Silver plan allows only 1 cashier');
-    }
-    if (requestedRole === 'warehouse' && (roleCounts.warehouse || 0) >= 1) {
-      throw new Error('Silver plan allows only 1 warehouse user');
-    }
+  if (plan === 'bronze' && requestedRole === 'warehouse') {
+    throw new Error('Bronze plan does not allow warehouse users');
+  }
+  if ((requestedRole === 'branch_manager' || requestedRole === 'multi_branch_manager') && plan !== 'branches') {
+    throw new Error('Branch Manager and Multi-Branch Manager roles require Branches plan');
   }
 };
 
@@ -1181,31 +1424,61 @@ const generateInvoiceNumber = async (shopId?: number) => {
 };
 
 const createSaleAndItems = async (req: any, paymentMethodOverride?: string) => {
-  const { items, paymentMethod, customerName, customerPhone, customerAddress } = req.body;
+  const { items, paymentMethod, customerName, customerPhone, customerAddress, idempotencyKey } = req.body;
   const shopId = resolveShopId(req);
-  if (!shopId) {
-    throw new Error('shopId is required');
-  }
-  if (!items || items.length === 0) {
-    throw new Error('Sale items required');
+  if (!shopId) throw new Error('shopId is required');
+  if (!items || items.length === 0) throw new Error('Sale items required');
+
+  if (idempotencyKey && typeof idempotencyKey === 'string' && idempotencyKey.length > 0) {
+    const [existing] = await pool.execute(
+      'SELECT sale_id FROM idempotency_keys WHERE idempotency_key = ? AND shop_id = ?',
+      [idempotencyKey, shopId]
+    );
+    const rows = existing as any[];
+    if (rows.length > 0) {
+      const saleId = Number(rows[0].sale_id);
+      const [sales] = await pool.execute(
+        `SELECT s.*, GROUP_CONCAT(CONCAT(si.quantity, 'x ', p.name_en, ' @ ', si.unit_price) SEPARATOR ', ') as items_summary
+         FROM sales s LEFT JOIN sale_items si ON s.id = si.sale_id LEFT JOIN products p ON si.product_id = p.id
+         WHERE s.id = ? GROUP BY s.id`,
+        [saleId]
+      );
+      const saleRow = (sales as any[])[0];
+      if (saleRow) {
+        return { saleId, sale: saleRow, invoiceNumber: saleRow.invoice_number };
+      }
+    }
   }
 
   const connection = await pool.getConnection();
   await connection.beginTransaction();
   try {
     let totalAmount = 0;
-    for (const item of items) {
-      totalAmount += item.quantity * item.unitPrice;
-    }
+    for (const item of items) totalAmount += item.quantity * item.unitPrice;
 
+    let branchId = resolveBranchId(req);
+    if (req.user?.role === 'branch_manager') {
+      const [uba] = await connection.execute('SELECT branch_id FROM user_branch_assignments WHERE user_id = ?', [req.user.id]);
+      const allowedBranchIds = (uba as any[]).map((r) => Number(r.branch_id)).filter((n) => Number.isFinite(n) && n > 0);
+      if (allowedBranchIds.length === 0) throw new Error('Branch Manager has no assigned branch');
+      if (branchId) {
+        if (!allowedBranchIds.includes(branchId)) throw new Error('Branch Manager can only sell at assigned branch');
+      } else {
+        branchId = allowedBranchIds[0];
+      }
+    } else if (!branchId) {
+      const [def] = await connection.execute('SELECT default_branch_id FROM shops WHERE id = ?', [shopId]);
+      branchId = (def as any[])[0]?.default_branch_id ?? null;
+    }
     const invoiceNumber = await generateInvoiceNumber(shopId);
     const [saleResult] = await connection.execute(
       `INSERT INTO sales 
-       (shop_id, user_id, invoice_number, customer_name, customer_phone, customer_address, total_amount, payment_method, source)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pos')`,
+       (shop_id, user_id, branch_id, invoice_number, customer_name, customer_phone, customer_address, total_amount, payment_method, source)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pos')`,
       [
         shopId,
         req.user.id,
+        branchId,
         invoiceNumber,
         customerName || null,
         customerPhone || null,
@@ -1230,8 +1503,8 @@ const createSaleAndItems = async (req: any, paymentMethodOverride?: string) => {
         throw new Error(`Insufficient stock for ${p?.name_en || p?.name_ar || 'product'}. Available: ${available}, needed: ${item.quantity}`);
       }
       await connection.execute(
-        'INSERT INTO sale_items (sale_id, product_id, quantity, unit_price, total_price) VALUES (?, ?, ?, ?, ?)',
-        [saleId, item.productId, item.quantity, item.unitPrice, item.quantity * item.unitPrice]
+        'INSERT INTO sale_items (sale_id, product_id, branch_id, quantity, unit_price, total_price) VALUES (?, ?, ?, ?, ?, ?)',
+        [saleId, item.productId, branchId, item.quantity, item.unitPrice, item.quantity * item.unitPrice]
       );
       await connection.execute('UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?', [
         item.quantity,
@@ -1277,6 +1550,13 @@ const createSaleAndItems = async (req: any, paymentMethodOverride?: string) => {
       [shopId, titleAr, titleEn, bodyAr, bodyEn, JSON.stringify({ invoiceId: saleId, saleId, total: totalAmount, itemsCount })]
     );
     if (process.env.NODE_ENV !== 'production') console.log('[notifications] INSERT pos_sale_created shopId=', shopId, 'saleId=', saleId);
+
+    if (idempotencyKey && typeof idempotencyKey === 'string' && idempotencyKey.length > 0) {
+      await connection.execute(
+        'INSERT IGNORE INTO idempotency_keys (idempotency_key, sale_id, shop_id) VALUES (?, ?, ?)',
+        [idempotencyKey, saleId, shopId]
+      );
+    }
 
     await connection.commit();
 
@@ -1335,7 +1615,7 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    
+
     const [result] = await pool.execute(
       'INSERT INTO users (username, password, role, package, shop_id) VALUES (?, ?, ?, ?, ?)',
       [username, hashedPassword, requestedRole, pkg || 'bronze', shopId || null]
@@ -1356,59 +1636,277 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
   }
 });
 
-app.post('/api/auth/login', async (req: Request, res: Response) => {
+/** Resolve user by identifier: numeric id, email, or username. Optional shopId for shop-scoped lookup. */
+async function findUserByIdentifier(identifier: string, shopId?: number | null): Promise<any | null> {
+  const raw = String(identifier || '').trim();
+  if (!raw) return null;
+  const shopFilter = shopId != null ? ' AND (shop_id = ? OR shop_id IS NULL)' : '';
+  const shopArgs = shopId != null ? [shopId] : [];
+  const cols = 'id, email, username, password, role, package, shop_id';
+  let rows: any[] = [];
+  if (/^\d+$/.test(raw)) {
+    const [r] = await pool.execute(`SELECT ${cols} FROM users WHERE id = ?${shopFilter}`, [raw, ...shopArgs]);
+    rows = r as any[];
+  } else if (raw.includes('@')) {
+    const [r] = await pool.execute(`SELECT ${cols} FROM users WHERE LOWER(email) = LOWER(?)${shopFilter}`, [raw, ...shopArgs]);
+    rows = r as any[];
+  } else {
+    const [r] = await pool.execute(`SELECT ${cols} FROM users WHERE username = ?${shopFilter}`, [raw, ...shopArgs]);
+    rows = r as any[];
+  }
+  return rows.length > 0 ? rows[0] : null;
+}
+
+const SUPER_ADMIN_EMAIL_ONLY_AR = 'حساب مدير النظام يجب تسجيل الدخول بالبريد الإلكتروني.';
+const SUPER_ADMIN_EMAIL_ONLY_EN = 'Super admin must sign in using email.';
+
+let userColumnSet: Set<string> | null = null;
+
+async function ensureUserColumnsLoaded() {
+  if (userColumnSet) return;
   try {
-    const { username, password } = req.body;
-    
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password required' });
+    const [rows] = await pool.execute<RowDataPacket[]>('SHOW COLUMNS FROM users');
+    const cols = (rows as any[]).map((r) => String(r.Field || r.field || '').toLowerCase());
+    userColumnSet = new Set(cols);
+  } catch (err: any) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[login] SHOW COLUMNS FAILED', err?.code, err?.message);
+    }
+    // Fallback minimal set so SELECTs remain safe
+    userColumnSet = new Set(['id', 'role']);
+  }
+}
+
+const hasUserColumn = (name: string): boolean =>
+  !!userColumnSet && userColumnSet.has(name.toLowerCase());
+
+app.post('/api/auth/login', async (req: Request, res: Response) => {
+  const body = req.body || {};
+  const identifierRaw = body.identifier ?? body.email ?? body.username ?? body.id ?? '';
+  const identifier = String(identifierRaw).trim();
+  const password = String(body.password ?? '').trim();
+
+  if (!identifier || !password) {
+    return res.status(400).json({ error: 'Missing credentials' });
+  }
+
+  await ensureUserColumnsLoaded();
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[login] DB:', {
+      DB_HOST: process.env.DB_HOST,
+      DB_NAME: process.env.DB_NAME,
+      DB_USER: process.env.DB_USER,
+    });
+  }
+
+  // Build SELECT columns dynamically based on existing schema
+  const cols: string[] = ['id', 'role'];
+  if (hasUserColumn('email')) cols.push('email');
+  if (hasUserColumn('username')) cols.push('username');
+  if (hasUserColumn('employee_id')) cols.push('employee_id');
+  if (hasUserColumn('shop_id')) cols.push('shop_id');
+  if (hasUserColumn('package')) cols.push('package');
+  if (hasUserColumn('is_active')) cols.push('is_active');
+  if (hasUserColumn('password_hash')) cols.push('password_hash');
+  if (hasUserColumn('password')) cols.push('password');
+
+  const sqlCols = cols.join(', ');
+
+  let user: any = null;
+  let identifierType: 'id' | 'email' | 'username' = 'username';
+
+  try {
+    let sql: string;
+    let params: (string | number)[];
+
+    if (/^\d+$/.test(identifier)) {
+      identifierType = 'id';
+      sql = `SELECT ${sqlCols} FROM users WHERE id = ?`;
+      params = [identifier];
+    } else if (identifier.includes('@') && hasUserColumn('email')) {
+      identifierType = 'email';
+      sql = `SELECT ${sqlCols} FROM users WHERE LOWER(email) = LOWER(?)`;
+      params = [identifier];
+    } else {
+      identifierType = 'username';
+      if (hasUserColumn('username') && hasUserColumn('employee_id')) {
+        sql = `SELECT ${sqlCols} FROM users WHERE (username = ? OR employee_id = ?)`;
+        params = [identifier, identifier];
+      } else {
+        sql = `SELECT ${sqlCols} FROM users WHERE username = ?`;
+        params = [identifier];
+      }
     }
 
-    const [users] = await pool.execute('SELECT * FROM users WHERE username = ?', [username]);
-    const userArray = users as any[];
-    
-    if (userArray.length === 0) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+    const [rows] = await pool.execute<RowDataPacket[]>(sql, params);
+    user = (rows as any[])[0];
+  } catch (err: any) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(
+        '[login] SELECT_FAILED',
+        'identifierType=',
+        identifierType,
+        'code=',
+        err?.code,
+        'message=',
+        err?.message
+      );
+    }
+    return res.status(500).json({ error: 'SERVER_ERROR', code: 'SELECT_FAILED' });
+  }
+
+  if (process.env.NODE_ENV !== 'production') {
+    const ph =
+      user?.password_hash ??
+      user?.passwordHash ??
+      (user as any)?.PASSWORD_HASH ??
+      user?.password ??
+      null;
+    console.log('[login] resolved identifierType=', identifierType);
+    console.log('[login] userFound=', !!user);
+    console.log('[login] hashLen=', typeof ph === 'string' ? ph.length : null);
+  }
+
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid credentials', code: 'USER_NOT_FOUND' });
+  }
+
+  // Prefer password_hash, then bcrypt-style password, then plaintext fallback
+  const rawHash =
+    user?.password_hash ??
+    user?.passwordHash ??
+    (user as any)?.PASSWORD_HASH ??
+    user?.password ??
+    null;
+
+  let hash: string | null = null;
+  if (typeof rawHash === 'string' && rawHash.trim().length > 0) {
+    hash = rawHash;
+  }
+
+  if (!hash) {
+    return res.status(401).json({ error: 'Invalid credentials', code: 'HASH_MISSING' });
+  }
+
+  if (user.is_active === 0 || user.is_active === false) {
+    return res.status(401).json({ error: 'Invalid credentials', code: 'INACTIVE_USER' });
+  }
+
+  if (user.role === 'super_admin' && !identifier.includes('@')) {
+    return res.status(401).json({
+      error: 'SUPER_ADMIN_EMAIL_ONLY',
+      message_ar: SUPER_ADMIN_EMAIL_ONLY_AR,
+      message_en: SUPER_ADMIN_EMAIL_ONLY_EN,
+    });
+  }
+
+  let ok = false;
+  try {
+    // If hash looks like bcrypt, compare via bcrypt; otherwise fallback to plain equality (legacy)
+    if (hash.startsWith('$2a$') || hash.startsWith('$2b$') || hash.startsWith('$2y$')) {
+      ok = await bcrypt.compare(password, hash);
+    } else {
+      ok = password === hash;
+    }
+  } catch (e: any) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[login] COMPARE_THROW', e?.message);
+    }
+    return res.status(500).json({ error: 'SERVER_ERROR', code: 'COMPARE_THROW' });
+  }
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[login] compareOk=', ok);
+  }
+
+  if (!ok) {
+    return res.status(401).json({ error: 'Invalid credentials', code: 'PASSWORD_MISMATCH' });
+  }
+
+  if (!process.env.JWT_SECRET) {
+    return res
+      .status(500)
+      .json({ error: 'SERVER_ERROR', code: 'JWT_SECRET_MISSING' });
+  }
+
+  let shopId: number | null =
+    (user as any).shop_id ??
+    (user as any).shopId ??
+    null;
+
+  // For super_admin: ensure shop exists at login so token has a valid shopId
+  if (!shopId && user.role === 'super_admin') {
+    try {
+      shopId = await resolveOrCreateShopForUser(user);
+      (user as any).shop_id = shopId;
+    } catch (e: any) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[login] resolveOrCreateShopForUser failed:', e?.message || e);
+      }
+    }
+  }
+
+  // Determine effective plan (role + subscriptions)
+  const effective = await getEffectivePlanForUser({ ...user, shop_id: shopId });
+
+  const token = jwt.sign(
+    {
+      userId: user.id,
+      role: user.role,
+      package: effective.planId,
+      shopId,
+    },
+    JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+
+  res.json({
+    token,
+    user: {
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      role: user.role,
+      package: effective.planId,
+      shopId,
+    },
+  });
+});
+
+app.get('/api/auth/me', authenticateToken, async (req: any, res: Response) => {
+  try {
+    let shopId: number | null =
+      (req.user.shop_id as number | undefined) ??
+      (req.user.shopId as number | undefined) ??
+      null;
+
+    if (!shopId && req.user.role === 'super_admin') {
+      try {
+        shopId = await resolveOrCreateShopForUser(req.user);
+        req.user.shop_id = shopId;
+      } catch (e: any) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[auth/me] resolveOrCreateShopForUser failed:', e?.message || e);
+        }
+      }
     }
 
-    const user = userArray[0];
-    const validPassword = await bcrypt.compare(password, user.password);
-    
-    if (!validPassword) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    const token = jwt.sign(
-      { userId: user.id, role: user.role, package: user.package, shopId: user.shop_id },
-      JWT_SECRET,
-      { expiresIn: '24h' }
-    );
+    const effective = await getEffectivePlanForUser({ ...req.user, shop_id: shopId });
 
     res.json({
-      token,
       user: {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        package: user.package,
-        shopId: user.shop_id
-      }
+        id: req.user.id,
+        email: req.user.email,
+        username: req.user.username,
+        role: req.user.role,
+        package: effective.planId,
+        shopId,
+      },
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
-});
-
-app.get('/api/auth/me', authenticateToken, async (req: any, res: Response) => {
-  res.json({
-    user: {
-      id: req.user.id,
-      username: req.user.username,
-      role: req.user.role,
-      package: req.user.package,
-      shopId: req.user.shop_id,
-    },
-  });
 });
 
 app.post('/api/auth/register-shop', async (req: Request, res: Response) => {
@@ -1419,49 +1917,79 @@ app.post('/api/auth/register-shop', async (req: Request, res: Response) => {
       businessName,
       ownerName,
       activityType,
+      activity_type: bodyActivityType,
+      businessType,
+      business_type: bodyBusinessType,
       address,
       contactEmail,
       contactPhone,
-      package: pkg,
     } = req.body;
 
     if (!username || !password || !businessName) {
       return res.status(400).json({ error: 'Username, password, and business name are required' });
     }
 
+    const activityRaw =
+      bodyActivityType ??
+      activityType ??
+      bodyBusinessType ??
+      businessType ??
+      '';
+    const activityTypeValue =
+      String(activityRaw).trim().slice(0, 128) || null;
+
     const hashedPassword = await bcrypt.hash(password, 10);
     const connection = await pool.getConnection();
+    const defaultPlan = 'gold';
+    const trialDays = 7;
+    const trialEndsAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
 
     try {
       await connection.beginTransaction();
       const [userResult] = await connection.execute(
         'INSERT INTO users (username, password, role, package, shop_id) VALUES (?, ?, ?, ?, ?)',
-        [username, hashedPassword, 'shop_owner', pkg || 'bronze', null]
+        [username, hashedPassword, 'shop_owner', defaultPlan, null]
       );
       const userInsert = userResult as any;
 
       const [shopResult] = await connection.execute(
-        `INSERT INTO shops (name, business_name, owner_name, activity_type, address, contact_email, contact_phone, owner_id, package)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO shops (name, business_name, owner_name, activity_type, address, contact_email, contact_phone, owner_id, package, plan_type, trial_ends_at, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
         [
           businessName,
           businessName,
           ownerName || null,
-          activityType || null,
+          activityTypeValue,
           address || null,
           contactEmail || null,
           contactPhone || null,
           userInsert.insertId,
-          pkg || 'bronze',
+          defaultPlan,
+          defaultPlan,
+          trialEndsAt,
         ]
       );
       const shopInsert = shopResult as any;
+      const shopId = shopInsert.insertId;
 
-      await connection.execute('UPDATE users SET shop_id = ? WHERE id = ?', [shopInsert.insertId, userInsert.insertId]);
+      await connection.execute('UPDATE users SET shop_id = ? WHERE id = ?', [shopId, userInsert.insertId]);
+
+      const [branchResult] = await connection.execute(
+        'INSERT INTO branches (shop_id, name, name_ar, name_en, code) VALUES (?, ?, ?, ?, ?)',
+        [shopId, 'الفرع الرئيسي', 'الفرع الرئيسي', 'Main Branch', 'main']
+      );
+      const branchId = (branchResult as any).insertId;
+      await connection.execute('UPDATE shops SET default_branch_id = ? WHERE id = ?', [branchId, shopId]);
+
+      await connection.execute(
+        'INSERT INTO subscriptions (shop_id, plan_name, started_at, expires_at, last_activated_at) VALUES (?, ?, NOW(), ?, NOW())',
+        [shopId, defaultPlan, trialEndsAt]
+      );
+
       await connection.commit();
 
       const token = jwt.sign(
-        { userId: userInsert.insertId, role: 'shop_owner', package: pkg || 'bronze', shopId: shopInsert.insertId },
+        { userId: userInsert.insertId, role: 'shop_owner', package: defaultPlan, shopId },
         JWT_SECRET,
         { expiresIn: '24h' }
       );
@@ -1472,9 +2000,11 @@ app.post('/api/auth/register-shop', async (req: Request, res: Response) => {
           id: userInsert.insertId,
           username,
           role: 'shop_owner',
-          package: pkg || 'bronze',
-          shopId: shopInsert.insertId,
+          package: defaultPlan,
+          shopId,
         },
+        trialDays,
+        trialEndsAt: trialEndsAt.toISOString(),
       });
     } catch (error) {
       await connection.rollback();
@@ -1497,7 +2027,7 @@ app.post('/api/auth/forgot-password', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Email is required' });
     }
 
-    const [users] = await pool.execute('SELECT * FROM users WHERE username = ?', [email]);
+    const [users] = await pool.execute('SELECT * FROM users WHERE email = ?', [email]);
     const userArray = users as any[];
     if (userArray.length === 0) {
       return res.json({ message: 'If an account exists, a reset link will be sent.' });
@@ -1577,18 +2107,38 @@ app.post('/api/auth/reset-password', async (req: Request, res: Response) => {
 
 // ========== GEMINI AI ASSISTANT ==========
 app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req: Request, res: Response) => {
-  let detectedLang: 'ar' | 'en' = 'en';
+  let lang: 'ar' | 'en' = 'en';
   try {
     if (!GEMINI_API_KEY || !genAI) {
-      return res.status(400).json({ error: 'AI API key is missing' });
+      // Graceful disable when key/client missing
+      const detectedLang: 'ar' | 'en' = (req.body?.lang === 'ar' || req.body?.language === 'ar') ? 'ar' : 'en';
+      const ttsLang = getTtsLocaleForLang(detectedLang);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[AI] /api/chat disabled: missing GEMINI_API_KEY or genAI client');
+      }
+      const ctx = typeof req.body?.context === 'object' && req.body.context !== null ? req.body.context : {};
+      const pathname = (ctx as any).pathname || '';
+      const question = String(req.body?.message || '');
+      const answer = getLocalHelp(detectedLang, pathname, question);
+      return res.status(200).json({
+        ok: false,
+        mode: 'offline',
+        error: 'AI_UNAVAILABLE',
+        reason: 'AI_DISABLED',
+        message_en: 'AI cloud unavailable, using local help.',
+        message_ar: 'المساعد السحابي غير متاح حالياً، سيتم استخدام المساعدة المحلية.',
+        answer,
+        lang: detectedLang,
+        ttsLang,
+      });
     }
-    const { message } = req.body;
+    const { message, lang: bodyLang, context: liveContext, history: chatHistory } = req.body;
     if (!message || typeof message !== 'string') {
-      return res.status(400).json({ error: 'message is required' });
+      return res.status(400).json({ ok: false, error: 'message is required' });
     }
-    detectedLang = detectUserLanguage(message);
-    const ttsLang = getTtsLocaleForLang(detectedLang);
-    console.log('📩 Chat message:', { detectedLang, preview: String(message).slice(0, 120) });
+    lang = bodyLang === 'ar' || bodyLang === 'en' ? bodyLang : detectUserLanguage(message);
+    const ttsLang = getTtsLocaleForLang(lang);
+    console.log('📩 Chat message:', { lang, preview: String(message).slice(0, 120) });
 
     const resolvedShopId =
       resolveShopId(req) || (req as any).user?.shop_id || (req as any).user?.shopId || 1;
@@ -1616,6 +2166,15 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
       FROM sales s
       WHERE s.shop_id = ?
       AND DATE(s.created_at) = CURRENT_DATE()
+      `,
+      [shopId]
+    );
+
+    const [todayOnlineRows] = await pool.execute(
+      `
+      SELECT COALESCE(SUM(o.total), 0) as amount, COUNT(o.id) as cnt
+      FROM online_orders o
+      WHERE o.shop_id = ? AND o.status IN ('confirmed', 'completed') AND DATE(o.created_at) = CURRENT_DATE()
       `,
       [shopId]
     );
@@ -1693,9 +2252,40 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
       .join('\n');
 
     const stats = (todayStatsRows as any[])[0] || { today_revenue: 0, today_sales: 0 };
+    const todayOnline = (todayOnlineRows as any[])[0] || { amount: 0, cnt: 0 };
     const totalProducts = Number((totalProductsRows as any[])[0]?.total_products || 0);
     const lowStockCount = Number((lowStockCountRows as any[])[0]?.low_stock_count || 0);
     const yesterday = (yesterdayRows as any[])[0] || { revenue: 0, invoices: 0 };
+
+    const todayRevenue = Number(stats.today_revenue ?? 0);
+    const todaySales = Number(stats.today_sales ?? 0);
+    const todayOnlineAmount = Number(todayOnline.amount ?? 0);
+    const todayOnlineCount = Number(todayOnline.cnt ?? 0);
+    const totalTodayAmount = todayRevenue + todayOnlineAmount;
+    const totalTodayOps = todaySales + todayOnlineCount;
+
+    const msg = String(message).trim().toLowerCase();
+    const numericIntentAr =
+      /مبيعات النهارده|مبيعات اليوم|كام النهارده|عدد العمليات|طلبات مؤكدة|أوردرات|مبيعات امبارح|إيه وضع النهارده|كام بعتنا النهارده|فواتير النهارده/i.test(
+        message
+      );
+    const numericIntentEn = /today'?s? sales|sales today|how much today|operations count|confirmed orders|invoices today/i.test(msg);
+    const isNumericIntent = numericIntentAr || numericIntentEn;
+
+    if (isNumericIntent) {
+      const quickAr =
+        lang === 'ar'
+          ? `مبيعات النهارده: ${totalTodayAmount} ج.م (${todaySales} فاتورة POS + ${todayOnlineCount} طلبات أونلاين مؤكدة).\n${totalTodayAmount === 0 ? 'مفيش عمليات لحد دلوقتي.' : 'عايز تفصيل POS ولا أونلاين؟'}`
+          : null;
+      const quickEn =
+        lang === 'en'
+          ? `Today's sales: ${totalTodayAmount} EGP (${todaySales} POS invoices + ${todayOnlineCount} confirmed online orders).\n${totalTodayAmount === 0 ? 'No operations yet.' : 'Want POS vs online breakdown?'}`
+          : null;
+      const quickReply = lang === 'ar' ? quickAr : quickEn;
+      if (quickReply) {
+        return res.json({ ok: true, reply: sanitizeReply(quickReply), message: sanitizeReply(quickReply), lang, ttsLang });
+      }
+    }
 
     const last7 = (last7DaysRows as any[]).map((row) => ({
       date: row.sale_date ? String(row.sale_date).slice(0, 10) : null,
@@ -1729,7 +2319,7 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
     const rawUserName = (req as any).user?.username || '';
     const firstToken = String(rawUserName || '').split(' ')[0];
     const userName = firstToken && !firstToken.includes('@') ? firstToken : 'Ahmed';
-    const businessName = shopProfile.business_name || (detectedLang === 'en' ? 'the shop' : 'المحل');
+    const businessName = shopProfile.business_name || (lang === 'en' ? 'the shop' : 'المحل');
     const activityType = String(shopProfile.activity_type || '').toLowerCase();
     const businessType =
       activityType === 'pharmacy'
@@ -1749,92 +2339,163 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
         ? 'ديكور ومفروشات'
         : 'قطع غيار سيارات';
 
-    const systemPromptAr = `إنت مساعد ذكي اسمك "كراون" — بتتكلم باللهجة المصرية بطريقة ودودة وبستايل سايبربانك (نيون/سيستم/شبكات) من غير مبالغة.
-إنت متخصص في مساعدة أصحاب المحلات في إدارة المخزون والمبيعات داخل Crown Services ERP.
+    const liveCtx = typeof liveContext === 'object' && liveContext !== null ? liveContext : {};
+    const ctxLine =
+      Object.keys(liveCtx).length > 0
+        ? (lang === 'ar' ? 'سياق الجلسة الحية: ' : 'Live context: ') + JSON.stringify(liveCtx)
+        : '';
+    const effectiveRole = (liveCtx as any).effectiveRole || (req as any).user?.role || '';
+    const pathname = (liveCtx as any).pathname || '';
+    const roleInstructionAr =
+      effectiveRole
+        ? `دور المستخدم الحالي: ${effectiveRole}. الصفحة: ${pathname || '/'}. لا تنصح بإجراءات غير مسموحة لهذا الدور.`
+        : '';
+    const roleInstructionEn =
+      effectiveRole
+        ? `Current user role: ${effectiveRole}. Page: ${pathname || '/'}. Do NOT advise actions not allowed for this role.`
+        : '';
 
-إنت بتتكلم مع "${userName}" صاحب "${businessName}". نادِه باسمه أحياناً عشان يحس بالتخصيص.
+    const systemKnowledge = loadSystemKnowledge();
 
-ملخص المبيعات (Sales/Invoices) لآخر 7 أيام:
+    const systemPromptAr = `أنت المساعد داخل نظام "Crown Services ERP".
+لازم:
+- ترد عربي مصري طبيعي (مش فصحى تقيلة).
+- ردود سريعة ومختصرة: 1–3 سطور افتراضيًا. جاوب بالنتيجة الأول.
+- ما تسألش أكتر من سؤال توضيحي واحد لو لازم.
+- ممنوع تستخدم رموز ماركداون زي ** أو * أو \` نهائيًا. اكتب نص عادي فقط.
+- لو المستخدم سأل: "فيه متجر أونلاين؟/صفحة أونلاين؟" الإجابة لازم تكون: أيوه. المتجر: /storefront. الطلبات الأونلاين بتتأكد من صفحة طلبات الأونلاين في الأدمن، وبتأثر على المخزون بنظام الحجز (reservations)، وبتظهر في الإشعارات ولوحة التحكم والتقارير.
+أنت عارف أقسام النظام:
+لوحة التحكم: المبيعات + مبيعات الأونلاين المؤكدة + العمليات + الراكد/البطيء.
+نقطة البيع POS: بيع وفواتير + available_stock.
+المخزن: منتجات وتنبيهات + صفحة الراكد/البطيء.
+الأونلاين: المتجر + إنشاء طلب + تأكيد/إلغاء/إكمال + حجز مخزون.
+الإشعارات: الجرس + القائمة + العدد + روابط مباشرة.
+التقارير: فترة + المصدر (الكل/POS/أونلاين) + تجميعة (يومي/أسبوعي/شهري) + تصدير CSV/Excel/PDF + طباعة.
+
+${systemKnowledge}
+
+المستخدم: "${userName}" — المحل: "${businessName}" (Shop ${shopId}).
+${ctxLine}
+${roleInstructionAr}
+
+ملخص المبيعات لآخر 7 أيام:
 ${last7DaysContextAr}
+امبارح: ${Number(yesterday.revenue || 0)} جنيه — ${Number(yesterday.invoices || 0)} فاتورة.
 
-مبيعات امبارح: ${Number(yesterday.revenue || 0)} جنيه — ${Number(yesterday.invoices || 0)} فاتورة
+آخر 25 فاتورة:
+${recentInvoices.length ? JSON.stringify(recentInvoices, null, 2) : 'لا توجد.'}
 
-آخر 25 فاتورة خلال 7 أيام (للإجابة على أسئلة زي "امبارح بعنا كام؟"):
-${recentInvoices.length ? JSON.stringify(recentInvoices, null, 2) : 'لا توجد فواتير خلال آخر 7 أيام.'}
+المخزون الحالي:
+${inventoryContextAr || 'لا توجد منتجات.'}
 
-معلومات عن المخزون الحالي:
-${inventoryContextAr || 'لا توجد منتجات في المخزن حالياً'}
+إحصائيات اليوم: مبيعات ${stats.today_revenue} جنيه، فواتير ${stats.today_sales}، منتجات ${totalProducts}، قليلة المخزون ${lowStockCount}.
+نوع النشاط: ${businessTypeAr}.`;
 
-إحصائيات اليوم:
-- إجمالي المبيعات: ${stats.today_revenue} جنيه
-- عدد الفواتير: ${stats.today_sales}
-- إجمالي المنتجات: ${totalProducts}
-- منتجات قليلة المخزون: ${lowStockCount}
+    const systemPromptEn = `You are the in-app assistant for "Crown Services ERP".
+You MUST:
+- Answer in English.
+- Be concise and fast: default to 1–3 short lines. Give the final answer first.
+- Ask at most ONE clarification question only if required.
+- Never output Markdown formatting markers (**, *, backticks). Use plain text only.
+- When user asks "do we have an online shop/storefront?" you MUST answer YES and explain: Storefront: /storefront. Online orders are confirmed from Admin Orders, affect stock via reservations, and appear in notifications, dashboard, and reports.
+You KNOW these modules:
+Dashboard: sales + online confirmed sales + operations count + dead/slow KPI.
+POS: sales, invoice, stock checks with available_stock.
+Inventory: products, low stock, dead/slow-moving page.
+Online: storefront products, online order create, admin confirm/cancel/complete, reservations.
+Notifications: bell + list + unread count + deep links.
+Reports: date range + source filter (All/POS/Online) + bucket (daily/weekly/monthly) + export CSV/Excel/PDF + Print.
 
-نوع النشاط: ${businessTypeAr}
+${systemKnowledge}
 
-قواعد مهمة:
-- أنت تعرف فقط بيانات هذا المحل (Shop ${shopId}) ولا تكشف أي معلومات عن محلات أو مستخدمين آخرين.
-- لو رسالة المستخدم عربية/مصري: رد بالمصري فقط (لهجة مصرية) وبنَفَس سايبربانك. ممنوع الإنجليزية وممنوع الفصحى.
-- رد باختصار + خطوات عملية.
-- لو سؤاله عن "امبارح" أو "آخر 7 أيام": استخدم أرقام الملخص اللي فوق زي ما هي، ومتخمنش.
-- لو المستخدم سأل عن منتج، ابحث عنه في البيانات المعروضة وادّي توصية واضحة (إعادة طلب/تسعير/تنبيه مخزون).
-- لو الرسالة إنجليزية، لا ترد بالعربي أبداً.`;
+User: "${userName}" — Shop: "${businessName}" (Shop ${shopId}).
+${ctxLine}
+${roleInstructionEn}
 
-    const systemPromptEn = `You are "Crown", an AI assistant for Crown Services ERP.
-Respond in professional English. Be concise, actionable, and accurate.
-
-You are speaking with "${userName}", the owner of "${businessName}".
-
-Sales/Invoices summary (past 7 days):
+Sales summary (past 7 days):
 ${last7DaysContextEn}
+Yesterday: ${Number(yesterday.revenue || 0)} EGP — ${Number(yesterday.invoices || 0)} invoices.
 
-Yesterday: ${Number(yesterday.revenue || 0)} EGP — ${Number(yesterday.invoices || 0)} invoices
+Recent invoices (up to 25):
+${recentInvoices.length ? JSON.stringify(recentInvoices, null, 2) : 'None.'}
 
-Recent invoices (last 7 days, up to 25):
-${recentInvoices.length ? JSON.stringify(recentInvoices, null, 2) : 'No invoices in the last 7 days.'}
+Inventory snapshot:
+${inventoryContextEn || 'No products.'}
 
-Inventory snapshot (this shop only):
-${inventoryContextEn || 'No products found in inventory.'}
+Today: revenue ${stats.today_revenue} EGP, invoices ${stats.today_sales}, total products ${totalProducts}, low stock ${lowStockCount}.
+Business type: ${businessType}.`;
 
-Today stats:
-- Revenue today: ${stats.today_revenue} EGP
-- Invoices today: ${stats.today_sales}
-- Total products: ${totalProducts}
-- Low stock products: ${lowStockCount}
+    const systemPrompt = lang === 'ar' ? systemPromptAr : systemPromptEn;
+    const userLine = lang === 'ar' ? `رسالة العميل: ${message}` : `User: ${message}`;
 
-Business type: ${businessType}
-
-Rules:
-- Only use this shop's data (Shop ${shopId}). Do not mention or infer other shops/users.
-- If the user asks about a specific product, look for it in the inventory list above and answer precisely.
-- If the user asks about yesterday / last 7 days sales, use the provided summary numbers exactly. Do not guess.
-- If the user message is Arabic, do not reply in English.`;
-
-    const systemPrompt = detectedLang === 'ar' ? systemPromptAr : systemPromptEn;
-    const userLine = detectedLang === 'ar' ? `رسالة العميل: ${message}` : `User says: ${message}`;
+    const parts: string[] = [systemPrompt];
+    if (Array.isArray(chatHistory) && chatHistory.length > 0) {
+      for (const h of chatHistory.slice(-10)) {
+        if (h.role === 'user') parts.push(lang === 'ar' ? `رسالة العميل: ${h.content}` : `User: ${h.content}`);
+        else if (h.role === 'assistant') parts.push(lang === 'ar' ? `رد المساعد: ${h.content}` : `Assistant: ${h.content}`);
+      }
+    }
+    parts.push(userLine);
+    const contents = parts.join('\n\n');
 
     const result = await genAI.models.generateContent({
       model: GEMINI_MODEL,
-      contents: [systemPrompt, userLine],
+      contents,
     });
-    const text = String((result as any)?.text || '').trim();
+    const rawText = String((result as any)?.text || '').trim();
+    const text = sanitizeReply(rawText);
 
     if (text) {
-      res.json({ message: text, lang: detectedLang, ttsLang });
-    } else {
-      console.error('❌ Gemini empty response');
-      return res.status(500).json({ error: 'AI provider response empty' });
+      return res.json({ ok: true, reply: text, message: text, lang, ttsLang });
     }
-  } catch (error: any) {
-    console.error('❌ Chat error:', {
-      name: error?.name,
-      message: error?.message,
-      status: error?.status,
+
+    console.error('❌ Gemini empty response');
+    return res.status(200).json({
+      ok: false,
+      error: 'AI_UNAVAILABLE',
+      reason: 'EMPTY_RESPONSE',
+      message_en: 'AI is temporarily unavailable. Please try again later.',
+      message_ar: 'المساعد غير متاح حالياً، يرجى المحاولة مرة أخرى لاحقاً.',
+      lang,
+      ttsLang,
     });
+  } catch (error: any) {
+    console.error('❌ Chat error:', { name: error?.name, message: error?.message, status: error?.status });
+    const detectedLang: 'ar' | 'en' = lang === 'ar' ? 'ar' : 'en';
     const ttsLang = getTtsLocaleForLang(detectedLang);
-    res.status(500).json({
-      error: detectedLang === 'ar' ? 'المساعد في استراحة قصيرة' : 'Assistant is temporarily unavailable',
+
+    const isKeyError =
+      error?.status === 400 ||
+      error?.status === 401 ||
+      (typeof error?.message === 'string' && /api[_-]?key|unauthorized|invalid/i.test(error.message));
+
+    const ctx = typeof (error as any)?.liveContext === 'object' && (error as any).liveContext !== null ? (error as any).liveContext : {};
+    const pathname = (ctx as any).pathname || '';
+    const question = String((error as any)?.message || '');
+    const answer = getLocalHelp(detectedLang, pathname, question);
+
+    if (isKeyError) {
+      return res.status(200).json({
+        ok: false,
+        mode: 'offline',
+        error: 'AI_UNAVAILABLE',
+        reason: 'API_KEY_INVALID',
+        message_en: 'AI cloud unavailable (invalid or expired API key), using local help.',
+        message_ar: 'المساعد السحابي غير متاح حالياً (مفتاح API غير صالح أو منتهي)، سيتم استخدام المساعدة المحلية.',
+        answer,
+        lang: detectedLang,
+        ttsLang,
+      });
+    }
+
+    return res.status(200).json({
+      ok: false,
+      mode: 'offline',
+      error: 'AI_UNAVAILABLE',
+      reason: 'PROVIDER_ERROR',
+      message_en: 'AI cloud unavailable due to an internal error, using local help.',
+      message_ar: 'المساعد السحابي غير متاح حالياً بسبب خطأ داخلي، سيتم استخدام المساعدة المحلية.',
+      answer,
       lang: detectedLang,
       ttsLang,
     });
@@ -1986,6 +2647,120 @@ app.post('/api/ai/data-chat', authenticateToken, requirePackageFeature('ai'), as
   }
 });
 
+// High-level AI context for the assistant (bilingual system knowledge)
+app.get('/api/ai/context', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const langRaw = mustOne(req.query.language || req.query.lang || req.headers['x-language'], 'ar');
+    const language = langRaw === 'en' ? 'en' : 'ar';
+
+    let shopId = resolveShopId(req);
+    if (!shopId) {
+      shopId = await resolveOrCreateShopForUser(req.user);
+    }
+
+    let shop: any = null;
+    if (shopId) {
+      const [rows] = await pool.execute(
+        `SELECT id, name, business_name, activity_type, country_name, currency_code, currency_symbol 
+         FROM shops WHERE id = ?`,
+        [shopId]
+      );
+      shop = (rows as any[])[0] || null;
+    }
+
+    const effective = await getEffectivePlanForUser({ ...req.user, shop_id: shopId });
+    const enabledFeatures = Object.entries(effective.features || {})
+      .filter(([, v]) => Boolean(v))
+      .map(([k]) => k);
+
+    const routesSummary = {
+      pos: language === 'ar' ? 'نقطة البيع والفواتير السريعة داخل المتجر' : 'POS and quick in-store invoicing',
+      inventory:
+        language === 'ar'
+          ? 'إدارة المخزون والمنتجات والتنبيهات'
+          : 'Inventory, products, and low-stock alerts',
+      invoices:
+        language === 'ar'
+          ? 'فواتير وتقارير المبيعات PDF/Excel'
+          : 'Invoices and sales reports (PDF/Excel)',
+      onlineOrders:
+        language === 'ar'
+          ? 'طلبات أونلاين، تأكيد الطلب وخصم المخزون'
+          : 'Online orders, confirmation, and stock deduction',
+      notifications:
+        language === 'ar'
+          ? 'سجل النشاط والتنبيهات للمبيعات والطلبات'
+          : 'Activity log and notifications for sales/orders',
+      importExport:
+        language === 'ar'
+          ? 'استيراد/تصدير المنتجات عبر Excel/CSV (حسب الباقة)'
+          : 'Import/export products via Excel/CSV (depending on plan)',
+      branches:
+        language === 'ar'
+          ? 'إدارة الفروع وصلاحيات المستخدمين لكل فرع'
+          : 'Branch management and per-branch user roles',
+      users:
+        language === 'ar'
+          ? 'إضافة مستخدمين وصلاحيات مثل الكاشير والفرع والمدير'
+          : 'User management and roles such as cashier, branch manager, owner',
+      licenses:
+        language === 'ar'
+          ? 'أكواد التفعيل لتغيير الباقة لمدة شهر/سنة/مدى الحياة'
+          : 'Activation codes to change plans for month/year/lifetime',
+      subscriptions:
+        language === 'ar'
+          ? 'إدارة الاشتراك الحالي وتاريخ التفعيل والانتهاء'
+          : 'Manage current subscription and activation/expiry history',
+    };
+
+    const systemPrompt =
+      language === 'ar'
+        ? 'أنت مساعد ذكي لنظام Crown ERP. رد دائماً باختصار شديد (٣–٦ نقاط مرقمة أو فقرات قصيرة)، ووضح الخطوات العملية داخل لوحة التحكم (المسار في الـ UI أو اسم الصفحة) وأي endpoint مهم في الـ API إن لزم. لا تخترع معلومات غير موجودة في السياق أو منطق النظام؛ إذا كانت المعلومة ناقصة اسأل سؤالاً واحداً فقط لتوضيح المطلوب ثم اقترح أفضل ممارسة. ركّز على: المبيعات، المخزون، الفواتير، الأكواد والاشتراكات، الأدوار والصلاحيات، المتاجر والفروع، والاستيراد/التصدير. احترم خطة العميل (الباقة) واذكر إن كانت الخاصية متاحة في خطته أم تحتاج ترقية.'
+        : 'You are a smart assistant for the Crown ERP system. Always answer concisely (3–6 short bullet points or paragraphs), and highlight practical steps inside the dashboard (UI route or page name) plus any relevant API endpoint when useful. Do not hallucinate or invent features; if key information is missing, ask exactly one clarifying question before proposing best practices. Focus on: sales, inventory, invoices, licenses & subscriptions, roles & permissions, shops & branches, and import/export. Respect the customer plan (subscription) and mention when a feature requires a higher plan.';
+
+    const shopPayload = shop
+      ? {
+          ...shop,
+          country: shop.country_name ?? null,
+          currency: shop.currency_code ?? null,
+        }
+      : null;
+
+    res.json({
+      language,
+      user: {
+        id: req.user.id,
+        email: req.user.email,
+        role: req.user.role,
+      },
+      shop: shopPayload,
+      plan: {
+        id: effective.planId,
+        enabledFeatures,
+      },
+      routes: routesSummary,
+      systemPrompt,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== ADMIN SHOPS LIST (Super Admin - for shop switcher) ==========
+app.get('/api/admin/shops', authenticateToken, requireRole('super_admin'), async (req: Request, res: Response) => {
+  try {
+    const [rows] = await pool.execute(`
+      SELECT s.id, s.name, s.business_name,
+        (SELECT d.domain FROM domains d WHERE d.shop_id = s.id AND d.is_active = 1 AND d.status = 'active' LIMIT 1) as domain
+      FROM shops s
+      ORDER BY s.id ASC
+    `);
+    res.json(rows);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ========== SHOPS MANAGEMENT (Super Admin only) ==========
 app.get('/api/shops', authenticateToken, requireRole('super_admin'), async (req: Request, res: Response) => {
   try {
@@ -2017,9 +2792,12 @@ app.post('/api/shops', authenticateToken, requireRole('super_admin'), async (req
 // ========== SHOP PROFILE ==========
 app.get('/api/shops/profile', authenticateToken, async (req: any, res: Response) => {
   try {
-    const shopId = resolveShopId(req);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[SHOP_PROFILE] GET /api/shops/profile userId=', req.user?.id, 'role=', req.user?.role);
+    }
+    let shopId = resolveShopId(req);
     if (!shopId) {
-      return res.status(400).json({ error: 'shopId is required' });
+      shopId = await resolveOrCreateShopForUser(req.user);
     }
 
     const [shops] = await pool.execute('SELECT * FROM shops WHERE id = ?', [shopId]);
@@ -2035,22 +2813,55 @@ app.get('/api/shops/profile', authenticateToken, async (req: any, res: Response)
 
 app.put('/api/shops/profile', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
   try {
-    const {
-      businessName,
-      ownerName,
-      activityType,
-      address,
-      contactEmail,
-      contactPhone,
-      logoUrl,
-      countryName,
-      currencyCode,
-      currencySymbol,
-    } = req.body;
+    const body = req.body || {};
 
-    const shopId = resolveShopId(req);
+    // Normalize camelCase + snake_case + legacy keys from frontend
+    const businessName =
+      body.businessName ??
+      body.business_name ??
+      body.storeName ??
+      body.store_name ??
+      null;
+    const ownerName =
+      body.ownerName ??
+      body.owner_name ??
+      body.fullName ??
+      body.full_name ??
+      null;
+    const activityType =
+      body.activityType ??
+      body.activity_type ??
+      null;
+    const address = body.address ?? null;
+    const contactEmail =
+      body.contactEmail ??
+      body.contact_email ??
+      null;
+    const contactPhone =
+      body.contactPhone ??
+      body.contact_phone ??
+      body.phone ??
+      null;
+    const logoUrl =
+      body.logoUrl ??
+      body.logo_url ??
+      null;
+    const countryName =
+      body.countryName ??
+      body.country_name ??
+      null;
+    const currencyCode =
+      body.currencyCode ??
+      body.currency_code ??
+      null;
+    const currencySymbol =
+      body.currencySymbol ??
+      body.currency_symbol ??
+      null;
+
+    let shopId = resolveShopId(req);
     if (!shopId) {
-      return res.status(400).json({ error: 'shopId is required' });
+      shopId = await resolveOrCreateShopForUser(req.user);
     }
 
     await pool.execute(
@@ -2083,8 +2894,11 @@ app.put('/api/shops/profile', authenticateToken, requireRole('super_admin', 'sho
 // ========== STORE DOMAINS (Store Admin - shop_owner) ==========
 app.post('/api/domains/add', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
   try {
-    const shopId = Number(resolveShopId(req) || 0);
-    if (!Number.isFinite(shopId) || shopId <= 0) {
+    let shopId: number | null = resolveShopId(req);
+    if (!shopId && req.user?.role === 'super_admin') {
+      shopId = await resolveOrCreateShopForUser(req.user);
+    }
+    if (!shopId || !Number.isFinite(shopId) || shopId <= 0) {
       return res.status(400).json({ error: 'shopId is required' });
     }
 
@@ -2131,8 +2945,11 @@ app.post('/api/domains/add', authenticateToken, requireRole('super_admin', 'shop
 
 app.post('/api/domains/verify', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
   try {
-    const shopId = Number(resolveShopId(req) || 0);
-    if (!Number.isFinite(shopId) || shopId <= 0) {
+    let shopId: number | null = resolveShopId(req);
+    if (!shopId && req.user?.role === 'super_admin') {
+      shopId = await resolveOrCreateShopForUser(req.user);
+    }
+    if (!shopId || !Number.isFinite(shopId) || shopId <= 0) {
       return res.status(400).json({ error: 'shopId is required' });
     }
 
@@ -2180,8 +2997,11 @@ app.post('/api/domains/verify', authenticateToken, requireRole('super_admin', 's
 
 app.post('/api/domains/activate', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
   try {
-    const shopId = Number(resolveShopId(req) || 0);
-    if (!Number.isFinite(shopId) || shopId <= 0) {
+    let shopId: number | null = resolveShopId(req);
+    if (!shopId && req.user?.role === 'super_admin') {
+      shopId = await resolveOrCreateShopForUser(req.user);
+    }
+    if (!shopId || !Number.isFinite(shopId) || shopId <= 0) {
       return res.status(400).json({ error: 'shopId is required' });
     }
 
@@ -2232,8 +3052,11 @@ app.post('/api/domains/activate', authenticateToken, requireRole('super_admin', 
 
 app.post('/api/domains/deactivate', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
   try {
-    const shopId = Number(resolveShopId(req) || 0);
-    if (!Number.isFinite(shopId) || shopId <= 0) {
+    let shopId: number | null = resolveShopId(req);
+    if (!shopId && req.user?.role === 'super_admin') {
+      shopId = await resolveOrCreateShopForUser(req.user);
+    }
+    if (!shopId || !Number.isFinite(shopId) || shopId <= 0) {
       return res.status(400).json({ error: 'shopId is required' });
     }
 
@@ -2264,8 +3087,11 @@ app.post('/api/domains/deactivate', authenticateToken, requireRole('super_admin'
 
 app.get('/api/domains', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
   try {
-    const shopId = Number(resolveShopId(req) || 0);
-    if (!Number.isFinite(shopId) || shopId <= 0) {
+    let shopId: number | null = resolveShopId(req);
+    if (!shopId && req.user?.role === 'super_admin') {
+      shopId = await resolveOrCreateShopForUser(req.user);
+    }
+    if (!shopId || !Number.isFinite(shopId) || shopId <= 0) {
       return res.status(400).json({ error: 'shopId is required' });
     }
 
@@ -2291,15 +3117,24 @@ app.get('/api/domains', authenticateToken, requireRole('super_admin', 'shop_owne
 });
 
 // ========== USERS MANAGEMENT ==========
-app.get('/api/users', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
+app.get('/api/users', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'), async (req: any, res: Response) => {
   try {
-    const shopId = resolveShopId(req);
+    let shopId: number | null = resolveShopId(req) ?? (req.user.role === 'shop_owner' ? req.user.shop_id : null);
+    if (!shopId && req.user?.role === 'super_admin') {
+      shopId = await resolveOrCreateShopForUser(req.user);
+    }
     if (!shopId) {
+      if (req.user?.role === 'super_admin') {
+        return res.status(400).json({ error: 'SHOP_ID_REQUIRED', message_ar: 'اختر المتجر أولاً', message_en: 'Please select a shop first' });
+      }
       return res.status(400).json({ error: 'shopId is required' });
+    }
+    if (req.user.role !== 'super_admin' && req.user.shop_id !== shopId) {
+      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'غير مصرح', message_en: 'Forbidden' });
     }
 
     const [users] = await pool.execute(
-      'SELECT id, username, role, package, shop_id, created_at FROM users WHERE shop_id = ? ORDER BY created_at DESC',
+      'SELECT id, username, employee_id, email, role, package, shop_id, created_at FROM users WHERE shop_id = ? ORDER BY created_at DESC',
       [shopId]
     );
     res.json(users);
@@ -2308,50 +3143,122 @@ app.get('/api/users', authenticateToken, requireRole('super_admin', 'shop_owner'
   }
 });
 
-app.post('/api/users', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
+const CREATABLE_ROLES: Record<string, string[]> = {
+  super_admin: ['shop_owner', 'branch_manager', 'multi_branch_manager', 'cashier', 'warehouse'],
+  shop_owner: ['branch_manager', 'multi_branch_manager', 'cashier', 'warehouse'],
+  branch_manager: ['cashier', 'warehouse'],
+  multi_branch_manager: ['branch_manager', 'cashier', 'warehouse'],
+};
+
+/** Parse identifier into username, email, employee_id for user creation. */
+function parseUserIdentifier(identifier: string): { username: string; email: string | null; employee_id: string | null } {
+  const raw = String(identifier || '').trim();
+  if (!raw) return { username: '', email: null, employee_id: null };
+  if (raw.includes('@')) {
+    const lower = raw.toLowerCase();
+    return { username: lower, email: raw, employee_id: null };
+  }
+  if (raw.includes('#')) {
+    const parts = raw.split('#');
+    const idPart = parts[parts.length - 1];
+    if (/^\d+$/.test(idPart)) {
+      return { username: 'emp_' + idPart, email: null, employee_id: idPart };
+    }
+  }
+  if (/^\d+$/.test(raw)) {
+    return { username: 'emp_' + raw, email: null, employee_id: raw };
+  }
+  return { username: raw, email: null, employee_id: null };
+}
+
+app.post('/api/users', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'), async (req: any, res: Response) => {
   try {
-    const { username, password, role } = req.body;
-    if (!username || !password || !role) {
-      return res.status(400).json({ error: 'username, password, and role are required' });
+    const { username: rawUsername, identifier, password, role, branchId } = req.body;
+    const idInput = String(identifier ?? rawUsername ?? '').trim();
+    if (!idInput || !password || !role) {
+      return res.status(400).json({ error: 'identifier (or username), password, and role are required' });
     }
 
-    const requestedRole = role as string;
-    if (!['shop_owner', 'cashier', 'warehouse'].includes(requestedRole)) {
-      return res.status(400).json({ error: 'Invalid role' });
+    const { username, email, employee_id } = parseUserIdentifier(idInput);
+    if (!username) {
+      return res.status(400).json({ error: 'Invalid identifier' });
     }
 
-    const shopId = req.user.role === 'super_admin' ? req.body.shopId : req.user.shop_id;
+    const requestedRole = (role as string).toLowerCase();
+    const creatorRole = (req.user?.role || '') as string;
+    const allowed = CREATABLE_ROLES[creatorRole];
+    if (!allowed || !allowed.includes(requestedRole)) {
+      return res.status(400).json({ error: `Role ${requestedRole} cannot be created by ${creatorRole}` });
+    }
+
+    const shopId = resolveShopId(req) ?? (req.user.role === 'shop_owner' ? req.user.shop_id : null);
     if (!shopId) {
+      if (req.user?.role === 'super_admin') {
+        return res.status(400).json({
+          error: 'SHOP_ID_REQUIRED',
+          message_ar: 'اختر المتجر أولاً',
+          message_en: 'Please select a shop first',
+        });
+      }
       return res.status(400).json({ error: 'shopId is required' });
     }
 
     try {
       await enforcePlanLimits(shopId, requestedRole);
     } catch (planError: any) {
-      if (planError.message === 'Shop not found') {
-        return res.status(404).json({ error: 'Shop not found' });
+      if (planError.message === 'Shop not found') return res.status(404).json({ error: 'Shop not found' });
+      if (planError.message === 'PLAN_USER_LIMIT_REACHED') {
+        return res.status(403).json({
+          error: 'PLAN_USER_LIMIT_REACHED',
+          message_ar: planError.message_ar || 'لقد وصلت للحد الأقصى لعدد المستخدمين في باقتك. قم بالترقية أو احذف مستخدمًا.',
+          message_en: planError.message_en || "You have reached your plan's user limit. Upgrade your plan or remove a user.",
+        });
       }
       return res.status(403).json({ error: planError.message });
     }
 
     const [shopRows] = await pool.execute('SELECT package FROM shops WHERE id = ?', [shopId]);
     const shopArray = shopRows as any[];
-    if (shopArray.length === 0) {
-      return res.status(404).json({ error: 'Shop not found' });
-    }
+    if (shopArray.length === 0) return res.status(404).json({ error: 'Shop not found' });
     const shopPackage = shopArray[0].package;
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const [result] = await pool.execute(
-      'INSERT INTO users (username, password, role, package, shop_id) VALUES (?, ?, ?, ?, ?)',
-      [username, hashedPassword, requestedRole, shopPackage || 'bronze', shopId]
+      'INSERT INTO users (username, password, role, package, shop_id, email, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [username, hashedPassword, requestedRole, shopPackage || 'bronze', shopId, email || null, employee_id || null]
     );
     const insertResult = result as any;
-    res.status(201).json({ id: insertResult.insertId, username, role: requestedRole });
-  } catch (error: any) {
-    if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(400).json({ error: 'Username already exists' });
+    const userId = insertResult.insertId;
+
+    let branchToAssign: number | null = null;
+    if (creatorRole === 'branch_manager') {
+      const [assignments] = await pool.execute('SELECT branch_id FROM user_branch_assignments WHERE user_id = ?', [req.user.id]);
+      const ids = (assignments as any[]).map((r) => Number(r.branch_id)).filter((n) => Number.isFinite(n) && n > 0);
+      if (ids.length > 0) branchToAssign = ids[0];
+    } else if (branchId && Number(branchId) > 0) {
+      branchToAssign = Number(branchId);
+    } else if (requestedRole === 'branch_manager') {
+      const [def] = await pool.execute('SELECT default_branch_id FROM shops WHERE id = ?', [shopId]);
+      const defId = (def as any[])[0]?.default_branch_id;
+      if (defId && Number(defId) > 0) branchToAssign = Number(defId);
+    } else if (['cashier', 'warehouse'].includes(requestedRole)) {
+      const [def] = await pool.execute('SELECT default_branch_id FROM shops WHERE id = ?', [shopId]);
+      const defId = (def as any[])[0]?.default_branch_id;
+      if (defId && Number(defId) > 0) branchToAssign = Number(defId);
     }
+
+    if (branchToAssign) {
+      const [br] = await pool.execute('SELECT id, shop_id FROM branches WHERE id = ? AND shop_id = ?', [branchToAssign, shopId]);
+      if ((br as any[]).length) {
+        await pool.execute(
+          'INSERT INTO user_branch_assignments (user_id, branch_id, shop_id) VALUES (?, ?, ?)',
+          [userId, branchToAssign, shopId]
+        );
+      }
+    }
+    res.status(201).json({ id: userId, username, email, employee_id, role: requestedRole });
+  } catch (error: any) {
+    if (error.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'Username, email, or employee ID already exists' });
     res.status(500).json({ error: error.message });
   }
 });
@@ -2359,27 +3266,69 @@ app.post('/api/users', authenticateToken, requireRole('super_admin', 'shop_owner
 app.delete('/api/users/:id', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
   try {
     const userId = parseInt(req.params.id, 10);
-    if (!userId) {
-      return res.status(400).json({ error: 'Invalid user id' });
-    }
-
-    if (req.user.id === userId) {
-      return res.status(400).json({ error: 'Cannot delete your own account' });
-    }
+    if (!userId) return res.status(400).json({ error: 'Invalid user id' });
+    if (req.user.id === userId) return res.status(400).json({ error: 'Cannot delete your own account' });
 
     const [rows] = await pool.execute('SELECT * FROM users WHERE id = ?', [userId]);
     const userArray = rows as any[];
-    if (userArray.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+    if (userArray.length === 0) return res.status(404).json({ error: 'User not found' });
 
     const targetUser = userArray[0];
+    if (targetUser.role === 'shop_owner') return res.status(403).json({ error: 'OWNER_CANNOT_BE_DELETED' });
+    if (targetUser.role === 'super_admin') return res.status(403).json({ error: 'Only super_admin can delete super_admin' });
+
     const shopId = req.user.role === 'super_admin' ? targetUser.shop_id : req.user.shop_id;
-    if (req.user.role !== 'super_admin' && targetUser.shop_id !== shopId) {
-      return res.status(403).json({ error: 'Not allowed' });
-    }
+    if (req.user.role !== 'super_admin' && targetUser.shop_id !== shopId) return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'غير مصرح', message_en: 'Not allowed' });
 
     await pool.execute('DELETE FROM users WHERE id = ?', [userId]);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/users/:id/change-password', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'), async (req: any, res: Response) => {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    const { newPassword } = req.body;
+    if (!userId || !newPassword || typeof newPassword !== 'string' || newPassword.length < 4) {
+      return res.status(400).json({ error: 'Valid newPassword (min 4 chars) required' });
+    }
+
+    const [rows] = await pool.execute('SELECT id, role, shop_id FROM users WHERE id = ?', [userId]);
+    const userArray = rows as any[];
+    if (userArray.length === 0) return res.status(404).json({ error: 'User not found' });
+    const targetUser = userArray[0];
+
+    if (targetUser.role === 'super_admin' && req.user.role !== 'super_admin') {
+      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'لا يمكن تغيير كلمة مرور المدير العام', message_en: 'Cannot change super_admin password' });
+    }
+
+    if (req.user.role === 'shop_owner' && targetUser.shop_id !== req.user.shop_id) {
+      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'غير مصرح', message_en: 'Forbidden' });
+    }
+
+    if (req.user.role === 'branch_manager') {
+      if (targetUser.shop_id !== req.user.shop_id) {
+        return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'غير مصرح', message_en: 'Forbidden' });
+      }
+      const [myAssignments] = await pool.execute('SELECT branch_id FROM user_branch_assignments WHERE user_id = ?', [req.user.id]);
+      const myBranchIds = (myAssignments as any[]).map((r) => Number(r.branch_id));
+      if (myBranchIds.length === 0) return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'غير مصرح', message_en: 'Forbidden' });
+      const [targetAssignments] = await pool.execute('SELECT branch_id FROM user_branch_assignments WHERE user_id = ?', [userId]);
+      const targetBranchIds = (targetAssignments as any[]).map((r) => Number(r.branch_id));
+      const overlap = myBranchIds.some((b) => targetBranchIds.includes(b));
+      if (!overlap) {
+        return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'يمكنك تغيير كلمة مرور المستخدمين في فرعك فقط', message_en: 'Can only change password for users in your branch' });
+      }
+    }
+
+    if (req.user.role === 'multi_branch_manager' && targetUser.shop_id !== req.user.shop_id) {
+      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'غير مصرح', message_en: 'Forbidden' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await pool.execute('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, userId]);
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -2389,8 +3338,55 @@ app.delete('/api/users/:id', authenticateToken, requireRole('super_admin', 'shop
 // ========== LICENSES (Super Admin) ==========
 app.get('/api/licenses', authenticateToken, requireRole('super_admin'), async (req: Request, res: Response) => {
   try {
-    const [licenses] = await pool.execute('SELECT * FROM licenses ORDER BY created_at DESC');
+    const filter = getOne(req.query.filter) ?? 'all';
+    let sql = 'SELECT id, license_key, plan, duration, status, used_by_user_id, used_at, created_at FROM licenses';
+    const params: any[] = [];
+    if (filter === 'activated') {
+      sql += " WHERE status = 'active'";
+    } else if (filter === 'not_activated') {
+      sql += " WHERE status = 'unused'";
+    }
+    sql += ' ORDER BY created_at DESC';
+    const [licenses] = await pool.execute(sql, params);
     res.json(licenses);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/licenses/:id', authenticateToken, requireRole('super_admin'), async (req: Request, res: Response) => {
+  try {
+    const idRaw = getOne(req.params?.id);
+    const id = idRaw ? parseInt(idRaw, 10) : 0;
+    if (!id || !Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id' });
+    const [r] = await pool.execute('DELETE FROM licenses WHERE id = ?', [id]);
+    const affected = (r as any).affectedRows || 0;
+    if (affected === 0) return res.status(404).json({ error: 'Code not found' });
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/licenses/bulk-delete', authenticateToken, requireRole('super_admin'), async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids array required' });
+    const safeIds = ids.filter((x: any) => Number.isInteger(Number(x)) && Number(x) > 0).map(Number);
+    if (safeIds.length === 0) return res.status(400).json({ error: 'Invalid ids' });
+    const placeholders = safeIds.map(() => '?').join(',');
+    await pool.execute(`DELETE FROM licenses WHERE id IN (${placeholders})`, safeIds);
+    res.json({ success: true, deleted: safeIds.length });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/licenses/archive-activated', authenticateToken, requireRole('super_admin'), async (req: Request, res: Response) => {
+  try {
+    const [r] = await pool.execute("DELETE FROM licenses WHERE status = 'active'");
+    const deleted = (r as any).affectedRows || 0;
+    res.json({ success: true, deleted });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -2399,7 +3395,7 @@ app.get('/api/licenses', authenticateToken, requireRole('super_admin'), async (r
 app.post('/api/licenses/generate', authenticateToken, requireRole('super_admin'), async (req: Request, res: Response) => {
   try {
     const { plan, duration, count } = req.body;
-    const allowedPlans = ['bronze', 'silver', 'gold'];
+    const allowedPlans = ['bronze', 'silver', 'gold', 'branches'];
     const allowedDurations = ['monthly', 'quarterly', 'yearly', 'lifetime'];
     if (!allowedPlans.includes(plan) || !allowedDurations.includes(duration)) {
       return res.status(400).json({ error: 'Invalid plan or duration' });
@@ -2421,46 +3417,121 @@ app.post('/api/licenses/generate', authenticateToken, requireRole('super_admin')
   }
 });
 
+/** Duration map: monthly=1 month, quarterly=3 months, yearly=12 months, lifetime=no expiry */
+const DURATION_DAYS: Record<string, number | null> = {
+  monthly: 30,
+  quarterly: 90,
+  yearly: 365,
+  lifetime: null,
+};
+
+async function subscriptionStackActivation(
+  shopId: number,
+  planName: string,
+  duration: string,
+  code: string,
+  _usedByUserId: number
+): Promise<{ expiresAt: Date | null; planStatus: string }> {
+  const conn = await pool.getConnection();
+  try {
+    const isLifetime = duration === 'lifetime' || DURATION_DAYS[duration] === null;
+    const days = isLifetime ? null : (DURATION_DAYS[duration] ?? 30);
+
+    const [subRows] = await conn.execute('SELECT id, expires_at FROM subscriptions WHERE shop_id = ?', [shopId]);
+    const sub = (subRows as any[])[0];
+    const now = new Date();
+    const previousExpiresAt = sub?.expires_at ? new Date(sub.expires_at) : null;
+    const isAlreadyLifetime = sub && sub.expires_at === null;
+
+    let newExpiresAt: Date | null = null;
+    if (isLifetime || isAlreadyLifetime) {
+      newExpiresAt = null;
+    } else if (days !== null && days > 0) {
+      const startFrom = previousExpiresAt && previousExpiresAt > now ? previousExpiresAt : now;
+      newExpiresAt = new Date(startFrom.getTime() + days * 24 * 60 * 60 * 1000);
+    }
+
+    const daysForRecord = isLifetime ? 0 : (days ?? 0);
+    if (sub) {
+      await conn.execute(
+        'UPDATE subscriptions SET plan_name = ?, expires_at = ?, last_activated_at = NOW(), updated_at = NOW() WHERE shop_id = ?',
+        [planName, newExpiresAt, shopId]
+      );
+    } else {
+      await conn.execute(
+        'INSERT INTO subscriptions (shop_id, plan_name, started_at, expires_at, last_activated_at) VALUES (?, ?, NOW(), ?, NOW()) ON DUPLICATE KEY UPDATE plan_name = ?, expires_at = ?, last_activated_at = NOW()',
+        [shopId, planName, newExpiresAt, planName, newExpiresAt]
+      );
+    }
+    await conn.execute(
+      'INSERT INTO subscription_activations (shop_id, code, days, previous_expires_at, new_expires_at) VALUES (?, ?, ?, ?, ?)',
+      [shopId, code, daysForRecord, previousExpiresAt, newExpiresAt]
+    );
+    await pool.execute(
+      'UPDATE shops SET package = ?, plan_type = ?, is_active = 1, trial_ends_at = ? WHERE id = ?',
+      [planName, planName, newExpiresAt, shopId]
+    );
+    await pool.execute('UPDATE users SET package = ? WHERE shop_id = ?', [planName, shopId]);
+
+    const planStatus = newExpiresAt === null ? 'LIFETIME' : 'ACTIVE';
+    return { expiresAt: newExpiresAt, planStatus };
+  } finally {
+    conn.release();
+  }
+}
+
 app.post('/api/licenses/activate', authenticateToken, async (req: any, res: Response) => {
   try {
     const { code } = req.body;
-    if (!code) {
-      return res.status(400).json({ error: 'Activation code required' });
-    }
+    if (!code) return res.status(400).json({ error: 'Activation code required' });
 
-    const shopId = resolveShopId(req);
+    let shopId = resolveShopId(req);
     if (!shopId) {
-      return res.status(400).json({ error: 'shopId is required' });
+      shopId = await resolveOrCreateShopForUser(req.user);
     }
 
-    const [licenses] = await pool.execute('SELECT * FROM licenses WHERE license_key = ? AND status = "unused"', [code]);
-    const licenseArray = licenses as any[];
-    if (licenseArray.length === 0) {
-      return res.status(404).json({ error: 'Invalid or used code' });
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const [licenses] = await conn.execute('SELECT * FROM licenses WHERE license_key = ? AND status = "unused" FOR UPDATE', [code]);
+      const licenseArray = licenses as any[];
+      if (licenseArray.length === 0) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'CODE_ALREADY_USED' });
+      }
+
+      const license = licenseArray[0];
+      const duration = String(license.duration || 'monthly').toLowerCase();
+
+      const { expiresAt, planStatus } = await subscriptionStackActivation(Number(shopId), 'gold', duration, String(code), req.user.id);
+
+      await conn.execute(
+        'UPDATE licenses SET status = "active", used_by_user_id = ?, used_at = NOW(), expires_at = ? WHERE id = ?',
+        [req.user.id, expiresAt, license.id]
+      );
+
+      await conn.commit();
+
+      const daysLeft = expiresAt ? Math.ceil((expiresAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000)) : null;
+      const expiresIso = expiresAt ? expiresAt.toISOString() : null;
+      res.json({
+        ok: true,
+        plan: 'gold',
+        duration,
+        expires_at: expiresIso,
+        status: planStatus,
+        success: true,
+        expiresAt: expiresIso,
+        planStatus,
+        daysLeft: planStatus === 'LIFETIME' ? null : daysLeft,
+      });
+    } catch (err: any) {
+      await conn.rollback().catch(() => {});
+      throw err;
+    } finally {
+      conn.release();
     }
-
-    const license = licenseArray[0];
-    const durationMap: Record<string, number | null> = {
-      monthly: 30,
-      quarterly: 90,
-      yearly: 365,
-      lifetime: null,
-    };
-    const days = durationMap[license.duration] ?? 30;
-    const expiresAt = days ? new Date(Date.now() + days * 24 * 60 * 60 * 1000) : null;
-
-    await pool.execute(
-      'UPDATE licenses SET status = "active", used_by_user_id = ?, used_at = NOW(), expires_at = ? WHERE id = ?',
-      [req.user.id, expiresAt, license.id]
-    );
-
-    await pool.execute(
-      'UPDATE shops SET package = ?, plan_type = ?, is_active = 1 WHERE id = ?',
-      ['gold', 'gold', shopId]
-    );
-    await pool.execute('UPDATE users SET package = ? WHERE shop_id = ?', ['gold', shopId]);
-
-    res.json({ success: true, plan: 'gold', duration: license.duration, expiresAt });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -2469,45 +3540,228 @@ app.post('/api/licenses/activate', authenticateToken, async (req: any, res: Resp
 app.post('/api/activate', authenticateToken, async (req: any, res: Response) => {
   try {
     const { code } = req.body;
-    if (!code) {
-      return res.status(400).json({ error: 'Activation code required' });
-    }
+    if (!code) return res.status(400).json({ error: 'Activation code required' });
 
-    const shopId = resolveShopId(req);
+    let shopId = resolveShopId(req);
     if (!shopId) {
-      return res.status(400).json({ error: 'shopId is required' });
+      shopId = await resolveOrCreateShopForUser(req.user);
     }
 
-    const [licenses] = await pool.execute('SELECT * FROM licenses WHERE license_key = ? AND status = "unused"', [code]);
-    const licenseArray = licenses as any[];
-    if (licenseArray.length === 0) {
-      return res.status(404).json({ error: 'Invalid or used code' });
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const [licenses] = await conn.execute('SELECT * FROM licenses WHERE license_key = ? AND status = "unused" FOR UPDATE', [code]);
+      const licenseArray = licenses as any[];
+      if (licenseArray.length === 0) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'CODE_ALREADY_USED' });
+      }
+
+      const license = licenseArray[0];
+      const duration = String(license.duration || 'monthly').toLowerCase();
+      const planName = String(license.plan || 'gold').toLowerCase();
+
+      const { expiresAt, planStatus } = await subscriptionStackActivation(Number(shopId), planName, duration, String(code), req.user.id);
+
+      await conn.execute(
+        'UPDATE licenses SET status = "active", used_by_user_id = ?, used_at = NOW(), expires_at = ? WHERE id = ?',
+        [req.user.id, expiresAt, license.id]
+      );
+
+      await conn.commit();
+
+      const daysLeft = expiresAt ? Math.ceil((expiresAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000)) : null;
+      const expiresIso = expiresAt ? expiresAt.toISOString() : null;
+      res.json({
+        ok: true,
+        plan: planName,
+        duration,
+        expires_at: expiresIso,
+        status: planStatus,
+        success: true,
+        expiresAt: expiresIso,
+        planStatus,
+        daysLeft: planStatus === 'LIFETIME' ? null : daysLeft,
+      });
+    } catch (err: any) {
+      await conn.rollback().catch(() => {});
+      throw err;
+    } finally {
+      conn.release();
     }
-
-    const license = licenseArray[0];
-    const durationMap: Record<string, number | null> = {
-      monthly: 30,
-      quarterly: 90,
-      yearly: 365,
-      lifetime: null,
-    };
-    const days = durationMap[license.duration] ?? 30;
-    const expiresAt = days ? new Date(Date.now() + days * 24 * 60 * 60 * 1000) : null;
-
-    await pool.execute(
-      'UPDATE licenses SET status = "active", used_by_user_id = ?, used_at = NOW(), expires_at = ? WHERE id = ?',
-      [req.user.id, expiresAt, license.id]
-    );
-
-    await pool.execute(
-      'UPDATE shops SET package = ?, plan_type = ?, is_active = 1 WHERE id = ?',
-      [license.plan, license.plan, shopId]
-    );
-    await pool.execute('UPDATE users SET package = ? WHERE shop_id = ?', [license.plan, shopId]);
-
-    res.json({ success: true, plan: license.plan, duration: license.duration, expiresAt });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== BRANCHES (multi-branch) ==========
+app.get('/api/admin/branches', authenticateToken, requireRole('shop_owner', 'super_admin', 'branch_manager', 'multi_branch_manager'), async (req: any, res: Response) => {
+  try {
+    const shopId = Number(resolveShopId(req) || 0);
+    if (!shopId) return res.status(400).json({ error: 'Shop required' });
+    if (req.user?.role !== 'super_admin' && req.user?.shop_id !== shopId)
+      return res.status(403).json({ error: 'Forbidden' });
+    if (req.user?.role === 'branch_manager') {
+      const [rows] = await pool.execute(
+        'SELECT b.id, b.shop_id, b.name, b.name_ar, b.name_en, b.code, b.created_at FROM branches b INNER JOIN user_branch_assignments uba ON uba.branch_id = b.id WHERE uba.user_id = ? ORDER BY b.id',
+        [req.user.id]
+      );
+      return res.json(rows);
+    }
+    const [rows] = await pool.execute(
+      'SELECT id, shop_id, name, name_ar, name_en, code, created_at FROM branches WHERE shop_id = ? ORDER BY id',
+      [shopId]
+    );
+    res.json(rows);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/admin/branches', authenticateToken, requireRole('shop_owner', 'super_admin'), async (req: any, res: Response) => {
+  try {
+    const shopId = Number(resolveShopId(req) || 0);
+    if (!shopId) return res.status(400).json({ error: 'Shop required' });
+    if (req.user?.role !== 'super_admin' && req.user?.shop_id !== shopId)
+      return res.status(403).json({ error: 'Forbidden' });
+    const { name, code } = req.body || {};
+    const c = String((code || '').trim() || 'branch').toLowerCase().replace(/\s+/g, '_');
+    const n = String(name || '').trim() || 'Branch';
+    const [result] = await pool.execute('INSERT INTO branches (shop_id, name, name_ar, name_en, code) VALUES (?, ?, ?, ?, ?)', [shopId, n, n, n, c]);
+    const id = (result as any).insertId;
+    const [rows] = await pool.execute('SELECT id, shop_id, name, name_ar, name_en, code, created_at FROM branches WHERE id = ?', [id]);
+    const defaultBranchId = await pool.execute('SELECT default_branch_id FROM shops WHERE id = ?', [shopId])
+      .then(([r]: any) => (r && r[0] ? r[0].default_branch_id : null));
+    if (!defaultBranchId) await pool.execute('UPDATE shops SET default_branch_id = ? WHERE id = ?', [id, shopId]);
+    res.status(201).json((rows as any[])[0]);
+  } catch (e: any) {
+    if (e?.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'Branch code already exists' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/admin/branches/:id', authenticateToken, requireRole('shop_owner', 'super_admin'), async (req: any, res: Response) => {
+  try {
+    const branchId = Number(req.params.id);
+    if (!branchId) return res.status(400).json({ error: 'Branch id required' });
+    const shopId = Number(resolveShopId(req) || 0);
+    const [existing] = await pool.execute('SELECT shop_id FROM branches WHERE id = ?', [branchId]);
+    if (!(existing as any[]).length) return res.status(404).json({ error: 'Branch not found' });
+    if ((existing as any[])[0].shop_id !== shopId && req.user?.role !== 'super_admin')
+      return res.status(403).json({ error: 'Forbidden' });
+    const { name, code } = req.body || {};
+    const { name_ar, name_en } = req.body || {};
+    if (name !== undefined) {
+      const nm = String(name).trim() || (existing as any[])[0].name;
+      await pool.execute('UPDATE branches SET name = ? WHERE id = ?', [nm, branchId]);
+    }
+    if (name_ar !== undefined) await pool.execute('UPDATE branches SET name_ar = ? WHERE id = ?', [String(name_ar).trim() || null, branchId]);
+    if (name_en !== undefined) await pool.execute('UPDATE branches SET name_en = ? WHERE id = ?', [String(name_en).trim() || null, branchId]);
+    if (code !== undefined) await pool.execute('UPDATE branches SET code = ? WHERE id = ?', [String(code).trim().toLowerCase().replace(/\s+/g, '_'), branchId]);
+    const [rows] = await pool.execute('SELECT id, shop_id, name, name_ar, name_en, code, created_at FROM branches WHERE id = ?', [branchId]);
+    res.json((rows as any[])[0]);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/admin/branches/:id', authenticateToken, requireRole('shop_owner', 'super_admin'), async (req: any, res: Response) => {
+  try {
+    const branchId = Number(req.params.id);
+    const shopId = Number(resolveShopId(req) || 0);
+    const [existing] = await pool.execute('SELECT shop_id FROM branches WHERE id = ?', [branchId]);
+    if (!(existing as any[]).length) return res.status(404).json({ error: 'Branch not found' });
+    if ((existing as any[])[0].shop_id !== shopId && req.user?.role !== 'super_admin')
+      return res.status(403).json({ error: 'Forbidden' });
+    const [branches] = await pool.execute('SELECT id FROM branches WHERE shop_id = ?', [shopId]);
+    if ((branches as any[]).length <= 1) return res.status(400).json({ error: 'Cannot delete the only branch' });
+    await pool.execute('DELETE FROM branches WHERE id = ?', [branchId]);
+    const [defaultRow] = await pool.execute('SELECT default_branch_id FROM shops WHERE id = ?', [shopId]);
+    if ((defaultRow as any[])[0]?.default_branch_id === branchId) {
+      const next = (branches as any[]).find((b: any) => b.id !== branchId);
+      if (next) await pool.execute('UPDATE shops SET default_branch_id = ? WHERE id = ?', [next.id, shopId]);
+    }
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/admin/branches/current', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = Number(resolveShopId(req) || 0);
+    if (!shopId) return res.status(400).json({ error: 'Shop required' });
+    const [rows] = await pool.execute(
+      'SELECT b.id, b.shop_id, b.name, b.name_ar, b.name_en, b.code FROM branches b INNER JOIN shops s ON s.default_branch_id = b.id WHERE s.id = ? LIMIT 1',
+      [shopId]
+    );
+    if ((rows as any[]).length) return res.json((rows as any[])[0]);
+    const [first] = await pool.execute('SELECT id, shop_id, name, name_ar, name_en, code FROM branches WHERE shop_id = ? ORDER BY id LIMIT 1', [shopId]);
+    res.json((first as any[])[0] || null);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ========== SUBSCRIPTION (for settings) ==========
+app.get('/api/subscription', authenticateToken, async (req: any, res: Response) => {
+  try {
+    let shopId: number | null = resolveShopId(req);
+    if (!shopId && req.user?.role === 'super_admin') {
+      shopId = await resolveOrCreateShopForUser(req.user);
+    }
+    if (!shopId) return res.status(400).json({ error: 'Shop required' });
+
+    const [subRows] = await pool.execute(
+      'SELECT plan_name, started_at, expires_at, last_activated_at FROM subscriptions WHERE shop_id = ? LIMIT 1',
+      [shopId]
+    );
+    const sub = (subRows as any[])[0];
+    const [actRows] = await pool.execute(
+      'SELECT code, days, activated_at, previous_expires_at, new_expires_at FROM subscription_activations WHERE shop_id = ? ORDER BY activated_at DESC LIMIT 20',
+      [shopId]
+    );
+    const activations = (actRows as any[]).map((r) => ({
+      code: r.code,
+      days: r.days,
+      activated_at: r.activated_at,
+      previous_expires_at: r.previous_expires_at,
+      new_expires_at: r.new_expires_at,
+    }));
+    const expiresAt = sub?.expires_at ? new Date(sub.expires_at) : null;
+    const isLifetime = !expiresAt;
+    const planStatus = isLifetime ? 'LIFETIME' : 'ACTIVE';
+    const daysLeft = isLifetime ? null : Math.max(0, Math.ceil((expiresAt!.getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
+    const planName = String(sub?.plan_name || 'gold').toLowerCase();
+    const planConfig = getPlanFeatures(planName);
+    const additionalUsersLimit = (planConfig as any).additionalUsersLimit ?? 4;
+    const userLimitTotal = (planConfig as any).userLimit ?? 5;
+    const [allCountRows] = await pool.execute('SELECT COUNT(*) as total FROM users WHERE shop_id = ?', [shopId]);
+    const [additionalCountRows] = await pool.execute("SELECT COUNT(*) as total FROM users WHERE shop_id = ? AND role != 'shop_owner'", [shopId]);
+    const userCountTotal = Number((allCountRows as any[])[0]?.total || 0);
+    const additionalUsersCount = Number((additionalCountRows as any[])[0]?.total || 0);
+    const canAddUser = additionalUsersCount < additionalUsersLimit;
+    res.json({
+      // مصدر واضح للباقة المستخدمة في الـ UI
+      planId: planName,
+      planName,
+      planStatus,
+      startedAt: sub?.started_at,
+      expiresAt: sub?.expires_at,
+      lastActivatedAt: sub?.last_activated_at,
+      daysLeft: isLifetime ? null : daysLeft,
+      activations,
+      userLimitTotal,
+      userLimit: userLimitTotal,
+      additionalUsersLimit,
+      userCountTotal,
+      userCount: userCountTotal,
+      additionalUsersCount,
+      canAddUser,
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
   }
 });
 
@@ -2680,6 +3934,12 @@ app.put('/api/products/:id', authenticateToken, requireRole('super_admin', 'shop
       minStockLevel,
       imageUrl,
       extra_fields: extraFieldsBody,
+      descriptionShort,
+      descriptionLong,
+      specs,
+      warrantyText,
+      returnPolicyText,
+      galleryUrls,
     } = req.body;
 
     if (!nameEn) {
@@ -2698,11 +3958,14 @@ app.put('/api/products/:id', authenticateToken, requireRole('super_admin', 'shop
       extraFieldsBody != null && typeof extraFieldsBody === 'object'
         ? JSON.stringify(extraFieldsBody)
         : null;
+    const specsJson = Array.isArray(specs) ? JSON.stringify(specs) : (typeof specs === 'string' ? specs : null);
+    const galleryUrlsJson = Array.isArray(galleryUrls) ? JSON.stringify(galleryUrls) : (typeof galleryUrls === 'string' ? galleryUrls : null);
 
     await pool.execute(
       `UPDATE products 
        SET name_en = ?, name_ar = ?, sku = ?, barcode = ?, qr_code = ?, brand = ?, buy_price = ?, sell_price = ?,
-           stock_quantity = ?, min_stock_level = ?, image_url = ?, is_incomplete = ?, missing_fields = ?, extra_fields = ?
+           stock_quantity = ?, min_stock_level = ?, image_url = ?, is_incomplete = ?, missing_fields = ?, extra_fields = ?,
+           description_short = ?, description_long = ?, specs_json = ?, warranty_text = ?, return_policy_text = ?, gallery_urls_json = ?
        WHERE id = ? AND shop_id = ?`,
       [
         nameEn,
@@ -2719,6 +3982,12 @@ app.put('/api/products/:id', authenticateToken, requireRole('super_admin', 'shop
         isComplete ? 0 : 1,
         isComplete ? null : missingFieldsJson,
         extraFieldsJson,
+        descriptionShort ?? null,
+        descriptionLong ?? null,
+        specsJson,
+        warrantyText ?? null,
+        returnPolicyText ?? null,
+        galleryUrlsJson,
         productId,
         shopId,
       ]
@@ -3999,6 +5268,83 @@ app.get(
   }
 );
 
+// POS Store Alerts: low stock + slow stock (branch-scoped when branch_inventory exists)
+app.get('/api/pos/alerts', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager', 'cashier'), async (req: any, res: Response) => {
+  try {
+    const shopId = await resolveShopIdSafe(req);
+    if (!shopId) return res.json({ lowStock: [], lowStockCount: 0, slowSummary: { deadCount: 0, slowCount: 0 } });
+    const branchId = resolveBranchId(req);
+    const branchIds = await getBranchManagerBranchIds(req);
+
+    let lowStockQuery = `
+      SELECT p.id, p.name_en, p.name_ar, p.stock_quantity, p.min_stock_level, c.name_en as category_name_en, c.name_ar as category_name_ar
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      WHERE (p.is_deleted = 0 OR p.is_deleted IS NULL) AND p.shop_id = ?
+    `;
+    const lowParams: any[] = [shopId];
+
+    const [biCheck] = await pool.execute('SELECT 1 FROM branch_inventory WHERE shop_id = ? LIMIT 1', [shopId]);
+    const hasBranchInventory = (biCheck as any[]).length > 0;
+    if (hasBranchInventory && (branchId || (branchIds && branchIds.length > 0))) {
+      const bid = branchId || (branchIds && branchIds[0] ? branchIds[0] : null);
+      if (bid) {
+        lowStockQuery = `
+          SELECT p.id, p.name_en, p.name_ar, COALESCE(bi.qty, p.stock_quantity) as stock_quantity, p.min_stock_level, c.name_en as category_name_en, c.name_ar as category_name_ar
+          FROM products p
+          LEFT JOIN branch_inventory bi ON bi.product_id = p.id AND bi.branch_id = ? AND bi.shop_id = p.shop_id
+          LEFT JOIN categories c ON p.category_id = c.id
+          WHERE (p.is_deleted = 0 OR p.is_deleted IS NULL) AND p.shop_id = ?
+          HAVING COALESCE(bi.qty, p.stock_quantity) <= p.min_stock_level
+          ORDER BY COALESCE(bi.qty, p.stock_quantity) ASC
+        `;
+        lowParams.length = 0;
+        lowParams.push(bid, shopId);
+      } else {
+        lowStockQuery += ' AND p.stock_quantity <= p.min_stock_level ORDER BY p.stock_quantity ASC';
+      }
+    } else {
+      lowStockQuery += ' AND p.stock_quantity <= p.min_stock_level ORDER BY p.stock_quantity ASC';
+    }
+
+    const [lowRows] = await pool.execute(lowStockQuery, lowParams);
+    const lowStock = (lowRows as any[]).slice(0, 20);
+
+    const days = 120;
+    const threshold = 2;
+    const [summaryRows] = await pool.execute(
+      `SELECT p.id,
+        COALESCE(pos_sold.sold, 0) + COALESCE(online_sold.sold, 0) AS soldQtyWindow
+       FROM products p
+       LEFT JOIN (SELECT si.product_id, SUM(si.quantity) AS sold FROM sale_items si
+         JOIN sales s ON s.id = si.sale_id AND (s.source = 'pos' OR s.source IS NULL)
+         WHERE s.created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY) AND s.shop_id = ?
+         GROUP BY si.product_id) pos_sold ON pos_sold.product_id = p.id
+       LEFT JOIN (SELECT oi.product_id, SUM(oi.quantity) AS sold FROM online_order_items oi
+         JOIN online_orders o ON o.id = oi.order_id AND o.status IN ('confirmed','completed')
+         WHERE o.created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY) AND o.shop_id = ?
+         GROUP BY oi.product_id) online_sold ON online_sold.product_id = p.id
+       WHERE (p.is_deleted = 0 OR p.is_deleted IS NULL) AND p.shop_id = ?`,
+      [days, shopId, days, shopId, shopId]
+    );
+    let deadCount = 0;
+    let slowCount = 0;
+    for (const r of summaryRows as any[]) {
+      const sold = Number(r.soldQtyWindow || 0);
+      if (sold === 0) deadCount++;
+      else if (sold <= threshold) slowCount++;
+    }
+
+    res.json({
+      lowStock,
+      lowStockCount: (lowRows as any[]).length,
+      slowSummary: { deadCount, slowCount },
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Server error' });
+  }
+});
+
 app.get('/api/products/low-stock', authenticateToken, async (req: any, res: Response) => {
   try {
     const shopId = resolveShopId(req);
@@ -4007,7 +5353,7 @@ app.get('/api/products/low-stock', authenticateToken, async (req: any, res: Resp
       SELECT p.*, c.name_en as category_name_en, c.name_ar as category_name_ar 
       FROM products p 
       LEFT JOIN categories c ON p.category_id = c.id 
-      WHERE p.stock_quantity <= p.min_stock_level
+      WHERE (p.is_deleted = 0 OR p.is_deleted IS NULL) AND p.stock_quantity <= p.min_stock_level
     `;
     const params: any[] = [];
     
@@ -4054,7 +5400,7 @@ app.post(
   '/api/sales',
   authenticateToken,
   requirePackageFeature('pos'),
-  requireRole('super_admin', 'shop_owner', 'cashier'),
+  requireRole('super_admin', 'shop_owner', 'cashier', 'branch_manager'),
   async (req: any, res: Response) => {
   try {
     const result = await createSaleAndItems(req);
@@ -4134,6 +5480,11 @@ const incrementInvoicePrintCount = async (req: any, saleId: number) => {
     });
 
     const printCount = Number(invoiceRow?.print_count || 0);
+    await connection.execute(
+      `INSERT INTO invoice_print_log (shop_id, invoice_id, invoice_type, printed_by_user_id, print_count_after)
+       VALUES (?, ?, 'pos', ?, ?)`,
+      [shopId, saleId, req.user?.id ?? null, printCount]
+    );
     const titleAr = 'طباعة فاتورة POS';
     const titleEn = 'POS invoice printed';
     const bodyAr = `فاتورة #${invoiceRow?.invoice_number || saleId} — نسخة ${printCount}`;
@@ -4160,7 +5511,7 @@ const incrementInvoicePrintCount = async (req: any, saleId: number) => {
   }
 };
 
-app.post('/api/invoices/:id/print', authenticateToken, requireRole('super_admin', 'shop_owner', 'cashier'), async (req: any, res: Response) => {
+app.post('/api/invoices/:id/print', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager', 'cashier'), async (req: any, res: Response) => {
   try {
     const saleId = parseInt(req.params.id, 10);
     if (!saleId) {
@@ -4180,7 +5531,7 @@ app.post('/api/invoices/:id/print', authenticateToken, requireRole('super_admin'
 });
 
 // Alias: sales/:id/print (same as invoices/:id/print)
-app.post('/api/sales/:id/print', authenticateToken, requireRole('super_admin', 'shop_owner', 'cashier'), async (req: any, res: Response) => {
+app.post('/api/sales/:id/print', authenticateToken, requireRole('super_admin', 'shop_owner', 'cashier', 'branch_manager'), async (req: any, res: Response) => {
   try {
     const saleId = parseInt(req.params.id, 10);
     if (!saleId) {
@@ -4202,6 +5553,7 @@ app.post('/api/sales/:id/print', authenticateToken, requireRole('super_admin', '
 app.get('/api/sales', authenticateToken, async (req: any, res: Response) => {
   try {
     const shopId = Number(resolveShopId(req) || 0);
+    const branchIds = await getBranchManagerBranchIds(req);
     const limitRaw = Number(req.query.limit);
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 500) : 50;
     const sourceFilter = String(req.query.source || 'all').toLowerCase();
@@ -4217,11 +5569,13 @@ app.get('/api/sales', authenticateToken, async (req: any, res: Response) => {
     `;
     const params: any[] = [];
     
-    if (!shopId) {
-      return res.json([]);
-    }
+    if (!shopId) return res.json([]);
     query += ' AND s.shop_id = ?';
     params.push(shopId);
+    if (branchIds?.length) {
+      query += ` AND s.branch_id IN (${branchIds.map(() => '?').join(',')})`;
+      params.push(...branchIds);
+    }
     
     if (sourceFilter === 'online') {
       query += " AND (s.source = 'online' OR s.online_order_id IS NOT NULL)";
@@ -4254,6 +5608,11 @@ app.get('/api/invoices', authenticateToken, async (req: any, res: Response) => {
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 500) : 50;
     const sourceFilter = String(req.query.source || 'all').toLowerCase();
     const search = String(req.query.search || req.query.q || '').trim();
+    let branchId = resolveBranchId(req);
+    if (!branchId && shopId) {
+      const [def] = await pool.execute('SELECT default_branch_id FROM shops WHERE id = ?', [shopId]);
+      branchId = (def as any[])[0]?.default_branch_id ?? null;
+    }
 
     let query = `
       SELECT s.*, u.username as cashier_name,
@@ -4264,6 +5623,10 @@ app.get('/api/invoices', authenticateToken, async (req: any, res: Response) => {
       WHERE s.shop_id = ?
     `;
     const params: any[] = [shopId];
+    if (branchId) {
+      query += ' AND s.branch_id = ?';
+      params.push(branchId);
+    }
 
     if (sourceFilter === 'online') {
       query += " AND (s.source = 'online' OR s.online_order_id IS NOT NULL)";
@@ -4478,25 +5841,64 @@ app.post('/api/audit-logs', authenticateToken, requireRole('super_admin', 'shop_
 app.get('/api/dashboard/stats', authenticateToken, requirePackageFeature('dashboard'), async (req: any, res: Response) => {
   try {
     const shopId = resolveShopId(req);
-    
+    let branchId = resolveBranchId(req);
+    if (!branchId && shopId) {
+      const [def] = await pool.execute('SELECT default_branch_id FROM shops WHERE id = ?', [shopId]);
+      branchId = (def as any[])[0]?.default_branch_id ?? null;
+    }
+
     let whereClause = 'WHERE 1=1';
     const params: any[] = [];
-    
+
     if (shopId) {
       whereClause += ' AND s.shop_id = ?';
       params.push(shopId);
     } else if (req.user.role !== 'super_admin') {
       return res.status(400).json({ error: 'shopId is required' });
     }
-    
-    // Monthly revenue
-    const [revenue] = await pool.execute(`
-      SELECT COALESCE(SUM(total_amount), 0) as monthly_revenue 
+    if (branchId) {
+      whereClause += ' AND s.branch_id = ?';
+      params.push(branchId);
+    }
+
+    // Monthly revenue (POS only, like reports summary)
+    const [revenue] = await pool.execute(
+      `
+      SELECT COALESCE(SUM(s.total_amount), 0) as monthly_revenue 
       FROM sales s 
       ${whereClause}
+      AND (s.source = 'pos' OR s.source IS NULL)
       AND MONTH(s.created_at) = MONTH(CURRENT_DATE())
       AND YEAR(s.created_at) = YEAR(CURRENT_DATE())
-    `, params);
+      `,
+      params
+    );
+
+    // Monthly confirmed/complete online revenue (same rules as reports + analytics)
+    let onlineWhere = 'WHERE 1=1';
+    const onlineParams: any[] = [];
+    if (shopId) {
+      onlineWhere += ' AND o.shop_id = ?';
+      onlineParams.push(shopId);
+    }
+    if (branchId) {
+      onlineWhere += ' AND o.branch_id = ?';
+      onlineParams.push(branchId);
+    }
+    const [onlineRevenueRows] = await pool.execute(
+      `
+      SELECT COALESCE(SUM(o.total), 0) as monthly_online
+      FROM online_orders o
+      ${onlineWhere}
+      AND o.status IN ('confirmed', 'completed')
+      AND MONTH(o.created_at) = MONTH(CURRENT_DATE())
+      AND YEAR(o.created_at) = YEAR(CURRENT_DATE())
+      `,
+      onlineParams
+    );
+    const monthlyPos = Number((revenue as any[])[0]?.monthly_revenue || 0);
+    const monthlyOnline = Number((onlineRevenueRows as any[])[0]?.monthly_online || 0);
+    const monthlyCombined = monthlyPos + monthlyOnline;
     
     // Total products
     let productQuery = 'SELECT COUNT(*) as total_products FROM products';
@@ -4517,9 +5919,9 @@ app.get('/api/dashboard/stats', authenticateToken, requirePackageFeature('dashbo
     const [lowStock] = await pool.execute(lowStockQuery, lowStockParams);
     
     res.json({
-      monthlyRevenue: (revenue as any[])[0]?.monthly_revenue || 0,
+      monthlyRevenue: monthlyCombined,
       totalProducts: (products as any[])[0]?.total_products || 0,
-      lowStockCount: (lowStock as any[])[0]?.low_stock_count || 0
+      lowStockCount: (lowStock as any[])[0]?.low_stock_count || 0,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -4529,18 +5931,27 @@ app.get('/api/dashboard/stats', authenticateToken, requirePackageFeature('dashbo
 app.get('/api/dashboard/sales-chart', authenticateToken, requirePackageFeature('dashboard'), async (req: any, res: Response) => {
   try {
     const shopId = resolveShopId(req);
+    let branchId = resolveBranchId(req);
+    if (!branchId && shopId) {
+      const [def] = await pool.execute('SELECT default_branch_id FROM shops WHERE id = ?', [shopId]);
+      branchId = (def as any[])[0]?.default_branch_id ?? null;
+    }
     const days = parseInt(req.query.days as string) || 30;
-    
+
     let whereClause = '';
     const params: any[] = [days];
-    
     if (shopId) {
       whereClause = 'AND s.shop_id = ?';
       params.push(shopId);
-    } else if (req.user.role !== 'super_admin') {
+    }
+    if (branchId) {
+      whereClause += ' AND s.branch_id = ?';
+      params.push(branchId);
+    }
+    if (!shopId && req.user.role !== 'super_admin') {
       return res.status(400).json({ error: 'shopId is required' });
     }
-    
+
     const [chartData] = await pool.execute(`
       SELECT 
         DATE(s.created_at) as date,
@@ -4598,6 +6009,14 @@ app.get('/api/dashboard/profit-chart', authenticateToken, requirePackageFeature(
 // ========== ADMIN ANALYTICS ==========
 app.get('/api/admin/analytics/summary', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
   try {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[ANALYTICS] /api/admin/analytics/summary', {
+        from: req.query.from,
+        to: req.query.to,
+        userId: req.user?.id,
+        role: req.user?.role,
+      });
+    }
     const shopId = await resolveShopIdSafe(req);
     if (!shopId) return res.json({ ok: true, pos: { amount: 0, count: 0 }, online: { amount: 0, count: 0 }, combined: { amount: 0, count: 0 } });
     const from = String(req.query.from || '').trim() || new Date().toISOString().slice(0, 10);
@@ -4639,6 +6058,16 @@ app.get('/api/admin/analytics/summary', authenticateToken, requireRole('super_ad
 
 app.get('/api/admin/analytics/timeseries', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
   try {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[ANALYTICS] /api/admin/analytics/timeseries', {
+        from: req.query.from,
+        to: req.query.to,
+        bucket: req.query.bucket,
+        source: req.query.source,
+        userId: req.user?.id,
+        role: req.user?.role,
+      });
+    }
     const shopId = await resolveShopIdSafe(req);
     if (!shopId) return res.json({ ok: true, points: [] });
     const from = String(req.query.from || '').trim() || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -4657,7 +6086,7 @@ app.get('/api/admin/analytics/timeseries', authenticateToken, requireRole('super
       const [rows] = await pool.execute(
         `SELECT ${dateExprS} as dateKey, COALESCE(SUM(s.total_amount), 0) as posAmount, COUNT(s.id) as posCount
          FROM sales s
-         WHERE (s.source = 'pos' OR s.source IS NULL) AND s.created_at BETWEEN ? AND ?${posShopFilter}
+         WHERE (s.source = 'pos' OR s.source IS NULL) AND DATE(s.created_at) BETWEEN ? AND ?${posShopFilter}
          GROUP BY ${dateExprS} ORDER BY dateKey ASC`,
         p
       );
@@ -4673,7 +6102,7 @@ app.get('/api/admin/analytics/timeseries', authenticateToken, requireRole('super
       const [rows] = await pool.execute(
         `SELECT ${dateExprO} as dateKey, COALESCE(SUM(o.total), 0) as onlineAmount, COUNT(o.id) as onlineCount
          FROM online_orders o
-         WHERE o.status IN ('confirmed', 'completed') AND o.created_at BETWEEN ? AND ?${onlineShopFilter}
+         WHERE o.status IN ('confirmed', 'completed') AND DATE(o.created_at) BETWEEN ? AND ?${onlineShopFilter}
          GROUP BY ${dateExprO} ORDER BY dateKey ASC`,
         p
       );
@@ -4713,10 +6142,11 @@ app.get('/api/admin/analytics/timeseries', authenticateToken, requireRole('super
 });
 
 // ========== ADMIN REPORTS ==========
-app.get('/api/admin/reports/transactions', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
+app.get('/api/admin/reports/transactions', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager'), async (req: any, res: Response) => {
   try {
     const shopId = await resolveShopIdSafe(req);
     if (!shopId) return res.json({ ok: true, items: [] });
+    const branchIds = await getBranchManagerBranchIds(req);
     const from = String(req.query.from || '').trim() || new Date().toISOString().slice(0, 10);
     const to = String(req.query.to || '').trim() || from;
     const source = String(req.query.source || '').toLowerCase();
@@ -4724,17 +6154,20 @@ app.get('/api/admin/reports/transactions', authenticateToken, requireRole('super
     const offset = Math.max(0, parseInt(String(req.query.offset || 0), 10) || 0);
 
     const posShopFilter = shopId ? ' AND s.shop_id = ?' : '';
+    const posBranchFilter = branchIds?.length ? ` AND s.branch_id IN (${branchIds.map(() => '?').join(',')})` : '';
     const onlineShopFilter = shopId ? ' AND o.shop_id = ?' : '';
-    const params = shopId ? [from, to, shopId] : [from, to];
+    const onlineBranchFilter = branchIds?.length ? ` AND o.branch_id IN (${branchIds.map(() => '?').join(',')})` : '';
+    const posParams = shopId ? (branchIds?.length ? [from, to, shopId, ...branchIds] : [from, to, shopId]) : [from, to];
+    const onlineParams = shopId ? (branchIds?.length ? [from, to, shopId, ...branchIds] : [from, to, shopId]) : [from, to];
 
     const rows: Array<{ id: string; type: 'pos' | 'online'; date: string; total: number; status?: string; invoiceId?: number; orderId?: number; publicCode?: string }> = [];
 
     if (source !== 'online') {
       const [posRows] = await pool.execute(
         `SELECT s.id, s.created_at, s.total_amount, s.invoice_number
-         FROM sales s WHERE (s.source = 'pos' OR s.source IS NULL) AND DATE(s.created_at) BETWEEN ? AND ?${posShopFilter}
+         FROM sales s WHERE (s.source = 'pos' OR s.source IS NULL) AND DATE(s.created_at) BETWEEN ? AND ?${posShopFilter}${posBranchFilter}
          ORDER BY s.created_at DESC LIMIT ${limit} OFFSET ${offset}`,
-        params
+        posParams
       );
       for (const r of posRows as any[]) {
         rows.push({
@@ -4749,9 +6182,9 @@ app.get('/api/admin/reports/transactions', authenticateToken, requireRole('super
     if (source !== 'pos') {
       const [onlineRows] = await pool.execute(
         `SELECT o.id, o.created_at, o.total, o.status, o.public_code
-         FROM online_orders o WHERE o.status IN ('confirmed', 'completed') AND DATE(o.created_at) BETWEEN ? AND ?${onlineShopFilter}
+         FROM online_orders o WHERE o.status IN ('confirmed', 'completed') AND DATE(o.created_at) BETWEEN ? AND ?${onlineShopFilter}${onlineBranchFilter}
          ORDER BY o.created_at DESC LIMIT ${limit} OFFSET ${offset}`,
-        params
+        onlineParams
       );
       for (const r of onlineRows as any[]) {
         rows.push({
@@ -4780,7 +6213,7 @@ const clampIntSlow = (val: unknown, min: number, max: number, def: number): numb
   return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : def;
 };
 
-app.get('/api/admin/inventory/slow-moving/summary', authenticateToken, requireRole('super_admin', 'shop_owner', 'warehouse'), async (req: any, res: Response) => {
+app.get('/api/admin/inventory/slow-moving/summary', authenticateToken, requireRole('super_admin', 'shop_owner', 'warehouse', 'branch_manager', 'multi_branch_manager'), async (req: any, res: Response) => {
   try {
     const shopId = await resolveShopIdSafe(req);
     if (!shopId) return res.json({ ok: true, days: 120, threshold: 2, deadCount: 0, slowCount: 0, deadValue: 0, slowValue: 0, bucketCounts: {} });
@@ -4841,7 +6274,7 @@ app.get('/api/admin/inventory/slow-moving/summary', authenticateToken, requireRo
   }
 });
 
-app.get('/api/admin/inventory/slow-moving', authenticateToken, requireRole('super_admin', 'shop_owner', 'warehouse'), async (req: any, res: Response) => {
+app.get('/api/admin/inventory/slow-moving', authenticateToken, requireRole('super_admin', 'shop_owner', 'warehouse', 'branch_manager', 'multi_branch_manager'), async (req: any, res: Response) => {
   try {
     const shopId = await resolveShopIdSafe(req);
     if (!shopId) return res.json({ ok: true, items: [], nextOffset: null });
@@ -4956,11 +6389,21 @@ async function maybeCreateDeadStockAlert(shopId: number, deadCount: number, slow
 }
 
 // ========== UNIFIED REPORTS ==========
-app.get('/api/admin/reports/summary', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
+app.get('/api/admin/reports/summary', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager'), async (req: any, res: Response) => {
   try {
     const shopId = await resolveShopIdSafe(req);
+    const branchIds = await getBranchManagerBranchIds(req);
+    const isBranchManager = req.user?.role === 'branch_manager';
     if (process.env.NODE_ENV !== 'production') {
-      console.log('[reports] summary req:', { shopId: shopId ?? 'null', from: req.query.from, to: req.query.to, source: req.query.source });
+      console.log('[REPORTS] /api/admin/reports/summary', {
+        shopId: shopId ?? 'null',
+        from: req.query.from,
+        to: req.query.to,
+        source: req.query.source,
+        bucket: req.query.bucket,
+        userId: req.user?.id,
+        role: req.user?.role,
+      });
     }
     if (!shopId) {
       return res.json({
@@ -4978,8 +6421,11 @@ app.get('/api/admin/reports/summary', authenticateToken, requireRole('super_admi
     const dateExprS = bucket === 'month' ? "DATE_FORMAT(s.created_at, '%Y-%m-01')" : bucket === 'week' ? "DATE(DATE_SUB(s.created_at, INTERVAL WEEKDAY(s.created_at) DAY))" : 'DATE(s.created_at)';
     const dateExprO = bucket === 'month' ? "DATE_FORMAT(o.created_at, '%Y-%m-01')" : bucket === 'week' ? "DATE(DATE_SUB(o.created_at, INTERVAL WEEKDAY(o.created_at) DAY))" : 'DATE(o.created_at)';
     const posShopFilter = shopId ? ' AND s.shop_id = ?' : '';
+    const posBranchFilter = branchIds?.length ? ` AND s.branch_id IN (${branchIds.map(() => '?').join(',')})` : '';
     const onlineShopFilter = shopId ? ' AND o.shop_id = ?' : '';
-    const p = shopId ? [from, to, shopId] : [from, to];
+    const onlineBranchFilter = branchIds?.length ? ` AND o.branch_id IN (${branchIds.map(() => '?').join(',')})` : '';
+    const baseP = shopId ? [from, to, shopId] : [from, to];
+    const p = branchIds?.length ? [...baseP, ...branchIds] : baseP;
 
     let posRevenue = 0; let posCount = 0;
     let onlineRevenue = 0; let onlineCount = 0;
@@ -4988,7 +6434,7 @@ app.get('/api/admin/reports/summary', authenticateToken, requireRole('super_admi
     if (source !== 'online') {
       const [posRows] = await pool.execute(
         `SELECT COALESCE(SUM(s.total_amount), 0) AS rev, COUNT(*) AS cnt FROM sales s
-         WHERE (s.source = 'pos' OR s.source IS NULL) AND DATE(s.created_at) BETWEEN ? AND ?${posShopFilter}`,
+         WHERE (s.source = 'pos' OR s.source IS NULL) AND DATE(s.created_at) BETWEEN ? AND ?${posShopFilter}${posBranchFilter}`,
         p
       );
       posRevenue = Number((posRows as any[])[0]?.rev ?? 0);
@@ -4998,7 +6444,7 @@ app.get('/api/admin/reports/summary', authenticateToken, requireRole('super_admi
     if (source !== 'pos') {
       const [onlineRows] = await pool.execute(
         `SELECT o.status, COALESCE(SUM(o.total), 0) AS rev, COUNT(*) AS cnt FROM online_orders o
-         WHERE DATE(o.created_at) BETWEEN ? AND ?${onlineShopFilter} GROUP BY o.status`,
+         WHERE DATE(o.created_at) BETWEEN ? AND ?${onlineShopFilter}${onlineBranchFilter} GROUP BY o.status`,
         p
       );
       for (const r of onlineRows as any[]) {
@@ -5016,13 +6462,13 @@ app.get('/api/admin/reports/summary', authenticateToken, requireRole('super_admi
 
     const [dailyRows] = await pool.execute(
       `SELECT ${dateExprS} AS dt, COALESCE(SUM(s.total_amount), 0) AS pos
-       FROM sales s WHERE (s.source = 'pos' OR s.source IS NULL) AND DATE(s.created_at) BETWEEN ? AND ?${posShopFilter}
+       FROM sales s WHERE (s.source = 'pos' OR s.source IS NULL) AND DATE(s.created_at) BETWEEN ? AND ?${posShopFilter}${posBranchFilter}
        GROUP BY ${dateExprS} ORDER BY dt`,
       p
     );
     const [dailyOnline] = await pool.execute(
       `SELECT ${dateExprO} AS dt, COALESCE(SUM(CASE WHEN o.status IN ('confirmed','completed') THEN o.total ELSE 0 END), 0) AS onlineRev
-       FROM online_orders o WHERE DATE(o.created_at) BETWEEN ? AND ?${onlineShopFilter}
+       FROM online_orders o WHERE DATE(o.created_at) BETWEEN ? AND ?${onlineShopFilter}${onlineBranchFilter}
        GROUP BY ${dateExprO} ORDER BY dt`,
       p
     );
@@ -5044,17 +6490,17 @@ app.get('/api/admin/reports/summary', authenticateToken, requireRole('super_admi
     const [profitRows] = await pool.execute(
       `SELECT ${dateExprS} AS dt, SUM((si.unit_price - COALESCE(p.buy_price, 0)) * si.quantity) AS profit
        FROM sales s JOIN sale_items si ON s.id = si.sale_id JOIN products p ON p.id = si.product_id
-       WHERE (s.source = 'pos' OR s.source IS NULL) AND DATE(s.created_at) BETWEEN ? AND ?${posShopFilter}
+       WHERE (s.source = 'pos' OR s.source IS NULL) AND DATE(s.created_at) BETWEEN ? AND ?${posShopFilter}${posBranchFilter}
        GROUP BY ${dateExprS} ORDER BY dt`,
       p
     );
-    let profitAvailable = (profitRows as any[]).length > 0;
+    let profitAvailable = !isBranchManager && (profitRows as any[]).length > 0;
     const dailyProfit = (profitRows as any[]).map((r: any) => ({ date: String(r.dt).slice(0, 10), profit: Number(r.profit ?? 0) }));
 
     const [topPos] = await pool.execute(
       `SELECT si.product_id AS productId, p.name_en AS name, p.sku, SUM(si.quantity) AS qty, SUM(si.total_price) AS revenue
        FROM sale_items si JOIN sales s ON s.id = si.sale_id JOIN products p ON p.id = si.product_id
-       WHERE (s.source = 'pos' OR s.source IS NULL) AND DATE(s.created_at) BETWEEN ? AND ?${posShopFilter}
+       WHERE (s.source = 'pos' OR s.source IS NULL) AND DATE(s.created_at) BETWEEN ? AND ?${posShopFilter}${posBranchFilter}
        GROUP BY si.product_id ORDER BY revenue DESC LIMIT 20`,
       p
     );
@@ -5062,7 +6508,7 @@ app.get('/api/admin/reports/summary', authenticateToken, requireRole('super_admi
       `SELECT oi.product_id AS productId, p.name_en AS name, p.sku, SUM(oi.quantity) AS qty, SUM(oi.quantity * oi.sell_price_snapshot) AS revenue
        FROM online_order_items oi JOIN online_orders o ON o.id = oi.order_id AND o.status IN ('confirmed','completed')
        JOIN products p ON p.id = oi.product_id
-       WHERE DATE(o.created_at) BETWEEN ? AND ?${onlineShopFilter}
+       WHERE DATE(o.created_at) BETWEEN ? AND ?${onlineShopFilter}${onlineBranchFilter}
        GROUP BY oi.product_id ORDER BY revenue DESC LIMIT 20`,
       p
     );
@@ -5087,8 +6533,8 @@ app.get('/api/admin/reports/summary', authenticateToken, requireRole('super_admi
       profit: {
         available: profitAvailable,
         totalProfit: profitAvailable ? dailyProfit.reduce((s, d) => s + d.profit, 0) : undefined,
-        profitNoteAr: profitAvailable ? undefined : 'الأرباح غير متوفرة — تأكد من وجود سعر الشراء للمنتجات',
-        profitNoteEn: profitAvailable ? undefined : 'Gross profit unavailable — ensure buy_price is set for products',
+        profitNoteAr: isBranchManager ? 'مدير الفرع لا يمكنه رؤية الأرباح' : profitAvailable ? undefined : 'الأرباح غير متوفرة — تأكد من وجود سعر الشراء للمنتجات',
+        profitNoteEn: isBranchManager ? 'Branch Manager cannot view profits' : profitAvailable ? undefined : 'Gross profit unavailable — ensure buy_price is set for products',
       },
       charts: { dailyRevenue, dailyProfit: profitAvailable ? dailyProfit : undefined },
       topProducts,
@@ -5168,7 +6614,7 @@ app.get('/api/shop/public', async (req: Request, res: Response) => {
     }
 
     const [shops] = await pool.execute(
-      'SELECT id, name, business_name, activity_type, currency_symbol, package FROM shops WHERE id = ? AND package = "gold"',
+      "SELECT id, name, business_name, activity_type, currency_symbol, package FROM shops WHERE id = ? AND package IN ('gold', 'branches')",
       [shopId]
     );
     const shop = (shops as any[])[0];
@@ -5451,8 +6897,8 @@ app.post('/api/storefront/orders', async (req: Request, res: Response) => {
         tries++;
       }
       const [ordResult] = await conn.execute(
-        `INSERT INTO online_orders (shop_id, status, customer_name, phone, governorate, city, address, notes, payment_method, subtotal, total, currency, source, public_code)
-         VALUES (?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'EGP', 'online', ?)`,
+        `INSERT INTO online_orders (shop_id, status, order_status, customer_name, phone, governorate, city, address, notes, payment_method, subtotal, total, currency, source, public_code)
+         VALUES (?, 'pending', 'NEW', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'EGP', 'online', ?)`,
         [
           shopId,
           String(customerName).trim(),
@@ -5490,6 +6936,22 @@ app.post('/api/storefront/orders', async (req: Request, res: Response) => {
         [shopId, titleAr, titleEn, bodyAr, bodyEn, JSON.stringify({ orderId, total, itemsCount, publicCode })]
       );
       if (process.env.NODE_ENV !== 'production') console.log('[notifications] INSERT online_order_created shopId=', shopId, 'orderId=', orderId);
+
+      // Create payment record (VodafoneCash, InstaPay, Bank, COD etc.)
+      const paymentMethodMap: Record<string, string> = {
+        cod: 'COD',
+        vodafone: 'VodafoneCash',
+        vodafonecash: 'VodafoneCash',
+        instapay: 'InstaPay',
+        bank: 'Bank',
+        transfer: 'Bank',
+      };
+      const methodKey = String(paymentMethodCode || '').toLowerCase();
+      const paymentMethodName = paymentMethodMap[methodKey] || paymentMethodCode || 'COD';
+      await conn.execute(
+        `INSERT INTO payments (shop_id, order_id, method, amount, status) VALUES (?, ?, ?, ?, 'pending')`,
+        [shopId, orderId, paymentMethodName, total]
+      );
 
       await conn.commit();
       const trackingUrl = `/track?code=${encodeURIComponent(publicCode)}&phone=${encodeURIComponent(phoneStr)}`;
@@ -5583,7 +7045,7 @@ app.get('/api/storefront/orders/track', async (req: Request, res: Response) => {
 });
 
 // ========== ADMIN ORDERS ==========
-app.get('/api/admin/orders', authenticateToken, requireRole('super_admin', 'shop_owner', 'cashier'), async (req: any, res: Response) => {
+app.get('/api/admin/orders', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager', 'cashier'), async (req: any, res: Response) => {
   try {
     let shopId = resolveShopId(req);
     if (shopId) await expireOldReservations(shopId);
@@ -5607,7 +7069,7 @@ app.get('/api/admin/orders', authenticateToken, requireRole('super_admin', 'shop
   }
 });
 
-app.get('/api/admin/orders/:id', authenticateToken, requireRole('super_admin', 'shop_owner', 'cashier'), async (req: any, res: Response) => {
+app.get('/api/admin/orders/:id', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager', 'cashier'), async (req: any, res: Response) => {
   try {
     let shopId = resolveShopId(req);
     if (!shopId && req.user?.role === 'super_admin') {
@@ -5629,7 +7091,7 @@ app.get('/api/admin/orders/:id', authenticateToken, requireRole('super_admin', '
   }
 });
 
-app.patch('/api/admin/orders/:id/status', authenticateToken, requireRole('super_admin', 'shop_owner', 'cashier'), async (req: any, res: Response) => {
+app.patch('/api/admin/orders/:id/status', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager', 'cashier'), async (req: any, res: Response) => {
   try {
     let shopId = resolveShopId(req);
     if (!shopId && req.user?.role === 'super_admin') {
@@ -5693,8 +7155,8 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requireRole('super_
         }
 
         await conn.execute(
-          'UPDATE online_orders SET status = ? WHERE id = ? AND shop_id = ?',
-          ['confirmed', orderId, shopId]
+          'UPDATE online_orders SET status = ?, order_status = ? WHERE id = ? AND shop_id = ?',
+          ['confirmed', 'PROCESSING', orderId, shopId]
         );
 
         const publicCode = order.public_code || String(orderId);
@@ -5731,7 +7193,7 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requireRole('super_
           return res.status(404).json({ error: 'Order not found' });
         }
         await releaseReservation(conn, shopId, orderId);
-        await conn.execute('UPDATE online_orders SET status = ? WHERE id = ? AND shop_id = ?', ['cancelled', orderId, shopId]);
+        await conn.execute('UPDATE online_orders SET status = ?, order_status = ? WHERE id = ? AND shop_id = ?', ['cancelled', 'CANCELLED', orderId, shopId]);
         await conn.commit();
       } finally {
         conn.release();
@@ -5764,15 +7226,24 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requireRole('super_
 
     const [ordRows] = await pool.execute('SELECT status FROM online_orders WHERE id = ? AND shop_id = ?', [orderId, shopId]);
     const fromStatus = (ordRows as any[])[0]?.status ?? 'pending';
+    const orderStatusMap: Record<string, string> = { pending: 'NEW', confirmed: 'PROCESSING', completed: 'DELIVERED', cancelled: 'CANCELLED' };
+    const orderStatus = orderStatusMap[status] || status;
     const [result] = await pool.execute(
-      'UPDATE online_orders SET status = ? WHERE id = ? AND shop_id = ?',
-      [status, orderId, shopId]
+      'UPDATE online_orders SET status = ?, order_status = ? WHERE id = ? AND shop_id = ?',
+      [status, orderStatus, orderId, shopId]
     );
     if ((result as any).affectedRows === 0) {
       return res.status(404).json({ error: 'Order not found' });
     }
     const titleAr = `تحديث الطلب #${orderId}: ${status}`;
     const titleEn = `Order #${orderId} status: ${status}`;
+    // Update payment_status when confirming order
+    if (status === 'confirmed') {
+      try {
+        await pool.execute('UPDATE payments SET status = ? WHERE order_id = ? AND shop_id = ?', ['confirmed', orderId, shopId]);
+        await pool.execute('UPDATE online_orders SET payment_status = ? WHERE id = ? AND shop_id = ?', ['confirmed', orderId, shopId]);
+      } catch (_) {}
+    }
     const bodyAr = `تم تغيير حالة الطلب إلى ${status}`;
     const bodyEn = `Order status changed to ${status}`;
     await pool.execute(
@@ -5783,6 +7254,278 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requireRole('super_
     res.json({ status, message: 'Updated' });
   } catch (error: any) {
     res.status(500).json({ ok: false, error: String((error as any)?.message || 'Server error') });
+  }
+});
+
+// ========== PAYMENTS / ORDERS (Owner, Branch Manager, Multi-Branch Manager - NO Cashier, Warehouse) ==========
+const canAccessPaymentsOrders = (req: any) =>
+  ['super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'].includes(req.user?.role);
+
+app.get('/api/admin/payments-orders/orders', authenticateToken, async (req: any, res: Response) => {
+  try {
+    if (!canAccessPaymentsOrders(req)) return res.status(403).json({ error: 'Forbidden', ar: 'غير مصرح' });
+    let shopId = resolveShopId(req);
+    if (!shopId && req.user?.role === 'super_admin') {
+      const [shops] = await pool.execute('SELECT id FROM shops ORDER BY id ASC LIMIT 1');
+      shopId = (shops as any[])[0]?.id ?? null;
+    }
+    if (!shopId) return res.status(400).json({ error: 'shopId is required' });
+    const branchIds = await getBranchManagerBranchIds(req);
+    const status = String(req.query.status || '').trim();
+    const paymentStatus = String(req.query.paymentStatus || '').trim();
+    const branchId = resolveBranchId(req);
+    const search = String(req.query.search || '').trim();
+    const dateFrom = String(req.query.dateFrom || req.query.from || '').trim();
+    const dateTo = String(req.query.dateTo || req.query.to || '').trim();
+    let query = `
+      SELECT o.*, b.name as branch_name, b.name_ar as branch_name_ar, b.name_en as branch_name_en
+      FROM online_orders o
+      LEFT JOIN branches b ON b.id = o.branch_id
+      WHERE o.shop_id = ?
+    `;
+    const params: any[] = [shopId];
+    if (branchIds && branchIds.length > 0) {
+      query += ' AND (o.branch_id IS NULL OR o.branch_id IN (' + branchIds.map(() => '?').join(',') + '))';
+      params.push(...branchIds);
+    }
+    if (branchId) {
+      query += ' AND (o.branch_id IS NULL OR o.branch_id = ?)';
+      params.push(branchId);
+    }
+    if (status && ['pending', 'confirmed', 'cancelled', 'completed'].includes(status)) {
+      query += ' AND o.status = ?';
+      params.push(status);
+    }
+    if (paymentStatus && ['pending', 'confirmed', 'rejected', 'refunded'].includes(paymentStatus)) {
+      query += ' AND (o.payment_status = ? OR (o.payment_status IS NULL AND ? = ?))';
+      params.push(paymentStatus, paymentStatus, 'pending');
+    }
+    if (search) {
+      const like = `%${search}%`;
+      const num = parseInt(search, 10);
+      if (Number.isFinite(num) && num > 0) {
+        query += ' AND (o.id = ? OR o.customer_name LIKE ? OR o.phone LIKE ?)';
+        params.push(num, like, like);
+      } else {
+        query += ' AND (o.customer_name LIKE ? OR o.phone LIKE ?)';
+        params.push(like, like);
+      }
+    }
+    if (dateFrom) {
+      query += ' AND DATE(o.created_at) >= ?';
+      params.push(dateFrom);
+    }
+    if (dateTo) {
+      query += ' AND DATE(o.created_at) <= ?';
+      params.push(dateTo);
+    }
+    query += ' ORDER BY o.created_at DESC LIMIT 300';
+    const [rows] = await pool.execute(query, params);
+    res.json(rows || []);
+  } catch (error: any) {
+    res.status(500).json({ error: String(error?.message || 'Server error') });
+  }
+});
+
+app.get('/api/admin/payments-orders/payments', authenticateToken, async (req: any, res: Response) => {
+  try {
+    if (!canAccessPaymentsOrders(req)) return res.status(403).json({ error: 'Forbidden', ar: 'غير مصرح' });
+    let shopId = resolveShopId(req);
+    if (!shopId && req.user?.role === 'super_admin') {
+      const [shops] = await pool.execute('SELECT id FROM shops ORDER BY id ASC LIMIT 1');
+      shopId = (shops as any[])[0]?.id ?? null;
+    }
+    if (!shopId) return res.status(400).json({ error: 'shopId is required' });
+    const branchIds = await getBranchManagerBranchIds(req);
+    const status = String(req.query.status || '').trim();
+    const method = String(req.query.method || '').trim();
+    const branchId = resolveBranchId(req);
+    const search = String(req.query.search || '').trim();
+    const dateFrom = String(req.query.dateFrom || req.query.from || '').trim();
+    const dateTo = String(req.query.dateTo || req.query.to || '').trim();
+    let query = `
+      SELECT p.*, o.customer_name, o.phone, o.public_code, b.name as branch_name, b.name_ar as branch_name_ar, b.name_en as branch_name_en
+      FROM payments p
+      LEFT JOIN online_orders o ON o.id = p.order_id
+      LEFT JOIN branches b ON b.id = p.branch_id
+      WHERE p.shop_id = ?
+    `;
+    const params: any[] = [shopId];
+    if (branchIds && branchIds.length > 0) {
+      query += ' AND (p.branch_id IS NULL OR p.branch_id IN (' + branchIds.map(() => '?').join(',') + '))';
+      params.push(...branchIds);
+    }
+    if (branchId) {
+      query += ' AND (p.branch_id IS NULL OR p.branch_id = ?)';
+      params.push(branchId);
+    }
+    if (status && ['pending', 'confirmed', 'rejected', 'refunded'].includes(status)) {
+      query += ' AND p.status = ?';
+      params.push(status);
+    }
+    if (method) {
+      query += ' AND p.method LIKE ?';
+      params.push(`%${method}%`);
+    }
+    if (dateFrom) {
+      query += ' AND DATE(p.created_at) >= ?';
+      params.push(dateFrom);
+    }
+    if (dateTo) {
+      query += ' AND DATE(p.created_at) <= ?';
+      params.push(dateTo);
+    }
+    if (search) {
+      const like = `%${search}%`;
+      const num = parseInt(search, 10);
+      if (Number.isFinite(num) && num > 0) {
+        query += ' AND (p.order_id = ? OR p.reference LIKE ? OR o.phone LIKE ?)';
+        params.push(num, like, like);
+      } else {
+        query += ' AND (p.reference LIKE ? OR o.phone LIKE ?)';
+        params.push(like, like);
+      }
+    }
+    query += ' ORDER BY p.created_at DESC LIMIT 300';
+    const [rows] = await pool.execute(query, params);
+    res.json(rows || []);
+  } catch (error: any) {
+    res.status(500).json({ error: String(error?.message || 'Server error') });
+  }
+});
+
+app.post('/api/admin/payments/:id/confirm', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'), async (req: any, res: Response) => {
+  try {
+    const paymentId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(paymentId)) return res.status(400).json({ error: 'Invalid payment id' });
+    let shopId = resolveShopId(req);
+    if (!shopId && req.user?.role === 'super_admin') {
+      const [shops] = await pool.execute('SELECT id FROM shops ORDER BY id ASC LIMIT 1');
+      shopId = (shops as any[])[0]?.id ?? null;
+    }
+    if (!shopId) return res.status(400).json({ error: 'shopId is required' });
+    const [rows] = await pool.execute('SELECT id, order_id FROM payments WHERE id = ? AND shop_id = ?', [paymentId, shopId]);
+    const pay = (rows as any[])[0];
+    if (!pay) return res.status(404).json({ error: 'Payment not found' });
+    await pool.execute('UPDATE payments SET status = ? WHERE id = ? AND shop_id = ?', ['confirmed', paymentId, shopId]);
+    await pool.execute('UPDATE online_orders SET payment_status = ?, status = ?, order_status = ? WHERE id = ? AND shop_id = ?', ['confirmed', 'confirmed', 'PROCESSING', pay.order_id, shopId]);
+    res.json({ success: true, message: 'Payment confirmed', ar: 'تم تأكيد الدفع' });
+  } catch (error: any) {
+    res.status(500).json({ error: String(error?.message || 'Server error') });
+  }
+});
+
+app.post('/api/admin/payments/:id/reject', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'), async (req: any, res: Response) => {
+  try {
+    const paymentId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(paymentId)) return res.status(400).json({ error: 'Invalid payment id' });
+    const shopId = resolveShopId(req);
+    if (!shopId) return res.status(400).json({ error: 'shopId is required' });
+    const { reason, rejectReason } = req.body || {};
+    const [rows] = await pool.execute('SELECT id, order_id FROM payments WHERE id = ? AND shop_id = ?', [paymentId, shopId]);
+    const pay = (rows as any[])[0];
+    if (!pay) return res.status(404).json({ error: 'Payment not found' });
+    await pool.execute('UPDATE payments SET status = ?, reject_reason = ? WHERE id = ? AND shop_id = ?', ['rejected', reason || rejectReason || null, paymentId, shopId]);
+    await pool.execute('UPDATE online_orders SET payment_status = ? WHERE id = ? AND shop_id = ?', ['rejected', pay.order_id, shopId]);
+    res.json({ success: true, message: 'Payment rejected', ar: 'تم رفض الدفع' });
+  } catch (error: any) {
+    res.status(500).json({ error: String(error?.message || 'Server error') });
+  }
+});
+
+// ========== CROSS-BRANCH INVENTORY AVAILABILITY (Read-only) ==========
+app.get('/api/admin/inventory/availability', authenticateToken, requireRole('super_admin', 'shop_owner', 'cashier', 'branch_manager', 'multi_branch_manager', 'warehouse'), async (req: any, res: Response) => {
+  try {
+    const productId = parseInt(req.query.productId as string, 10);
+    if (!Number.isFinite(productId) || productId <= 0) return res.status(400).json({ error: 'productId is required' });
+    let shopId = resolveShopId(req);
+    if (!shopId && req.user?.role === 'super_admin') {
+      const [sh] = await pool.execute('SELECT id FROM shops ORDER BY id ASC LIMIT 1');
+      shopId = (sh as any[])[0]?.id ?? null;
+    }
+    if (!shopId) return res.status(400).json({ error: 'shopId is required' });
+    const [shopRows] = await pool.execute('SELECT package FROM shops WHERE id = ?', [shopId]);
+    const plan = String(((shopRows as any[])[0]?.package || 'bronze')).toLowerCase();
+    const planConfig = getPlanFeatures(plan);
+    const hasBranches = !!(planConfig as any).branches;
+    if (!hasBranches) {
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        message_ar: 'ميزة الفروع غير متوفرة في باقتك الحالية',
+        message_en: 'Branches feature is not available in your current plan',
+      });
+    }
+    const branchIds = await getBranchManagerBranchIds(req);
+    const params: any[] = [productId, shopId, shopId];
+    const branchFilter = branchIds && branchIds.length > 0 ? ' AND b.id IN (' + branchIds.map(() => '?').join(',') + ')' : '';
+    if (branchIds && branchIds.length > 0) params.push(...branchIds);
+    const [safeRows] = await pool.execute(
+      `SELECT b.id, b.name, b.name_ar, b.name_en, b.code,
+              COALESCE(bi.qty, 0) as qty
+       FROM branches b
+       LEFT JOIN branch_inventory bi ON bi.branch_id = b.id AND bi.product_id = ? AND bi.shop_id = ?
+       WHERE b.shop_id = ? ${branchFilter}
+       ORDER BY COALESCE(bi.qty, 0) DESC`,
+      params
+    );
+    const list = (safeRows as any[]).map((r) => ({
+      branchId: r.id,
+      branchName: r.name,
+      branchNameAr: r.name_ar || r.name,
+      branchNameEn: r.name_en || r.name,
+      qty: Number(r.qty || 0),
+    }));
+    res.json({ productId, branches: list });
+  } catch (error: any) {
+    res.status(500).json({ error: String(error?.message || 'Server error') });
+  }
+});
+
+// Alias: GET /api/inventory/availability (same as /api/admin/inventory/availability)
+app.get('/api/inventory/availability', authenticateToken, requireRole('super_admin', 'shop_owner', 'cashier', 'branch_manager', 'multi_branch_manager', 'warehouse'), async (req: any, res: Response) => {
+  try {
+    const productId = parseInt(req.query.productId as string, 10);
+    if (!Number.isFinite(productId) || productId <= 0) return res.status(400).json({ error: 'productId is required' });
+    let shopId = resolveShopId(req);
+    if (!shopId && req.user?.role === 'super_admin') {
+      const [sh] = await pool.execute('SELECT id FROM shops ORDER BY id ASC LIMIT 1');
+      shopId = (sh as any[])[0]?.id ?? null;
+    }
+    if (!shopId) return res.status(400).json({ error: 'shopId is required' });
+    const [shopRows] = await pool.execute('SELECT package FROM shops WHERE id = ?', [shopId]);
+    const plan = String(((shopRows as any[])[0]?.package || 'bronze')).toLowerCase();
+    const planConfig = getPlanFeatures(plan);
+    const hasBranches = !!(planConfig as any).branches;
+    if (!hasBranches) {
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        message_ar: 'ميزة الفروع غير متوفرة في باقتك الحالية',
+        message_en: 'Branches feature is not available in your current plan',
+      });
+    }
+    const branchIds = await getBranchManagerBranchIds(req);
+    const params: any[] = [productId, shopId, shopId];
+    const branchFilter = branchIds && branchIds.length > 0 ? ' AND b.id IN (' + branchIds.map(() => '?').join(',') + ')' : '';
+    if (branchIds && branchIds.length > 0) params.push(...branchIds);
+    const [safeRows] = await pool.execute(
+      `SELECT b.id, b.name, b.name_ar, b.name_en, b.code,
+              COALESCE(bi.qty, 0) as qty
+       FROM branches b
+       LEFT JOIN branch_inventory bi ON bi.branch_id = b.id AND bi.product_id = ? AND bi.shop_id = ?
+       WHERE b.shop_id = ? ${branchFilter}
+       ORDER BY COALESCE(bi.qty, 0) DESC`,
+      params
+    );
+    const list = (safeRows as any[]).map((r) => ({
+      branchId: r.id,
+      branchName: r.name,
+      branchNameAr: r.name_ar || r.name,
+      branchNameEn: r.name_en || r.name,
+      qty: Number(r.qty || 0),
+    }));
+    res.json({ productId, branches: list });
+  } catch (error: any) {
+    res.status(500).json({ error: String(error?.message || 'Server error') });
   }
 });
 
@@ -5939,7 +7682,8 @@ app.get('/api/admin/online-invoices', authenticateToken, requireRole('super_admi
     const query = String(req.query.query || req.query.search || '').trim();
     const limit = Math.min(parseInt(String(req.query.limit || 50), 10) || 50, 200);
     let sql = `
-      SELECT inv.*, o.customer_name, o.phone, o.public_code, o.status as order_status, o.created_at as order_created_at
+      SELECT inv.*, o.customer_name, o.phone, o.public_code, o.status as order_status, o.created_at as order_created_at,
+             'online' AS source
       FROM online_invoices inv
       JOIN online_orders o ON inv.order_id = o.id
       WHERE inv.shop_id = ?
@@ -5966,7 +7710,8 @@ app.get('/api/admin/online-invoices/:id', authenticateToken, requireRole('super_
     const invId = parseInt(req.params.id, 10);
     if (!Number.isFinite(invId)) return res.status(400).json({ error: 'Invalid invoice id' });
     const [invs] = await pool.execute(
-      `SELECT inv.*, o.customer_name, o.phone, o.public_code, o.address, o.governorate, o.city, o.status as order_status, o.created_at as order_created_at
+      `SELECT inv.*, o.customer_name, o.phone, o.public_code, o.address, o.governorate, o.city,
+              o.status as order_status, o.created_at as order_created_at, 'online' AS source
        FROM online_invoices inv JOIN online_orders o ON inv.order_id = o.id
        WHERE inv.id = ? AND inv.shop_id = ?`,
       [invId, shopId]
@@ -5980,7 +7725,7 @@ app.get('/api/admin/online-invoices/:id', authenticateToken, requireRole('super_
   }
 });
 
-app.post('/api/admin/online-invoices/:id/print', authenticateToken, requireRole('super_admin', 'shop_owner', 'cashier'), async (req: any, res: Response) => {
+app.post('/api/admin/online-invoices/:id/print', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager', 'cashier'), async (req: any, res: Response) => {
   try {
     const shopId = resolveShopId(req);
     if (!shopId) return res.status(400).json({ error: 'shopId is required' });
@@ -5993,13 +7738,24 @@ app.post('/api/admin/online-invoices/:id/print', authenticateToken, requireRole(
     if ((result as any).affectedRows === 0) return res.status(404).json({ error: 'Invoice not found' });
     const [rows] = await pool.execute('SELECT id, invoice_number, printed_count, last_printed_at FROM online_invoices WHERE id = ?', [invId]);
     const row = (rows as any[])[0];
-    res.json({ printCount: Number(row?.printed_count || 0), lastPrintedAt: row?.last_printed_at });
+    const printCount = Number(row?.printed_count || 0);
+    await pool.execute(
+      `INSERT INTO invoice_print_log (shop_id, invoice_id, invoice_type, printed_by_user_id, print_count_after)
+       VALUES (?, ?, 'online', ?, ?)`,
+      [shopId, invId, req.user?.id ?? null, printCount]
+    );
+    res.json({ printCount, lastPrintedAt: row?.last_printed_at });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
 
 // ========== PUBLIC STOREFRONT (Gold package only) ==========
+// Regression checklist: Storefront must NOT show:
+// - Deleted products (is_deleted=1)
+// - Out-of-stock products (available_stock<=0, for endpoints that compute it)
+// All product queries here filter: (p.is_deleted = 0 OR p.is_deleted IS NULL)
+// Main storefront endpoints also filter: HAVING available_stock > 0
 // Load storefront by domain query (for Back to Store from track page)
 app.get('/api/public/storefront/by-domain', async (req: Request, res: Response) => {
   try {
@@ -6013,7 +7769,7 @@ app.get('/api/public/storefront/by-domain', async (req: Request, res: Response) 
     const row = (rows as any[])[0];
     if (!row) return res.status(404).json({ error: 'Unknown domain' });
     const shopId = Number(row.shop_id);
-    const [shops] = await pool.execute('SELECT * FROM shops WHERE id = ? AND package = "gold"', [shopId]);
+    const [shops] = await pool.execute("SELECT * FROM shops WHERE id = ? AND package IN ('gold', 'branches')", [shopId]);
     const shopArray = shops as any[];
     if (shopArray.length === 0) return res.status(404).json({ error: 'Storefront not available' });
     const [categories] = await pool.execute(
@@ -6023,7 +7779,8 @@ app.get('/api/public/storefront/by-domain', async (req: Request, res: Response) 
     const [products] = await pool.execute(
       `SELECT p.*, c.name_en as category_name_en, c.name_ar as category_name_ar
        FROM products p LEFT JOIN categories c ON p.category_id = c.id
-       WHERE p.shop_id = ? ORDER BY p.created_at DESC`,
+       WHERE p.shop_id = ? AND (p.is_deleted = 0 OR p.is_deleted IS NULL)
+       ORDER BY p.created_at DESC`,
       [shopId]
     );
     return res.json({ domain, shop: shopArray[0], categories, products });
@@ -6059,7 +7816,7 @@ app.get('/api/public/storefront/preview/:shopSlug', async (req: Request, res: Re
       SELECT p.*, c.name_en as category_name_en, c.name_ar as category_name_ar
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
-      WHERE p.shop_id = ?
+      WHERE p.shop_id = ? AND (p.is_deleted = 0 OR p.is_deleted IS NULL)
       ORDER BY p.created_at DESC
       `,
       [shopId]
@@ -6086,7 +7843,7 @@ app.get('/api/public/storefront', resolveShopByDomainHost, async (req: any, res:
     await expireOldReservations(shopId);
 
     // Enforce Gold package for storefront publishing
-    const [shops] = await pool.execute('SELECT * FROM shops WHERE id = ? AND package = "gold"', [shopId]);
+    const [shops] = await pool.execute("SELECT * FROM shops WHERE id = ? AND package IN ('gold', 'branches')", [shopId]);
     const shopArray = shops as any[];
     if (shopArray.length === 0) {
       return res.status(404).json({ error: 'Storefront not available' });
@@ -6106,7 +7863,8 @@ app.get('/api/public/storefront', resolveShopByDomainHost, async (req: any, res:
         ), 0)) as available_stock
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
-      WHERE p.shop_id = ?
+      WHERE p.shop_id = ? AND (p.is_deleted = 0 OR p.is_deleted IS NULL)
+      HAVING available_stock > 0
       ORDER BY p.created_at DESC
       `,
       [shopId]
@@ -6130,7 +7888,7 @@ app.get('/api/public/storefront/:shopId', async (req: Request, res: Response) =>
     await expireOldReservations(Number(shopId));
 
     // Check if shop has Gold package
-    const [shops] = await pool.execute('SELECT * FROM shops WHERE id = ? AND package = "gold"', [shopId]);
+    const [shops] = await pool.execute("SELECT * FROM shops WHERE id = ? AND package IN ('gold', 'branches')", [shopId]);
     const shopArray = shops as any[];
 
     if (shopArray.length === 0) {
@@ -6145,7 +7903,8 @@ app.get('/api/public/storefront/:shopId', async (req: Request, res: Response) =>
         ), 0)) as available_stock
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
-      WHERE p.shop_id = ?
+      WHERE p.shop_id = ? AND (p.is_deleted = 0 OR p.is_deleted IS NULL)
+      HAVING available_stock > 0
       ORDER BY p.created_at DESC
     `, [shopId]);
     
@@ -6156,6 +7915,35 @@ app.get('/api/public/storefront/:shopId', async (req: Request, res: Response) =>
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
+});
+
+app.get('/api/public/storefront/:shopId/product/:productId', async (req: Request, res: Response) => {
+  try {
+    const { shopId, productId } = req.params;
+    const [shops] = await pool.execute("SELECT * FROM shops WHERE id = ? AND package IN ('gold', 'branches')", [shopId]);
+    const shopArray = shops as any[];
+    if (shopArray.length === 0) return res.status(404).json({ error: 'Storefront not available' });
+    const [products] = await pool.execute(
+      `SELECT p.*, c.name_en as category_name_en, c.name_ar as category_name_ar,
+        GREATEST(0, COALESCE(p.stock_quantity, 0) - COALESCE((
+          SELECT SUM(r.qty) FROM stock_reservations r
+          WHERE r.product_id = p.id AND r.shop_id = p.shop_id AND r.status = 'reserved'
+        ), 0)) as available_stock
+       FROM products p
+       LEFT JOIN categories c ON p.category_id = c.id
+       WHERE p.id = ? AND p.shop_id = ? AND (p.is_deleted = 0 OR p.is_deleted IS NULL)`,
+      [productId, shopId]
+    );
+    const product = (products as any[])[0];
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+    res.json({ shop: shopArray[0], product });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.use((_req: Request, res: Response) => {
+  res.status(404).json({ error: 'Not found', code: 'NOT_FOUND' });
 });
 
 const server = app.listen(PORT, '0.0.0.0', () => {

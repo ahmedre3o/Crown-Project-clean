@@ -3,9 +3,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Sidebar } from '../../components/Sidebar';
+import { Sidebar } from '@/components/Sidebar';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { apiRequest } from '../../contexts/AuthContext';
+import { apiRequest, useAuth } from '../../contexts/AuthContext';
+import { useRouteGuard } from '../../guards/useRouteGuard';
 import { Bell, Search, ShoppingCart, Globe, FileText, ChevronDown, ChevronUp, CheckCheck } from 'lucide-react';
 
 interface Notification {
@@ -23,6 +24,8 @@ interface Notification {
 
 export default function NotificationsPage() {
   const { language, direction } = useLanguage();
+  const { user, loading: authLoading, effectiveRole } = useAuth();
+  const { allowed } = useRouteGuard(user, authLoading, { feature: 'notifications', effectiveRole, showDenied: true });
   const router = useRouter();
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,9 +64,11 @@ export default function NotificationsPage() {
   }, [sourceFilter, search, language]);
 
   useEffect(() => {
-    const t = setTimeout(() => void load(0, false), search.trim() ? 350 : 0);
-    return () => clearTimeout(t);
-  }, [sourceFilter, search, load]);
+    if (!authLoading && allowed) {
+      const t = setTimeout(() => void load(0, false), search.trim() ? 350 : 0);
+      return () => clearTimeout(t);
+    }
+  }, [authLoading, allowed, sourceFilter, search, load]);
 
   const markRead = async (id: number) => {
     try {
@@ -112,6 +117,8 @@ export default function NotificationsPage() {
     if (source === 'pos') return <ShoppingCart className="h-4 w-4 text-green-300" />;
     return <FileText className="h-4 w-4 text-slate-400" />;
   };
+
+  if (authLoading || !allowed) return null;
 
   return (
     <div className={`min-h-screen flex ${direction === 'rtl' ? 'flex-row-reverse' : ''}`}>

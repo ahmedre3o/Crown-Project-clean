@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Sidebar } from '../components/Sidebar';
+import { Sidebar } from '@/components/Sidebar';
 import { useLanguage } from '../contexts/LanguageContext';
 import { apiRequest, useAuth } from '../contexts/AuthContext';
+import { useRouteGuard } from '../guards/useRouteGuard';
 import { useCurrency } from '../contexts/CurrencyContext';
+import { canAccess, getPlanFeatures } from '../permissions';
 import { AIAssistant } from '../components/AIAssistant';
 import { BarcodeScanner } from '../components/BarcodeScanner';
-import { Image as ImageIcon, Pencil } from 'lucide-react';
+import { Image as ImageIcon, Pencil, MapPin } from 'lucide-react';
 
 interface Product {
   id: number;
@@ -24,6 +26,12 @@ interface Product {
   min_stock_level: number;
   category_name_en?: string;
   category_name_ar?: string;
+  description_short?: string;
+  description_long?: string;
+  specs_json?: string;
+  warranty_text?: string;
+  return_policy_text?: string;
+  gallery_urls_json?: string;
 }
 
 const emptyForm = {
@@ -38,12 +46,22 @@ const emptyForm = {
   sellPrice: '',
   stockQuantity: '',
   minStockLevel: '',
+  descriptionShort: '',
+  descriptionLong: '',
+  warrantyText: '',
+  returnPolicyText: '',
+  specs: [] as { key: string; value: string }[],
+  galleryUrls: [] as string[],
 };
 
 export default function InventoryPage() {
   const { t, direction, language } = useLanguage();
-  const { user } = useAuth();
+  const { user, loading: authLoading, effectiveRole } = useAuth();
+  const { allowed } = useRouteGuard(user, authLoading, { feature: 'inventory', effectiveRole });
   const { symbol } = useCurrency();
+  const planFeatures = getPlanFeatures(user?.package);
+  const canEditInventory = canAccess(effectiveRole as any, 'inventory_edit', planFeatures);
+  const canViewAvailability = canAccess(effectiveRole as any, 'branch_availability', planFeatures);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +78,8 @@ export default function InventoryPage() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [deleteLastImportLoading, setDeleteLastImportLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const [availabilityModal, setAvailabilityModal] = useState<{ productId: number; productName: string } | null>(null);
+  const [availabilityData, setAvailabilityData] = useState<{ branches: Array<{ branchNameAr: string; branchNameEn: string; qty: number }> } | null>(null);
 
   const showToast = useCallback((msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
@@ -86,6 +106,17 @@ export default function InventoryPage() {
       setError(err.message || 'Failed to load products');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openAvailabilityModal = async (product: Product) => {
+    setAvailabilityModal({ productId: product.id, productName: language === 'ar' ? product.name_ar : product.name_en });
+    setAvailabilityData(null);
+    try {
+      const data = await apiRequest(`/admin/inventory/availability?productId=${product.id}`);
+      setAvailabilityData({ branches: (data.branches || []).map((b: any) => ({ branchNameAr: b.branchNameAr || b.branchName || b.name, branchNameEn: b.branchNameEn || b.branchName || b.name, qty: b.qty || 0 })) });
+    } catch {
+      setAvailabilityData({ branches: [] });
     }
   };
 
@@ -122,7 +153,13 @@ export default function InventoryPage() {
         sellPrice: form.sellPrice ? parseFloat(form.sellPrice) : undefined,
         stockQuantity: parseInt(form.stockQuantity || '0', 10),
         minStockLevel: parseInt(form.minStockLevel || '5', 10),
-          imageUrl: form.imageUrl,
+        imageUrl: form.imageUrl,
+        descriptionShort: form.descriptionShort || undefined,
+        descriptionLong: form.descriptionLong || undefined,
+        warrantyText: form.warrantyText || undefined,
+        returnPolicyText: form.returnPolicyText || undefined,
+        specs: form.specs?.length ? form.specs : undefined,
+        galleryUrls: form.galleryUrls?.length ? form.galleryUrls : undefined,
       };
       if (editingId) {
         await apiRequest(`/products/${editingId}`, {
@@ -148,7 +185,19 @@ export default function InventoryPage() {
 
   const openEdit = (product: Product) => {
     setEditingId(product.id);
+    const p = product as any;
+    let specs: { key: string; value: string }[] = [];
+    try {
+      if (p.specs_json) specs = Array.isArray(JSON.parse(p.specs_json)) ? JSON.parse(p.specs_json) : [];
+      else if (typeof p.specs_json === 'object' && Array.isArray(p.specs_json)) specs = p.specs_json;
+    } catch {}
+    let galleryUrls: string[] = [];
+    try {
+      if (p.gallery_urls_json) galleryUrls = Array.isArray(JSON.parse(p.gallery_urls_json)) ? JSON.parse(p.gallery_urls_json) : [];
+      else if (Array.isArray(p.gallery_urls_json)) galleryUrls = p.gallery_urls_json;
+    } catch {}
     setForm({
+      ...emptyForm,
       nameEn: product.name_en,
       nameAr: product.name_ar,
       brand: product.brand || '',
@@ -160,6 +209,12 @@ export default function InventoryPage() {
       sellPrice: String(product.sell_price ?? ''),
       stockQuantity: String(product.stock_quantity ?? ''),
       minStockLevel: String(product.min_stock_level ?? ''),
+      descriptionShort: p.description_short || '',
+      descriptionLong: p.description_long || '',
+      warrantyText: p.warranty_text || '',
+      returnPolicyText: p.return_policy_text || '',
+      specs,
+      galleryUrls,
     });
     setShowForm(true);
   };
@@ -264,6 +319,8 @@ export default function InventoryPage() {
   const selectedCount = selectedIds.size;
   const allOnPageSelected = filteredProducts.length > 0 && filteredProducts.every((p) => selectedIds.has(p.id));
 
+  if (authLoading || !allowed) return null;
+
   return (
     <div className="min-h-screen bg-black text-white flex" dir={direction}>
       <Sidebar />
@@ -272,22 +329,26 @@ export default function InventoryPage() {
         <div className="neon-card rounded-xl p-6">
           <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowForm(true)}
-                className="px-4 py-2 rounded-lg bg-cyan-600 text-white font-semibold"
-              >
-                {t('inventory.addProduct')}
-              </button>
-              <button
-                type="button"
-                onClick={fetchLastBatch}
-                disabled={deleteLastImportLoading}
-                className="px-4 py-2 rounded-lg border border-amber-500/50 text-amber-200 hover:bg-amber-500/10 text-sm disabled:opacity-50"
-              >
-                {deleteLastImportLoading
-                  ? (language === 'ar' ? 'جاري التحميل...' : 'Loading...')
-                  : (language === 'ar' ? 'التراجع عن آخر استيراد' : 'Undo last import')}
-              </button>
+              {canEditInventory && (
+                <>
+                  <button
+                    onClick={() => setShowForm(true)}
+                    className="px-4 py-2 rounded-lg bg-cyan-600 text-white font-semibold"
+                  >
+                    {t('inventory.addProduct')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={fetchLastBatch}
+                    disabled={deleteLastImportLoading}
+                    className="px-4 py-2 rounded-lg border border-amber-500/50 text-amber-200 hover:bg-amber-500/10 text-sm disabled:opacity-50"
+                  >
+                    {deleteLastImportLoading
+                      ? (language === 'ar' ? 'جاري التحميل...' : 'Loading...')
+                      : (language === 'ar' ? 'التراجع عن آخر استيراد' : 'Undo last import')}
+                  </button>
+                </>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -305,7 +366,7 @@ export default function InventoryPage() {
               </button>
             </div>
           </div>
-          {selectedCount > 0 && (
+          {canEditInventory && selectedCount > 0 && (
             <div className="flex items-center gap-3 mb-4 p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
               <span className="text-cyan-200 text-sm">
                 {language === 'ar' ? `${selectedCount} صنف محدد` : `${selectedCount} selected`}
@@ -346,14 +407,16 @@ export default function InventoryPage() {
               <table className="w-full text-sm">
                 <thead className="text-cyan-400 border-b border-cyan-500/20">
                   <tr>
-                    <th className="py-2 pr-2 w-10">
-                      <input
-                        type="checkbox"
-                        checked={allOnPageSelected}
-                        onChange={(e) => (e.target.checked ? selectAllOnPage() : clearSelection())}
-                        className="rounded border-cyan-500/50 bg-slate-800"
-                      />
-                    </th>
+                    {canEditInventory && (
+                      <th className="py-2 pr-2 w-10">
+                        <input
+                          type="checkbox"
+                          checked={allOnPageSelected}
+                          onChange={(e) => (e.target.checked ? selectAllOnPage() : clearSelection())}
+                          className="rounded border-cyan-500/50 bg-slate-800"
+                        />
+                      </th>
+                    )}
                     <th className="py-2 text-left">{t('inventory.productName')}</th>
                     <th className="py-2 text-left">SKU</th>
                     <th className="py-2 text-left">Barcode</th>
@@ -361,27 +424,30 @@ export default function InventoryPage() {
                     <th className="py-2 text-left">{t('inventory.sellPrice')}</th>
                     <th className="py-2 text-left">{t('inventory.buyPrice')}</th>
                     <th className="py-2 text-left">{t('inventory.productImage') || 'Image'}</th>
-                    <th className="py-2 text-left">{t('common.edit')}</th>
+                    {canViewAvailability && <th className="py-2 text-left">{language === 'ar' ? 'التوفر' : 'Availability'}</th>}
+                    {canEditInventory && <th className="py-2 text-left">{t('common.edit')}</th>}
                   </tr>
                 </thead>
                 <tbody className="text-slate-200">
                   {filteredProducts.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="py-4 text-center text-slate-500">
+                      <td colSpan={(canEditInventory ? 1 : 0) + (canViewAvailability ? 1 : 0) + 8} className="py-4 text-center text-slate-500">
                         {language === 'ar' ? 'لا توجد منتجات' : 'No products found'}
                       </td>
                     </tr>
                   ) : (
                     filteredProducts.map((product) => (
                       <tr key={product.id} className="border-b border-cyan-500/10">
-                        <td className="py-2 pr-2">
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.has(product.id)}
-                            onChange={() => toggleSelect(product.id)}
-                            className="rounded border-cyan-500/50 bg-slate-800"
-                          />
-                        </td>
+                        {canEditInventory && (
+                          <td className="py-2 pr-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(product.id)}
+                              onChange={() => toggleSelect(product.id)}
+                              className="rounded border-cyan-500/50 bg-slate-800"
+                            />
+                          </td>
+                        )}
                         <td className="py-2">
                           <div className="font-semibold text-white">
                             {language === 'ar' ? product.name_ar : product.name_en}
@@ -417,16 +483,30 @@ export default function InventoryPage() {
                             </div>
                           )}
                         </td>
-                        <td className="py-2">
-                          <button
-                            type="button"
-                            onClick={() => openEdit(product)}
-                            className="inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200"
-                          >
-                            <Pencil className="h-4 w-4" />
-                            <span className="text-xs">{t('common.edit')}</span>
-                          </button>
-                        </td>
+                        {canViewAvailability && (
+                          <td className="py-2">
+                            <button
+                              type="button"
+                              onClick={() => openAvailabilityModal(product)}
+                              className="inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200"
+                            >
+                              <MapPin className="h-4 w-4" />
+                              <span className="text-xs">{language === 'ar' ? 'توفر في فروع أخرى' : 'Available in other branches'}</span>
+                            </button>
+                          </td>
+                        )}
+                        {canEditInventory && (
+                          <td className="py-2">
+                            <button
+                              type="button"
+                              onClick={() => openEdit(product)}
+                              className="inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200"
+                            >
+                              <Pencil className="h-4 w-4" />
+                              <span className="text-xs">{t('common.edit')}</span>
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))
                   )}
@@ -517,6 +597,89 @@ export default function InventoryPage() {
               />
             </div>
 
+            {/* Storefront details */}
+            <div className="mt-6 border-t border-cyan-500/20 pt-6">
+              <h3 className="text-sm font-bold text-cyan-300 mb-3">{language === 'ar' ? 'تفاصيل المتجر الأونلاين' : 'Online store details'}</h3>
+              <div className="space-y-4">
+                <textarea
+                  className="w-full bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                  placeholder={language === 'ar' ? 'وصف قصير' : 'Short description'}
+                  rows={2}
+                  value={form.descriptionShort}
+                  onChange={(e) => setForm((prev) => ({ ...prev, descriptionShort: e.target.value }))}
+                />
+                <textarea
+                  className="w-full bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                  placeholder={language === 'ar' ? 'وصف طويل' : 'Long description'}
+                  rows={4}
+                  value={form.descriptionLong}
+                  onChange={(e) => setForm((prev) => ({ ...prev, descriptionLong: e.target.value }))}
+                />
+                <div>
+                  <div className="text-xs text-slate-400 mb-1">{language === 'ar' ? 'المواصفات (مفتاح / قيمة)' : 'Specs (key / value)'}</div>
+                  {form.specs.map((s, i) => (
+                    <div key={i} className="flex gap-2 mb-2">
+                      <input
+                        className="flex-1 bg-[#0f172a] border border-cyan-500/20 rounded px-2 py-1.5 text-sm"
+                        placeholder="Key"
+                        value={s.key}
+                        onChange={(e) => setForm((prev) => ({
+                          ...prev,
+                          specs: prev.specs.map((sp, j) => j === i ? { ...sp, key: e.target.value } : sp),
+                        }))}
+                      />
+                      <input
+                        className="flex-1 bg-[#0f172a] border border-cyan-500/20 rounded px-2 py-1.5 text-sm"
+                        placeholder="Value"
+                        value={s.value}
+                        onChange={(e) => setForm((prev) => ({
+                          ...prev,
+                          specs: prev.specs.map((sp, j) => j === i ? { ...sp, value: e.target.value } : sp),
+                        }))}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setForm((prev) => ({ ...prev, specs: prev.specs.filter((_, j) => j !== i) }))}
+                        className="px-2 text-red-400"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setForm((prev) => ({ ...prev, specs: [...prev.specs, { key: '', value: '' }] }))}
+                    className="text-xs text-cyan-400 hover:text-cyan-300"
+                  >
+                    {language === 'ar' ? '+ إضافة مواصفة' : '+ Add spec'}
+                  </button>
+                </div>
+                <input
+                  className="w-full bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                  placeholder={language === 'ar' ? 'نص الضمان' : 'Warranty text'}
+                  value={form.warrantyText}
+                  onChange={(e) => setForm((prev) => ({ ...prev, warrantyText: e.target.value }))}
+                />
+                <textarea
+                  className="w-full bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                  placeholder={language === 'ar' ? 'سياسة الإرجاع' : 'Return policy'}
+                  rows={2}
+                  value={form.returnPolicyText}
+                  onChange={(e) => setForm((prev) => ({ ...prev, returnPolicyText: e.target.value }))}
+                />
+                <div>
+                  <div className="text-xs text-slate-400 mb-1">{language === 'ar' ? 'روابط معرض الصور (كل سطر رابط)' : 'Gallery image URLs (one per line)'}</div>
+                  <textarea
+                    className="w-full bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                    placeholder="https://..."
+                    rows={2}
+                    value={form.galleryUrls.join('\n')}
+                    onChange={(e) => setForm((prev) => ({ ...prev, galleryUrls: e.target.value.split('\n').map((s) => s.trim()).filter(Boolean) }))}
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={() => {
@@ -600,7 +763,40 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {user?.package === 'gold' && <AIAssistant />}
+      {availabilityModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => setAvailabilityModal(null)}>
+          <div
+            className="w-full max-w-md rounded-2xl bg-[#0b1220] border border-cyan-500/30 p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-cyan-200">
+                {language === 'ar' ? 'توفر في فروع أخرى' : 'Available in other branches'}
+              </h3>
+              <button onClick={() => setAvailabilityModal(null)} className="text-slate-400 hover:text-white">×</button>
+            </div>
+            <p className="text-sm text-slate-300 mb-4 truncate" title={availabilityModal.productName}>{availabilityModal.productName}</p>
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {availabilityData ? (
+                availabilityData.branches.length === 0 ? (
+                  <p className="text-slate-500 text-sm">{language === 'ar' ? 'لا توجد بيانات' : 'No data'}</p>
+                ) : (
+                  availabilityData.branches.map((b, i) => (
+                    <div key={i} className="flex justify-between py-2 border-b border-cyan-500/10">
+                      <span className="text-slate-200">{language === 'ar' ? b.branchNameAr : b.branchNameEn}</span>
+                      <span className="font-bold text-cyan-300">{b.qty}</span>
+                    </div>
+                  ))
+                )
+              ) : (
+                <p className="text-slate-500 text-sm">{language === 'ar' ? 'جاري التحميل...' : 'Loading...'}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {canAccess(effectiveRole as any, 'ai', planFeatures) && <AIAssistant />}
 
       <BarcodeScanner
         open={scannerOpen}

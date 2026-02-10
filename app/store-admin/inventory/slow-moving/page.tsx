@@ -2,9 +2,11 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { apiRequest } from '../../../contexts/AuthContext';
+import { apiRequest, useAuth } from '../../../contexts/AuthContext';
+import { useRouteGuard } from '../../../guards/useRouteGuard';
 import { useCurrency } from '../../../contexts/CurrencyContext';
-import { Sidebar } from '../../../components/Sidebar';
+import { formatCurrency, formatNumber } from '@/lib/formatters';
+import { Sidebar } from '@/components/Sidebar';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
 interface SlowMovingItem {
@@ -58,7 +60,9 @@ const BUCKET_LABELS: Record<string, { ar: string; en: string }> = {
 
 export default function SlowMovingPage() {
   const { t, language, direction } = useLanguage();
-  const { format } = useCurrency();
+  const { user, loading: authLoading, effectiveRole } = useAuth();
+  const { allowed } = useRouteGuard(user, authLoading, { feature: 'inventory_slow', effectiveRole, showDenied: true });
+  const { currency, symbol } = useCurrency();
   const [type, setType] = useState<'all' | 'dead' | 'slow'>('all');
   const [days, setDays] = useState(120);
   const [threshold, setThreshold] = useState(2);
@@ -97,8 +101,8 @@ export default function SlowMovingPage() {
   }, [type, days, threshold, q, bucket]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (!authLoading && allowed) loadData();
+  }, [authLoading, allowed, loadData]);
 
   const handleExportCSV = () => {
     const rows: string[][] = [
@@ -106,8 +110,8 @@ export default function SlowMovingPage() {
       ...items.map((it) => [
         language === 'ar' ? it.nameAr || it.name : it.name,
         it.sku || '',
-        String(it.stock),
-        format(it.tiedValue),
+        formatNumber(it.stock, language === 'ar' ? 'ar' : 'en'),
+        formatCurrency(it.tiedValue, language === 'ar' ? 'ar' : 'en', currency, symbol),
         it.lastSoldAt || '-',
         String(it.soldQtyWindow),
         language === 'ar' ? it.recommendationAr : it.recommendationEn,
@@ -117,6 +121,8 @@ export default function SlowMovingPage() {
   };
 
   const handlePrint = () => window.print();
+
+  if (authLoading || !allowed) return null;
 
   return (
     <div className="min-h-screen bg-black text-white flex" dir={direction}>
@@ -131,7 +137,7 @@ export default function SlowMovingPage() {
             <div className="flex flex-wrap gap-6">
               <span className="text-xl font-bold text-red-400">{language === 'ar' ? 'راكد' : 'Dead'}: {summary.deadCount}</span>
               <span className="text-xl font-bold text-amber-400">{language === 'ar' ? 'بطيء' : 'Slow'}: {summary.slowCount}</span>
-              <span className="text-lg text-cyan-300">{language === 'ar' ? 'القيمة المربوطة' : 'Tied Value'}: {format(summary.deadValue + summary.slowValue)}</span>
+              <span className="text-lg text-cyan-300">{language === 'ar' ? 'القيمة المربوطة' : 'Tied Value'}: {formatCurrency(summary.deadValue + summary.slowValue, language === 'ar' ? 'ar' : 'en', currency, symbol)}</span>
               <span className="text-xs text-gray-500">Window: {days}d | Threshold: {threshold}</span>
             </div>
           </div>
@@ -226,7 +232,7 @@ export default function SlowMovingPage() {
                       <td className="py-3 pr-4">{language === 'ar' ? it.nameAr || it.name : it.name}</td>
                       <td className="py-3 pr-4 text-gray-400">{it.sku || '-'}</td>
                       <td className="py-3 pr-4">{it.stock}</td>
-                      <td className="py-3 pr-4 text-cyan-300 font-semibold">{format(it.tiedValue)}</td>
+                      <td className="py-3 pr-4 text-cyan-300 font-semibold">{formatCurrency(it.tiedValue, language === 'ar' ? 'ar' : 'en', currency, symbol)}</td>
                       <td className="py-3 pr-4 text-gray-400">{it.lastSoldAt ? new Date(it.lastSoldAt).toLocaleDateString() : '-'}</td>
                       <td className="py-3 pr-4">{it.soldQtyWindow}</td>
                       <td className="py-3">{BUCKET_LABELS[it.bucket] ? (language === 'ar' ? BUCKET_LABELS[it.bucket].ar : BUCKET_LABELS[it.bucket].en) : it.bucket}</td>

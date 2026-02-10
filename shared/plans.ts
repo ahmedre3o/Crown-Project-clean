@@ -1,0 +1,258 @@
+/**
+ * Single source of truth for Crown ERP plans.
+ * Used by: Admin, Settings, Login, backend API, AI knowledge.
+ * All pricing, limits, and features must match exactly.
+ */
+
+export type PlanId = 'bronze' | 'silver' | 'gold' | 'branches';
+
+export interface PlanPricing {
+  monthly: number;
+  quarterly?: number;
+  yearly: number;
+}
+
+export interface PlanConfig {
+  id: PlanId;
+  nameAr: string;
+  nameEn: string;
+  /** Total users including owner (Owner + additional) */
+  totalUsers: number;
+  /** Additional users excluding owner */
+  additionalUsersLimit: number;
+  features: {
+    pos: boolean;
+    manualEntry: boolean;
+    inventory: boolean;
+    excelImport: boolean;
+    onlineStore: boolean;
+    reports: boolean;
+    notifications: boolean;
+    ai: boolean;
+    branches: boolean;
+  };
+  /** AR/EGP pricing (Egypt) */
+  pricing: {
+    ar: PlanPricing;
+    en: PlanPricing;
+  };
+  /** @deprecated use pricing.ar */
+  pricingEGP: PlanPricing;
+  /** @deprecated use pricing.en */
+  pricingUSD: PlanPricing;
+  /** Display features for UI cards */
+  displayFeatures: Array<{ key: string; ar: string; en: string; included: boolean }>;
+  rolesAr: string;
+  rolesEn: string;
+  highlight?: boolean;
+}
+
+export const PLANS: PlanConfig[] = [
+  {
+    id: 'bronze',
+    nameAr: 'برونزي',
+    nameEn: 'Bronze',
+    totalUsers: 2,
+    additionalUsersLimit: 1,
+    features: {
+      pos: true,
+      manualEntry: true,
+      inventory: true,
+      excelImport: false,
+      onlineStore: false,
+      reports: false,
+      notifications: false,
+      ai: false,
+      branches: false,
+    },
+    pricing: {
+      ar: { monthly: 199, quarterly: 540, yearly: 1900 },
+      en: { monthly: 5, yearly: 50 },
+    },
+    pricingEGP: { monthly: 199, quarterly: 540, yearly: 1900 },
+    pricingUSD: { monthly: 5, yearly: 50 },
+    displayFeatures: [
+      { key: 'pos', ar: 'نقطة البيع', en: 'POS', included: true },
+      { key: 'manual', ar: 'إدخال يدوي', en: 'Manual Entry', included: true },
+      { key: 'inventory', ar: 'مخزون أساسي', en: 'Inventory basic', included: true },
+      { key: 'online', ar: 'متجر أونلاين', en: 'Online Store', included: false },
+      { key: 'ai', ar: 'مساعد ذكاء اصطناعي', en: 'AI Assistant', included: false },
+      { key: 'reports', ar: 'تقارير PDF/Excel', en: 'Reports PDF/Excel', included: false },
+    ],
+    rolesAr: 'مالك + 1',
+    rolesEn: 'Owner + 1',
+  },
+  {
+    id: 'silver',
+    nameAr: 'فضي',
+    nameEn: 'Silver',
+    totalUsers: 5,
+    additionalUsersLimit: 4,
+    features: {
+      pos: true,
+      manualEntry: true,
+      inventory: true,
+      excelImport: true,
+      onlineStore: false,
+      reports: false,
+      notifications: false,
+      ai: false,
+      branches: false,
+    },
+    pricing: {
+      ar: { monthly: 349, quarterly: 945, yearly: 3350 },
+      en: { monthly: 9, yearly: 90 },
+    },
+    pricingEGP: { monthly: 349, quarterly: 945, yearly: 3350 },
+    pricingUSD: { monthly: 9, yearly: 90 },
+    displayFeatures: [
+      { key: 'pos', ar: 'نقطة البيع', en: 'POS', included: true },
+      { key: 'manual', ar: 'إدخال يدوي', en: 'Manual Entry', included: true },
+      { key: 'inventory', ar: 'مخزون', en: 'Inventory', included: true },
+      { key: 'excel', ar: 'استيراد CSV / Excel', en: 'CSV / Excel import', included: true },
+      { key: 'ai', ar: 'مساعد ذكاء اصطناعي', en: 'AI Assistant', included: false },
+      { key: 'online', ar: 'متجر أونلاين', en: 'Online Store', included: false },
+    ],
+    rolesAr: 'مالك + 4',
+    rolesEn: 'Owner + 4',
+  },
+  {
+    id: 'gold',
+    nameAr: 'ذهبي',
+    nameEn: 'Gold',
+    totalUsers: 10,
+    additionalUsersLimit: 9,
+    features: {
+      pos: true,
+      manualEntry: true,
+      inventory: true,
+      excelImport: true,
+      onlineStore: true,
+      reports: true,
+      notifications: true,
+      ai: true,
+      branches: false,
+    },
+    pricing: {
+      ar: { monthly: 699, quarterly: 1890, yearly: 6700 },
+      en: { monthly: 19, yearly: 190 },
+    },
+    pricingEGP: { monthly: 699, quarterly: 1890, yearly: 6700 },
+    pricingUSD: { monthly: 19, yearly: 190 },
+    displayFeatures: [
+      { key: 'pos', ar: 'نقطة البيع', en: 'POS', included: true },
+      { key: 'inventory', ar: 'مخزون', en: 'Inventory', included: true },
+      { key: 'reports', ar: 'تقارير PDF / Excel / CSV', en: 'Reports PDF/Excel/CSV', included: true },
+      { key: 'ai', ar: 'مساعد ذكاء اصطناعي', en: 'AI Assistant', included: true },
+      { key: 'online', ar: 'متجر أونلاين', en: 'Online Store', included: true },
+      { key: 'notifications', ar: 'إشعارات', en: 'Notifications', included: true },
+    ],
+    rolesAr: 'مالك + 9',
+    rolesEn: 'Owner + 9',
+    highlight: true,
+  },
+  {
+    id: 'branches',
+    nameAr: 'فروع',
+    nameEn: 'Branches',
+    totalUsers: 30,
+    additionalUsersLimit: 29,
+    features: {
+      pos: true,
+      manualEntry: true,
+      inventory: true,
+      excelImport: true,
+      onlineStore: true,
+      reports: true,
+      notifications: true,
+      ai: true,
+      branches: true,
+    },
+    pricing: {
+      ar: { monthly: 1499, quarterly: 4050, yearly: 14400 },
+      en: { monthly: 39, yearly: 390 },
+    },
+    pricingEGP: { monthly: 1499, quarterly: 4050, yearly: 14400 },
+    pricingUSD: { monthly: 39, yearly: 390 },
+    displayFeatures: [
+      { key: 'branches', ar: 'فروع غير محدودة', en: 'Unlimited branches', included: true },
+      { key: 'all', ar: 'جميع مميزات الذهبي', en: 'All Gold features', included: true },
+      { key: 'control', ar: 'تحكم على مستوى الفرع', en: 'Branch-level control', included: true },
+      { key: 'enterprise', ar: 'إدارة على مستوى المؤسسة', en: 'Enterprise-level management', included: true },
+    ],
+    rolesAr: 'مالك + 29',
+    rolesEn: 'Owner + 29',
+  },
+];
+
+export const getPlanById = (id: string): PlanConfig | undefined =>
+  PLANS.find((p) => p.id === (id || 'bronze').toLowerCase());
+
+export const getPlanPricing = (planId: string, currency: 'EGP' | 'USD') => {
+  const plan = getPlanById(planId);
+  if (!plan) return null;
+  return currency === 'EGP' ? plan.pricingEGP : plan.pricingUSD;
+};
+
+/** Get pricing by language: ar → EGP, en → USD */
+export const getPlanPricingByLanguage = (planId: string, lang: 'ar' | 'en') => {
+  const plan = getPlanById(planId);
+  if (!plan) return null;
+  return plan.pricing[lang];
+};
+
+/** Currency for plan display by language */
+export const getPlanCurrency = (lang: 'ar' | 'en') => (lang === 'ar' ? 'EGP' : 'USD');
+export const getPlanCurrencySymbol = (lang: 'ar' | 'en') => (lang === 'ar' ? 'ج.م' : '$');
+
+/** Frontend PlanFeatures shape for permissions (ai, onlineStore, excelImport, manualEntry, branches) */
+export const getPlanFeaturesForFrontend = (planId: string) => {
+  const plan = getPlanById(planId);
+  if (!plan) {
+    return {
+      ai: false,
+      onlineStore: false,
+      excelImport: false,
+      manualEntry: true,
+      branches: false,
+    };
+  }
+  return {
+    ai: plan.features.ai,
+    onlineStore: plan.features.onlineStore,
+    excelImport: plan.features.excelImport,
+    manualEntry: plan.features.manualEntry,
+    branches: plan.features.branches,
+  };
+};
+
+/** Backend-compatible plan features (userLimit, additionalUsersLimit, branches, etc.) */
+export const getPlanFeaturesForBackend = (planId: string) => {
+  const plan = getPlanById(planId);
+  if (!plan) {
+    return {
+      userLimit: 2,
+      additionalUsersLimit: 1,
+      online: false,
+      reports_pdf: false,
+      reports_excel: false,
+      ai_assistant: false,
+      branches: false,
+      notifications: false,
+      slow_stock: false,
+      manual_entry: true,
+    };
+  }
+  return {
+    userLimit: plan.totalUsers,
+    additionalUsersLimit: plan.additionalUsersLimit,
+    online: plan.features.onlineStore,
+    reports_pdf: plan.features.reports,
+    reports_excel: plan.features.reports,
+    ai_assistant: plan.features.ai,
+    branches: plan.features.branches,
+    notifications: plan.features.notifications,
+    slow_stock: plan.features.reports,
+    manual_entry: plan.features.manualEntry,
+  };
+};

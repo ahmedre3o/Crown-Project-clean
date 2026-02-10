@@ -15,8 +15,10 @@ import { AlertTriangle, Package, TrendingUp, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useLanguage } from '../contexts/LanguageContext';
 import { apiRequest, useAuth } from '../contexts/AuthContext';
+import { useRouteGuard } from '../guards/useRouteGuard';
 import { useCurrency } from '../contexts/CurrencyContext';
-import { Sidebar } from '../components/Sidebar';
+import { formatCurrency, formatNumber } from '@/lib/formatters';
+import { Sidebar } from '@/components/Sidebar';
 import { AIAssistant } from '../components/AIAssistant';
 
 interface DashboardStats {
@@ -65,8 +67,9 @@ interface RecentProduct {
 
 export default function DashboardPage() {
   const { t, language, direction } = useLanguage();
-  const { user } = useAuth();
-  const { format } = useCurrency();
+  const { user, loading: authLoading, effectiveRole } = useAuth();
+  const { allowed } = useRouteGuard(user, authLoading, { feature: 'dashboard', effectiveRole, showDenied: true });
+  const { currency, symbol } = useCurrency();
   const [importNotice, setImportNotice] = useState<string | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
     monthlyRevenue: 0,
@@ -83,10 +86,30 @@ export default function DashboardPage() {
   const [recentProducts, setRecentProducts] = useState<RecentProduct[]>([]);
   const [staffCount, setStaffCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [trialToast, setTrialToast] = useState<string | null>(null);
+
+  const displayName = user?.username?.split('@')[0] || (user as any)?.ownerName || user?.username || '';
 
   useEffect(() => {
     loadDashboardData();
   }, []);
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && sessionStorage.getItem('crown-trial-toast') === '1') {
+        sessionStorage.removeItem('crown-trial-toast');
+        setTrialToast(
+          language === 'ar'
+            ? 'أنت على تجربة GOLD لمدة 7 أيام. بعد انتهاء التجربة، فعّل كود الاشتراك للاستمرار.'
+            : 'You are on a 7-day GOLD trial. After the trial, activate a subscription code to continue.'
+        );
+        const t = setTimeout(() => setTrialToast(null), 8000);
+        return () => clearTimeout(t);
+      }
+    } catch {
+      // ignore
+    }
+  }, [language]);
 
   useEffect(() => {
     try {
@@ -163,12 +186,22 @@ export default function DashboardPage() {
   const chartSalesData = salesChartData;
   const chartProfitData = profitChartData;
 
+  if (authLoading || !allowed) return null;
+
   return (
     <div className="min-h-screen bg-black text-white flex" dir={direction}>
       <Sidebar />
 
       {/* Main Content */}
       <div className="flex-1 p-8 pt-20 md:pt-8 overflow-y-auto">
+        {trialToast && (
+          <div className="mb-6 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-200 flex items-start justify-between gap-4">
+            <div>{trialToast}</div>
+            <button type="button" onClick={() => setTrialToast(null)} className="text-cyan-200/80 hover:text-cyan-100 text-xs">
+              {language === 'ar' ? 'إخفاء' : 'Dismiss'}
+            </button>
+          </div>
+        )}
         {importNotice && (
           <div className="mb-6 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-200 shadow-[0_0_18px_rgba(34,197,94,0.16)] flex items-start justify-between gap-4">
             <div className="font-semibold">{importNotice}</div>
@@ -182,7 +215,9 @@ export default function DashboardPage() {
           </div>
         )}
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-cyan-200">{t('dashboard.title')}</h1>
+          <h1 className="text-2xl font-bold text-cyan-200">
+            {language === 'ar' ? `مرحباً ${displayName || ''}` : `Welcome, ${displayName || 'User'}`}
+          </h1>
           <div className="text-xs text-gray-500">
             {t('common.package')}:&nbsp;
             <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] uppercase text-yellow-300 border border-yellow-500/50 bg-yellow-500/10 shadow-[0_0_12px_rgba(255,215,0,0.35)]">
@@ -198,7 +233,9 @@ export default function DashboardPage() {
               <TrendingUp className="w-5 h-5 text-cyan-400" />
             </div>
             <h3 className="text-3xl font-bold text-cyan-400">
-              {loading ? '...' : format(stats.monthlyRevenue)}
+              {loading
+                ? '...'
+                : formatCurrency(stats.monthlyRevenue, language === 'ar' ? 'ar' : 'en', currency, symbol)}
             </h3>
           </div>
           <div className="p-6 neon-card rounded-xl border border-fuchsia-500/40 shadow-[0_0_18px_rgba(236,72,153,0.2)]">
@@ -207,7 +244,9 @@ export default function DashboardPage() {
               <TrendingUp className="w-5 h-5 text-fuchsia-400" />
             </div>
             <h3 className="text-3xl font-bold text-fuchsia-400">
-              {loading ? '...' : format(onlineStats.total)}
+              {loading
+                ? '...'
+                : formatCurrency(onlineStats.total, language === 'ar' ? 'ar' : 'en', currency, symbol)}
             </h3>
             <p className="text-xs text-gray-500 mt-1">
               {onlineStats.count} {language === 'ar' ? 'طلب مؤكد' : 'confirmed orders'}
@@ -219,7 +258,7 @@ export default function DashboardPage() {
               <TrendingUp className="w-5 h-5 text-amber-400" />
             </div>
             <h3 className="text-3xl font-bold text-amber-400">
-              {loading ? '...' : operationsCount}
+              {loading ? '...' : formatNumber(operationsCount, language === 'ar' ? 'ar' : 'en')}
             </h3>
             <p className="text-xs text-gray-500 mt-1">
               {language === 'ar' ? 'فواتير + طلبات مؤكدة' : 'invoices + confirmed orders'}
@@ -231,7 +270,7 @@ export default function DashboardPage() {
               <Package className="w-5 h-5 text-fuchsia-400" />
             </div>
             <h3 className="text-3xl font-bold text-fuchsia-400">
-              {loading ? '...' : stats.totalProducts.toLocaleString()}
+              {loading ? '...' : formatNumber(stats.totalProducts, language === 'ar' ? 'ar' : 'en')}
             </h3>
           </div>
           <div className="p-6 neon-card rounded-xl">
@@ -240,7 +279,7 @@ export default function DashboardPage() {
               <Users className="w-5 h-5 text-cyan-400" />
             </div>
             <h3 className="text-3xl font-bold text-yellow-500">
-              {staffCount === null ? '—' : staffCount.toLocaleString()}
+              {staffCount === null ? '—' : formatNumber(staffCount, language === 'ar' ? 'ar' : 'en')}
             </h3>
           </div>
           {deadSlowStats && (deadSlowStats.deadCount > 0 || deadSlowStats.slowCount > 0) && (
@@ -251,9 +290,18 @@ export default function DashboardPage() {
                   <AlertTriangle className="w-5 h-5 text-amber-400" />
                 </div>
                 <h3 className="text-2xl font-bold text-amber-400">
-                  {language === 'ar' ? 'راكد' : 'Dead'}: {deadSlowStats.deadCount} | {language === 'ar' ? 'بطيء' : 'Slow'}: {deadSlowStats.slowCount}
+                  {language === 'ar' ? 'راكد' : 'Dead'}: {deadSlowStats.deadCount} |{' '}
+                  {language === 'ar' ? 'بطيء' : 'Slow'}: {deadSlowStats.slowCount}
                 </h3>
-                <p className="text-xs text-gray-500 mt-1">{format(deadSlowStats.deadValue + deadSlowStats.slowValue)} {language === 'ar' ? 'قيمة مربوطة' : 'tied value'}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {formatCurrency(
+                    deadSlowStats.deadValue + deadSlowStats.slowValue,
+                    language === 'ar' ? 'ar' : 'en',
+                    currency,
+                    symbol
+                  )}{' '}
+                  {language === 'ar' ? 'قيمة مربوطة' : 'tied value'}
+                </p>
               </div>
             </Link>
           )}
@@ -277,12 +325,28 @@ export default function DashboardPage() {
                 <BarChart data={chartSalesData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
                   <XAxis dataKey="date" stroke="#94a3b8" tickFormatter={formatDate} />
-                  <YAxis yAxisId="left" stroke="#00f3ff" tickFormatter={(v) => (v >= 1000 ? `${v / 1000}k` : String(v))} />
-                  <YAxis yAxisId="right" orientation="right" stroke="#ec4899" tickFormatter={(v) => String(v)} />
+                  <YAxis
+                    yAxisId="left"
+                    stroke="#00f3ff"
+                    tickFormatter={(v) => formatNumber(v as number, language === 'ar' ? 'ar' : 'en')}
+                  />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    stroke="#ec4899"
+                    tickFormatter={(v) => formatNumber(v as number, language === 'ar' ? 'ar' : 'en')}
+                  />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#0b1220', border: '1px solid #00f3ff', borderRadius: '8px' }}
                     labelStyle={{ color: '#00f3ff' }}
-                    formatter={(val: number, name: string) => [name === 'revenue' ? format(val) : String(val), name === 'revenue' ? (language === 'ar' ? 'المبيعات' : 'Sales') : (language === 'ar' ? 'العمليات' : 'Operations')]}
+                    formatter={(val: number, name: string) => [
+                      name === 'revenue'
+                        ? formatCurrency(val, language === 'ar' ? 'ar' : 'en', currency, symbol)
+                        : formatNumber(val, language === 'ar' ? 'ar' : 'en'),
+                      name === 'revenue'
+                        ? (language === 'ar' ? 'المبيعات' : 'Sales')
+                        : (language === 'ar' ? 'العمليات' : 'Operations'),
+                    ]}
                   />
                   <Legend />
                   <Bar dataKey="revenue" yAxisId="left" fill="#00f3ff" name={language === 'ar' ? 'المبيعات' : 'Sales'} />
@@ -308,12 +372,28 @@ export default function DashboardPage() {
                 <BarChart data={onlineChartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
                   <XAxis dataKey="date" stroke="#94a3b8" tickFormatter={formatDate} />
-                  <YAxis yAxisId="left" stroke="#ec4899" tickFormatter={(v) => (v >= 1000 ? `${v / 1000}k` : String(v))} />
-                  <YAxis yAxisId="right" orientation="right" stroke="#00f3ff" tickFormatter={(v) => String(v)} />
+                  <YAxis
+                    yAxisId="left"
+                    stroke="#ec4899"
+                    tickFormatter={(v) => formatNumber(v as number, language === 'ar' ? 'ar' : 'en')}
+                  />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    stroke="#00f3ff"
+                    tickFormatter={(v) => formatNumber(v as number, language === 'ar' ? 'ar' : 'en')}
+                  />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#0b1220', border: '1px solid #ec4899', borderRadius: '8px' }}
                     labelStyle={{ color: '#ec4899' }}
-                    formatter={(val: number, name: string) => [name === 'total' ? format(val) : String(val), name === 'total' ? (language === 'ar' ? 'المبيعات' : 'Sales') : (language === 'ar' ? 'العمليات' : 'Operations')]}
+                    formatter={(val: number, name: string) => [
+                      name === 'total'
+                        ? formatCurrency(val, language === 'ar' ? 'ar' : 'en', currency, symbol)
+                        : formatNumber(val, language === 'ar' ? 'ar' : 'en'),
+                      name === 'total'
+                        ? (language === 'ar' ? 'المبيعات' : 'Sales')
+                        : (language === 'ar' ? 'العمليات' : 'Operations'),
+                    ]}
                   />
                   <Legend />
                   <Bar dataKey="total" yAxisId="left" fill="#ec4899" name={language === 'ar' ? 'المبيعات' : 'Sales'} />
@@ -323,7 +403,8 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Profit Chart */}
+          {/* Profit Chart - hidden for multi_branch_manager (no profits/margins) */}
+          {effectiveRole !== 'multi_branch_manager' && (
           <div className="p-6 neon-card rounded-xl">
             <h3 className="text-xl font-bold mb-4 text-cyan-200">{t('dashboard.profitChart')}</h3>
             {loading ? (
@@ -339,7 +420,10 @@ export default function DashboardPage() {
                 <BarChart data={chartProfitData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
                   <XAxis dataKey="date" stroke="#94a3b8" tickFormatter={formatDate} />
-                  <YAxis stroke="#94a3b8" />
+                  <YAxis
+                    stroke="#94a3b8"
+                    tickFormatter={(v) => formatNumber(v as number, language === 'ar' ? 'ar' : 'en')}
+                  />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#0b1220', border: '1px solid #00f3ff', borderRadius: '8px' }}
                     labelStyle={{ color: '#00f3ff' }}
@@ -351,6 +435,7 @@ export default function DashboardPage() {
               </ResponsiveContainer>
             )}
           </div>
+          )}
         </div>
 
         {/* Low Stock Alerts & Recent Stock */}
@@ -361,7 +446,7 @@ export default function DashboardPage() {
               <AlertTriangle className="w-5 h-5 text-red-400" />
               <h3 className="text-xl font-bold text-cyan-200">{t('dashboard.lowStockAlerts')}</h3>
               <span className="ml-auto bg-red-500/20 text-red-400 px-3 py-1 rounded-full text-sm font-bold">
-                {lowStockProducts.length}
+                {formatNumber(lowStockProducts.length, language === 'ar' ? 'ar' : 'en')}
               </span>
             </div>
             <div className="space-y-3 max-h-64 overflow-y-auto">
@@ -432,7 +517,14 @@ export default function DashboardPage() {
                           {language === 'ar' ? product.name_ar : product.name_en}
                         </td>
                         <td className="py-3 px-2 text-green-400">{product.stock_quantity}</td>
-                        <td className="py-3 px-2">{format(product.sell_price)}</td>
+                        <td className="py-3 px-2">
+                          {formatCurrency(
+                            product.sell_price,
+                            language === 'ar' ? 'ar' : 'en',
+                            currency,
+                            symbol
+                          )}
+                        </td>
                       </tr>
                     ))
                   )}

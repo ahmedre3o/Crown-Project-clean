@@ -1,13 +1,19 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Sidebar } from '../components/Sidebar';
+import { Sidebar } from '@/components/Sidebar';
+import { PlanCards } from '@/components/PlanCards';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useOffline } from '../contexts/OfflineContext';
 import { useCurrency } from '../contexts/CurrencyContext';
-import { apiRequest } from '../contexts/AuthContext';
+import { apiRequest, useAuth } from '../contexts/AuthContext';
+import { useRouteGuard } from '../guards/useRouteGuard';
 
 export default function SettingsPage() {
-  const { t, direction } = useLanguage();
+  const { t, direction, language } = useLanguage();
+  const { isOnline } = useOffline();
+  const { user, loading: authLoading, effectiveRole } = useAuth();
+  const { allowed } = useRouteGuard(user, authLoading, { feature: 'settings', effectiveRole, showDenied: true });
   const { currency, setCurrency } = useCurrency();
   const [profile, setProfile] = useState({
     businessName: '',
@@ -25,8 +31,15 @@ export default function SettingsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activationCode, setActivationCode] = useState('');
-  const [subscription, setSubscription] = useState<{ plan: string; createdAt?: string; expiresAt?: string } | null>(null);
-  const trialDays = 14;
+  const [subscription, setSubscription] = useState<{
+    planName?: string;
+    planStatus?: string;
+    startedAt?: string;
+    expiresAt?: string | null;
+    lastActivatedAt?: string;
+    daysLeft?: number | null;
+    activations?: { code: string; days: number; activated_at: string; previous_expires_at?: string | null; new_expires_at?: string | null }[];
+  } | null>(null);
 
   const currencyOptions = [
     { country: 'Egypt', code: 'EGP', symbol: 'ج.م' },
@@ -67,10 +80,19 @@ export default function SettingsPage() {
       if (data.currency_code) {
         setCurrency(data.currency_code);
       }
-      setSubscription({
-        plan: data.package || 'bronze',
-        createdAt: data.created_at,
-      });
+      const subData = await apiRequest('/subscription').catch(() => null);
+      if (subData) {
+        setSubscription({
+          planName: subData.planName,
+          startedAt: subData.startedAt,
+          expiresAt: subData.expiresAt,
+          lastActivatedAt: subData.lastActivatedAt,
+          daysLeft: subData.daysLeft,
+          activations: subData.activations,
+        });
+      } else {
+        setSubscription({ planName: data.package || 'bronze' });
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to load profile');
     }
@@ -92,6 +114,26 @@ export default function SettingsPage() {
       setLoading(false);
     }
   };
+
+  if (authLoading || !allowed) return null;
+
+  if (!isOnline) {
+    return (
+      <div className="min-h-screen bg-black text-white flex" dir={direction}>
+        <Sidebar />
+        <div className="flex-1 p-8 pt-20 md:pt-8 overflow-y-auto flex items-center justify-center">
+          <div className="neon-card rounded-xl p-8 max-w-md w-full text-center">
+            <h1 className="text-xl font-bold text-amber-300 mb-3">
+              {language === 'ar' ? 'يتطلب اتصالاً بالإنترنت' : 'Requires Internet Connection'}
+            </h1>
+            <p className="text-slate-400">
+              {language === 'ar' ? 'هذه الصفحة تحتاج إلى اتصال بالإنترنت. تحقق من اتصالك وحاول مرة أخرى.' : 'This page requires an internet connection. Check your connection and try again.'}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-white flex" dir={direction}>
@@ -204,19 +246,60 @@ export default function SettingsPage() {
           </select>
 
           <div className="mt-6 border-t border-cyan-500/20 pt-6">
-            <h2 className="text-lg font-bold text-cyan-200 mb-2">Subscription Status</h2>
+            <h2 className="text-lg font-bold text-cyan-200 mb-2">
+              {language === 'ar' ? 'حالة الاشتراك' : 'Subscription Status'}
+            </h2>
             <p className="text-sm text-slate-400">
-              Plan: {subscription?.plan || 'bronze'} — Contact Support: +20 1202620913
+              {language === 'ar' ? 'الباقة' : 'Plan'}: {subscription?.planName || 'bronze'}
+              {subscription?.planStatus === 'LIFETIME' && ` (${language === 'ar' ? 'مدى الحياة' : 'Lifetime'})`}
             </p>
-            {subscription?.createdAt && (
+            {subscription?.startedAt && (
               <p className="text-xs text-slate-500 mt-1">
-                Trial Period: {Math.max(0, trialDays - Math.floor((Date.now() - new Date(subscription.createdAt).getTime()) / (1000 * 60 * 60 * 24)))} days left
+                {language === 'ar' ? 'تاريخ البدء' : 'Start date'}: {new Date(subscription.startedAt).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')}
               </p>
+            )}
+            {subscription?.lastActivatedAt && (
+              <p className="text-xs text-slate-500 mt-1">
+                {language === 'ar' ? 'آخر تفعيل' : 'Last activated'}: {new Date(subscription.lastActivatedAt).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')}
+              </p>
+            )}
+            {subscription?.planStatus === 'LIFETIME' ? (
+              <p className="text-xs text-cyan-300 mt-1">{language === 'ar' ? 'لا ينتهي (مدى الحياة)' : 'Never expires (Lifetime)'}</p>
+            ) : (
+              <>
+                {subscription?.expiresAt && (
+                  <p className="text-xs text-slate-500 mt-1">
+                    {language === 'ar' ? 'ينتهي في' : 'Expires'}: {new Date(subscription.expiresAt).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')}
+                  </p>
+                )}
+                {subscription?.daysLeft != null && (
+                  <p className="text-xs text-cyan-300 mt-1">
+                    {language === 'ar' ? `المتبقي: ${subscription.daysLeft} يوم` : `Days left: ${subscription.daysLeft}`}
+                  </p>
+                )}
+              </>
+            )}
+            {subscription?.activations && subscription.activations.length > 0 && (
+              <div className="mt-2">
+                <p className="text-xs text-slate-500 mb-1">
+                  {language === 'ar' ? 'سجل التفعيلات (آخر 5)' : 'Activation history (last 5)'}
+                </p>
+                <ul className="text-xs text-slate-400 list-disc list-inside space-y-0.5">
+                  {subscription.activations.slice(0, 5).map((a, i) => (
+                    <li key={i}>
+                      {a.days === 0 ? (language === 'ar' ? 'مدى الحياة' : 'Lifetime') : `${a.days} ${language === 'ar' ? 'يوم' : 'days'}`}
+                      {' — '}
+                      {new Date(a.activated_at).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US')}
+                      {a.new_expires_at === null && a.days === 0 && ` → ${language === 'ar' ? 'لا ينتهي' : 'no expiry'}`}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <input
                 className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-                placeholder="Activation code"
+                placeholder={language === 'ar' ? 'كود التفعيل' : 'Activation code'}
                 value={activationCode}
                 onChange={(e) => setActivationCode(e.target.value)}
               />
@@ -230,20 +313,43 @@ export default function SettingsPage() {
                       body: JSON.stringify({ code: activationCode }),
                     });
                     setSubscription((prev) => ({
-                      plan: data.plan,
-                      createdAt: prev?.createdAt,
-                      expiresAt: data.expiresAt,
+                      ...prev,
+                      planName: data.plan,
+                      planStatus: data.planStatus || (data.expiresAt ? 'ACTIVE' : 'LIFETIME'),
+                      expiresAt: data.expiresAt ?? null,
+                      lastActivatedAt: new Date().toISOString(),
+                      daysLeft: data.planStatus === 'LIFETIME' ? null : (data.daysLeft ?? (data.expiresAt ? Math.ceil((new Date(data.expiresAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000)) : null)),
                     }));
-                    setMessage('Subscription updated');
+                    setMessage(language === 'ar' ? 'تم تحديث الاشتراك' : 'Subscription updated');
+                    setActivationCode('');
+                    loadProfile();
                   } catch (err: any) {
-                    setError(err.message || 'Activation failed');
+                    setError(err.message || (language === 'ar' ? 'فشل التفعيل' : 'Activation failed'));
                   }
                 }}
                 className="px-4 py-2 rounded-lg bg-cyan-600 text-white font-semibold text-sm"
               >
-                Activate Code
+                {language === 'ar' ? 'تفعيل الكود' : 'Activate Code'}
               </button>
             </div>
+          </div>
+          <div className="mt-8 border-t border-cyan-500/20 pt-6">
+            <div className="flex flex-wrap items-center gap-4 mb-4">
+              <div className="flex flex-wrap items-center gap-4 text-sm text-slate-300">
+                <a href="https://wa.me/201202620913" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-green-400 hover:text-green-300">
+                  <span>{language === 'ar' ? 'واتساب:' : 'WhatsApp:'}</span>
+                  <span>+01202620913</span>
+                </a>
+                <a href="tel:+01070045116" className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300">
+                  <span>{language === 'ar' ? 'فودافون:' : 'Vodafone Call:'}</span>
+                  <span>+01070045116</span>
+                </a>
+              </div>
+              <h2 className="text-lg font-bold text-cyan-200">
+                {language === 'ar' ? 'الباقات المتاحة' : 'Available Plans'}
+              </h2>
+            </div>
+            <PlanCards />
           </div>
           <div className="mt-6">
             <button

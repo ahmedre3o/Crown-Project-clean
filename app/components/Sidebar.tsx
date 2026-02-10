@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -22,32 +22,65 @@ import {
   ShoppingBag,
   BarChart2,
   AlertTriangle,
+  GitBranch,
+  ChevronDown,
+  Users,
+  Key,
+  CreditCard,
 } from 'lucide-react';
 import { NeonCrownIcon } from './NeonCrownIcon';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useBranch, getBranchDisplayName } from '../contexts/BranchContext';
 import { NotificationsBell } from './NotificationsBell';
+import { ShopSwitcher } from './ShopSwitcher';
 import { useRouter } from 'next/navigation';
+import { getAllowedNav, getPlanFeatures, canAccess, SECTION_LABELS, type Role } from '../permissions';
+
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  LayoutDashboard,
+  MessageCircle,
+  ShoppingCart,
+  Package,
+  AlertTriangle,
+  FilePlus2,
+  FileSpreadsheet,
+  FileText,
+  BarChart2,
+  ShoppingBag,
+  CreditCard,
+  Bell,
+  GitBranch,
+  Users,
+  Shield,
+  Settings,
+  Key,
+};
 
 export function Sidebar() {
   const pathname = usePathname();
   const { t, direction, language, setLanguage } = useLanguage();
-  const { logout, user } = useAuth();
+  const { logout, user, effectiveRole } = useAuth();
+  const branchContext = useBranch();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [branchDropdownOpen, setBranchDropdownOpen] = useState(false);
   const [now, setNow] = useState<Date>(() => new Date());
   const isRtl = direction === 'rtl';
+  const branches = branchContext?.branches ?? [];
+  const activeBranch = branchContext?.activeBranch ?? null;
+  const setActiveBranchId = branchContext?.setActiveBranchId;
 
-  const canUseAi = user?.role === 'super_admin' || user?.package === 'gold';
-  const canUseExcel = user?.role === 'super_admin' || (user?.package === 'gold' && (user?.role === 'shop_owner' || user?.role === 'warehouse'));
-  const canSeeDashboard = user?.role === 'super_admin' || user?.role === 'shop_owner';
-  const canUsePos = user?.role === 'super_admin' || user?.role === 'shop_owner' || user?.role === 'cashier';
-  const canUseInventory = user?.role === 'super_admin' || user?.role === 'shop_owner' || user?.role === 'warehouse';
-  const canSeeInvoices = user?.role === 'super_admin' || user?.role === 'shop_owner' || user?.role === 'cashier';
-  const canSeeSystemAdmin = user?.role === 'super_admin';
-  const canSeeStoreAdmin = user?.role === 'shop_owner' || user?.role === 'super_admin';
-  const canSeeOnlineOrders = canSeeStoreAdmin || user?.role === 'cashier';
+  const planFeatures = useMemo(() => getPlanFeatures(user?.package), [user?.package]);
+  const role = (effectiveRole ?? user?.role) as Role | undefined;
+  const canSeeOnlineOrders = canAccess(role, 'online_orders', planFeatures);
+  const canSeeSystemAdmin = canAccess(role, 'admin', planFeatures);
+
+  const navItems = useMemo(
+    () => getAllowedNav(role, planFeatures, t, language),
+    [role, planFeatures, t, language]
+  );
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -56,8 +89,8 @@ export function Sidebar() {
   }, []);
 
   useEffect(() => {
-    const t = window.setInterval(() => setNow(new Date()), 1000);
-    return () => window.clearInterval(t);
+    const interval = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(interval);
   }, []);
 
   const toggleCollapsed = () => {
@@ -68,41 +101,16 @@ export function Sidebar() {
     }
   };
 
-  const items = [
-    ...(canSeeDashboard ? [{ href: '/dashboard', label: t('nav.dashboard'), icon: LayoutDashboard }] : []),
-    ...(canUseAi
-      ? [
-          {
-            href: '/dashboard?ai=1',
-            label: t('ai.title'),
-            icon: MessageCircle,
-            onClick: () => {
-              try {
-                localStorage.setItem('crown-open-ai', 'true');
-              } catch {
-                // ignore
-              }
-              if (typeof window !== 'undefined') {
-                window.dispatchEvent(new Event('crown:open-ai'));
-              }
-            },
-            glow: true,
-          },
-        ]
-      : []),
-    ...(canUsePos ? [{ href: '/pos', label: t('nav.pos'), icon: ShoppingCart }] : []),
-    ...(canUsePos ? [{ href: '/store-admin/reports', label: t('nav.reports'), icon: BarChart2 }] : []),
-    ...(canUseInventory ? [{ href: '/inventory', label: t('nav.inventory'), icon: Package }] : []),
-    ...(canUseInventory ? [{ href: '/store-admin/inventory/slow-moving', label: t('nav.slowMoving'), icon: AlertTriangle }] : []),
-    ...(canUseInventory ? [{ href: '/manual-entry', label: t('nav.manualEntry'), icon: FilePlus2 }] : []),
-    ...(canUseExcel ? [{ href: '/excel-import', label: t('nav.excelImport'), icon: FileSpreadsheet }] : []),
-    ...(canSeeInvoices ? [{ href: '/invoices', label: t('nav.invoices'), icon: FileText }] : []),
-    { href: '/settings', label: t('nav.settings'), icon: Settings },
-    ...(canSeeOnlineOrders ? [{ href: '/store-admin/orders', label: t('nav.onlineOrders'), icon: ShoppingBag }] : []),
-    ...(canSeeStoreAdmin || canSeeOnlineOrders ? [{ href: '/store-admin/notifications', label: t('nav.notifications'), icon: Bell }] : []),
-    ...(canSeeStoreAdmin ? [{ href: '/store-admin/domains', label: t('nav.storeAdmin'), icon: Shield }] : []),
-    ...(canSeeSystemAdmin ? [{ href: '/admin', label: t('nav.admin'), icon: Shield }] : []),
-  ];
+  const handleAiClick = () => {
+    try {
+      localStorage.setItem('crown-open-ai', 'true');
+    } catch {
+      // ignore
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('crown:open-ai'));
+    }
+  };
 
   return (
     <>
@@ -161,6 +169,42 @@ export function Sidebar() {
                         {canSeeOnlineOrders && <NotificationsBell />}
                       </div>
 
+                      {/* Shop switcher (super_admin only - use real role, not override) */}
+                      {user?.role === 'super_admin' && <ShopSwitcher />}
+                      {/* Branch switcher */}
+                      {branches.length > 0 && (
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setBranchDropdownOpen((v) => !v)}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/30 bg-black/25 px-3 py-1.5 text-[11px] text-cyan-200"
+                          >
+                            <GitBranch className="h-3.5 w-3.5" />
+                            <span className="max-w-[100px] truncate">{getBranchDisplayName(activeBranch, language)}</span>
+                            <ChevronDown className="h-3 w-3" />
+                          </button>
+                          {branchDropdownOpen && (
+                            <>
+                              <div className="fixed inset-0 z-10" onClick={() => setBranchDropdownOpen(false)} />
+                              <div className="absolute top-full left-0 mt-1 z-20 min-w-[160px] rounded-lg border border-cyan-500/30 bg-[#0b1220] py-1 shadow-xl">
+                                {branches.map((b) => (
+                                  <button
+                                    key={b.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveBranchId?.(b.id);
+                                      setBranchDropdownOpen(false);
+                                    }}
+                                    className={`w-full text-left px-3 py-2 text-xs ${activeBranch?.id === b.id ? 'bg-cyan-500/20 text-cyan-200' : 'text-slate-300 hover:bg-cyan-500/10'}`}
+                                  >
+                                    {getBranchDisplayName(b, language)}
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
                       {/* Language Switcher */}
                       <div className="inline-flex items-center gap-1 rounded-full border border-cyan-500/30 bg-black/25 p-1 shadow-[0_0_14px_rgba(0,243,255,0.10)]">
                         <button
@@ -199,28 +243,46 @@ export function Sidebar() {
             </button>
           </div>
 
-          <nav className="px-4 py-4 space-y-2">
-            {items.map(({ href, label, icon: Icon, onClick, glow }: any) => {
-              const active = pathname === href;
+          <nav className="px-4 py-4 space-y-4">
+            {(['operations', 'inventory', 'reports', 'admin', 'system'] as const).map((section) => {
+              const items = navItems.filter((x) => x.section === section);
+              if (items.length === 0) return null;
+              const sectionLabel = SECTION_LABELS[section][language as 'ar' | 'en'];
               return (
-                <Link
-                  key={href}
-                  href={href}
-                  onClick={() => {
-                    onClick?.();
-                    setOpen(false);
-                  }}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition ${
-                    glow
-                      ? 'bg-fuchsia-500/10 border border-fuchsia-500/40 text-fuchsia-200 shadow-[0_0_16px_rgba(236,72,153,0.35)] hover:bg-fuchsia-500/10'
-                      : active
-                      ? 'bg-cyan-500/10 border border-cyan-500/40 text-cyan-300 shadow-[0_0_14px_rgba(0,243,255,0.35)]'
-                      : 'text-slate-300 hover:text-cyan-300 hover:bg-cyan-500/10'
-                  }`}
-                >
-                  <Icon className={`h-5 w-5 ${glow ? 'text-fuchsia-300' : 'text-cyan-300'}`} />
-                  {!collapsed && <span className="text-sm font-semibold">{label}</span>}
-                </Link>
+                <div key={section}>
+                  {!collapsed && (
+                    <div className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      {sectionLabel}
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    {items.map((item) => {
+                      const Icon = ICON_MAP[item.icon] ?? Package;
+                      const active = pathname === item.href || (item.href === '/dashboard?ai=1' && pathname === '/dashboard');
+                      const onClick = item.id === 'ai' ? handleAiClick : undefined;
+                      return (
+                        <Link
+                          key={item.href + item.id}
+                          href={item.href}
+                          onClick={() => {
+                            onClick?.();
+                            setOpen(false);
+                          }}
+                          className={`flex items-center gap-3 px-4 py-3 rounded-xl transition ${
+                            item.glow
+                              ? 'bg-fuchsia-500/10 border border-fuchsia-500/40 text-fuchsia-200 shadow-[0_0_16px_rgba(236,72,153,0.35)] hover:bg-fuchsia-500/10'
+                              : active
+                              ? 'bg-cyan-500/10 border border-cyan-500/40 text-cyan-300 shadow-[0_0_14px_rgba(0,243,255,0.35)]'
+                              : 'text-slate-300 hover:text-cyan-300 hover:bg-cyan-500/10'
+                          }`}
+                        >
+                          <Icon className={`h-5 w-5 shrink-0 ${item.glow ? 'text-fuchsia-300' : 'text-cyan-300'}`} />
+                          {!collapsed && <span className="text-sm font-semibold">{item.label}</span>}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
               );
             })}
           </nav>

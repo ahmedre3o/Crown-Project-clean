@@ -2,10 +2,12 @@
 
 import React, { Suspense, useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Sidebar } from '../../components/Sidebar';
-import { useLanguage } from '../../contexts/LanguageContext';
-import { apiRequest } from '../../contexts/AuthContext';
-import { useCurrency } from '../../contexts/CurrencyContext';
+import { Sidebar } from '@/components/Sidebar';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { apiRequest, useAuth } from '@/contexts/AuthContext';
+import { useRouteGuard } from '@/guards/useRouteGuard';
+import { useCurrency } from '@/contexts/CurrencyContext';
+import { formatCurrency } from '@/lib/formatters';
 import { Package, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface Order {
@@ -37,7 +39,9 @@ function OnlineOrdersPageContent() {
   const searchParams = useSearchParams();
   const focusOrderId = searchParams.get('focus');
   const { t, language, direction } = useLanguage();
-  const { symbol } = useCurrency();
+  const { user, loading: authLoading, effectiveRole } = useAuth();
+  const { allowed } = useRouteGuard(user, authLoading, { feature: 'online_orders', effectiveRole, showDenied: true });
+  const { currency, symbol } = useCurrency();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,8 +52,8 @@ function OnlineOrdersPageContent() {
   const orderRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   useEffect(() => {
-    loadOrders();
-  }, [statusFilter]);
+    if (!authLoading && allowed) loadOrders();
+  }, [authLoading, allowed, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (focusOrderId && orders.length > 0) {
@@ -118,6 +122,8 @@ function OnlineOrdersPageContent() {
     };
     return map[s]?.[language] || s;
   };
+
+  if (authLoading || !allowed) return null;
 
   return (
     <div className={`min-h-screen flex ${direction === 'rtl' ? 'flex-row-reverse' : ''}`}>
@@ -190,7 +196,7 @@ function OnlineOrdersPageContent() {
                         <div className="text-xs text-slate-400">{order.phone}</div>
                       </div>
                       <div className="text-cyan-200 font-bold">
-                        {Number(order.total).toFixed(2)} {symbol}
+                        {formatCurrency(Number(order.total || 0), language === 'ar' ? 'ar' : 'en', currency, symbol)}
                       </div>
                       <div
                         className={`text-xs px-2 py-1 rounded-full border ${
@@ -252,7 +258,12 @@ function OnlineOrdersPageContent() {
                             >
                               <span>{item.name_snapshot || '-'} x {item.quantity}</span>
                               <span>
-                                {(Number(item.sell_price_snapshot ?? item.price_snapshot ?? 0) * item.quantity).toFixed(2)} {symbol}
+                                {formatCurrency(
+                                  Number(item.sell_price_snapshot ?? item.price_snapshot ?? 0) * item.quantity,
+                                  language === 'ar' ? 'ar' : 'en',
+                                  currency,
+                                  symbol
+                                )}
                               </span>
                             </div>
                           ))}

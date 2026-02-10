@@ -2,9 +2,11 @@
 
 import React, { useState, useRef } from 'react';
 import Link from 'next/link';
-import { Sidebar } from '../components/Sidebar';
+import { Sidebar } from '@/components/Sidebar';
 import { useLanguage } from '../contexts/LanguageContext';
 import { API_BASE_URL } from '../api-config';
+import { useAuth } from '../contexts/AuthContext';
+import { useRouteGuard } from '../guards/useRouteGuard';
 
 type AnalyzeResponse = {
   ok: boolean;
@@ -54,6 +56,8 @@ const CANONICAL_OPTIONS = [
 
 export default function ExcelImportPage() {
   const { t, direction, language } = useLanguage();
+  const { user, loading: authLoading, effectiveRole } = useAuth();
+  const { allowed } = useRouteGuard(user, authLoading, { feature: 'excel_import', effectiveRole });
   const [file, setFile] = useState<File | null>(null);
   const fileRef = useRef<File | null>(null);
   const [step, setStep] = useState<'idle' | 'analyzing' | 'summary' | 'mapping' | 'importing' | 'done'>('idle');
@@ -209,6 +213,8 @@ export default function ExcelImportPage() {
   const hasNameMapped = Object.values(columnMapping).some((v) => v === 'name');
   const confidence = analyze?.mappingConfidence ?? 0;
   const showConfirmation = confidence > 0 && confidence < 100;
+
+  if (authLoading || !allowed) return null;
 
   return (
     <div className="min-h-screen bg-black text-white flex" dir={direction}>

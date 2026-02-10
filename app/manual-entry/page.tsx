@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Sidebar } from '../components/Sidebar';
+import { Sidebar } from '@/components/Sidebar';
 import { useLanguage } from '../contexts/LanguageContext';
-import { apiRequest } from '../contexts/AuthContext';
+import { apiRequest, useAuth } from '../contexts/AuthContext';
+import { useRouteGuard } from '../guards/useRouteGuard';
 import { BarcodeScanner } from '../components/BarcodeScanner';
 
 interface Product {
@@ -22,6 +23,8 @@ interface Product {
 
 export default function ManualEntryPage() {
   const { t, direction, language } = useLanguage();
+  const { user, loading: authLoading, effectiveRole } = useAuth();
+  const { allowed } = useRouteGuard(user, authLoading, { feature: 'manual_entry', effectiveRole });
   const [form, setForm] = useState({
     nameEn: '',
     nameAr: '',
@@ -119,6 +122,8 @@ export default function ManualEntryPage() {
       setSaving(false);
     }
   };
+
+  if (authLoading || !allowed) return null;
 
   return (
     <div className="min-h-screen bg-black text-white flex" dir={direction}>

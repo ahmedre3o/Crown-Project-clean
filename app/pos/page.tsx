@@ -1,12 +1,18 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Printer, ShoppingCart, Trash2, X, Image as ImageIcon } from 'lucide-react';
+import { Printer, ShoppingCart, Trash2, X, Image as ImageIcon, MapPin, AlertTriangle } from 'lucide-react';
+import { toast } from 'sonner';
 import { useLanguage } from '../contexts/LanguageContext';
 import { apiRequest, useAuth } from '../contexts/AuthContext';
+import { useOffline } from '../contexts/OfflineContext';
+import { createPosSaleOrInvoice } from '../../lib/offline-api';
+import { useRouteGuard } from '../guards/useRouteGuard';
 import { useCurrency } from '../contexts/CurrencyContext';
-import { Sidebar } from '../components/Sidebar';
+import { getPlanFeatures } from '../permissions';
+import { Sidebar } from '@/components/Sidebar';
 import { BarcodeScanner } from '../components/BarcodeScanner';
+import { useBranch } from '../contexts/BranchContext';
 
 interface Category {
   id: number;
@@ -39,8 +45,11 @@ interface CartItem {
 
 export default function PosPage() {
   const { t, language, direction } = useLanguage();
-  const { user } = useAuth();
+  const { user, loading: authLoading, effectiveRole } = useAuth();
+  const { isOnline, refreshQueue } = useOffline();
+  const { allowed } = useRouteGuard(user, authLoading, { feature: 'pos', effectiveRole, showDenied: true });
   const { symbol } = useCurrency();
+  const planFeatures = getPlanFeatures(user?.package);
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<number | 'uncategorized' | 'all' | null>('all');
@@ -52,6 +61,14 @@ export default function PosPage() {
   const [customer, setCustomer] = useState({ name: '', phone: '', address: '' });
   const [business, setBusiness] = useState<any>(null);
   const scanInputRef = useRef<HTMLInputElement | null>(null);
+  const [availabilityModal, setAvailabilityModal] = useState<{ productId: number; productName: string } | null>(null);
+  const [availabilityData, setAvailabilityData] = useState<{ branches: Array<{ branchNameAr: string; branchNameEn: string; qty: number }> } | null>(null);
+  const [alerts, setAlerts] = useState<{
+    lowStock: Array<{ id: number; name_en: string; name_ar: string; stock_quantity: number; min_stock_level: number }>;
+    lowStockCount: number;
+    slowSummary: { deadCount: number; slowCount: number };
+  } | null>(null);
+  const branchCtx = useBranch();
   const handleScanMatchRef = useRef<(value: string) => void>(() => {});
   const scanSessionRef = useRef<{
     buffer: string;
@@ -66,6 +83,25 @@ export default function PosPage() {
     loadProducts();
     loadBusinessProfile();
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await apiRequest('/pos/alerts');
+        if (!cancelled) {
+          setAlerts({
+            lowStock: data.lowStock || [],
+            lowStockCount: data.lowStockCount ?? 0,
+            slowSummary: data.slowSummary || { deadCount: 0, slowCount: 0 },
+          });
+        }
+      } catch {
+        if (!cancelled) setAlerts(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [branchCtx?.activeBranchId]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -95,6 +131,17 @@ export default function PosPage() {
       console.log('POS Products Loaded:', Array.isArray(data) ? data.length : 0);
     } catch (error) {
       console.error('Failed to load products:', error);
+    }
+  };
+
+  const openAvailabilityModal = async (product: Product) => {
+    setAvailabilityModal({ productId: product.id, productName: language === 'ar' ? product.name_ar : product.name_en });
+    setAvailabilityData(null);
+    try {
+      const data = await apiRequest(`/admin/inventory/availability?productId=${product.id}`);
+      setAvailabilityData({ branches: (data.branches || []).map((b: any) => ({ branchNameAr: b.branchNameAr || b.branchName || b.name, branchNameEn: b.branchNameEn || b.branchName || b.name, qty: b.qty || 0 })) });
+    } catch {
+      setAvailabilityData({ branches: [] });
     }
   };
 
@@ -332,29 +379,32 @@ export default function PosPage() {
         unitPrice: item.price,
       }));
 
-      const sale = await apiRequest('/invoices', {
-        method: 'POST',
-        body: JSON.stringify({
-          items,
-          paymentMethod: 'invoice',
-          customerName: customer.name,
-          customerPhone: customer.phone,
-          customerAddress: customer.address,
-        }),
-      });
+      const payload = {
+        items,
+        paymentMethod: 'invoice',
+        customerName: customer.name,
+        customerPhone: customer.phone,
+        customerAddress: customer.address,
+      };
 
-      let printCount = 0;
-      try {
-        const printInfo = await apiRequest(`/invoices/${sale.saleId}/print`, { method: 'POST' });
-        printCount = Number(printInfo?.printCount || 0);
-      } catch {
-        // If print counter fails, still print the receipt
+      const sale = await createPosSaleOrInvoice(payload, isOnline);
+      if (isOnline) {
+        let printCount = 0;
+        try {
+          const printInfo = await apiRequest(`/invoices/${sale.saleId}/print`, { method: 'POST' });
+          printCount = Number(printInfo?.printCount || 0);
+        } catch {
+          // If print counter fails, still print the receipt
+        }
+        printReceipt(sale, printCount);
+      } else {
+        await refreshQueue();
+        printReceipt(sale, 0);
+        toast.success(language === 'ar' ? 'تمت الإضافة إلى قائمة الانتظار' : 'Queued for sync when online');
       }
-
-      printReceipt(sale, printCount);
       clearCart();
       setCustomer({ name: '', phone: '', address: '' });
-      loadProducts();
+      if (isOnline) loadProducts();
     } catch (error) {
       console.error('Invoice print failed:', error);
       alert(language === 'ar' ? 'فشلت العملية' : 'Payment failed');
@@ -371,34 +421,33 @@ export default function PosPage() {
         unitPrice: item.price,
       }));
 
-      const sale = await apiRequest('/invoices', {
-        method: 'POST',
-        body: JSON.stringify({
-          items,
-          paymentMethod: 'cash',
-          customerName: customer.name,
-          customerPhone: customer.phone,
-          customerAddress: customer.address,
-        }),
-      });
+      const payload = {
+        items,
+        paymentMethod: 'cash',
+        customerName: customer.name,
+        customerPhone: customer.phone,
+        customerAddress: customer.address,
+      };
 
-      let printCount = 0;
-      try {
-        const printInfo = await apiRequest(`/invoices/${sale.saleId}/print`, { method: 'POST' });
-        printCount = Number(printInfo?.printCount || 0);
-      } catch {
-        // If print counter fails, still print the receipt
+      const sale = await createPosSaleOrInvoice(payload, isOnline);
+      if (isOnline) {
+        let printCount = 0;
+        try {
+          const printInfo = await apiRequest(`/invoices/${sale.saleId}/print`, { method: 'POST' });
+          printCount = Number(printInfo?.printCount || 0);
+        } catch {
+          // If print counter fails, still print the receipt
+        }
+        printReceipt(sale, printCount);
+      } else {
+        await refreshQueue();
+        printReceipt(sale, 0);
+        toast.success(language === 'ar' ? 'تمت الإضافة إلى قائمة الانتظار' : 'Queued for sync when online');
       }
 
-      // Print receipt
-      printReceipt(sale, printCount);
-
-      // Clear cart
       clearCart();
       setCustomer({ name: '', phone: '', address: '' });
-
-      // Reload products to update stock
-      loadProducts();
+      if (isOnline) loadProducts();
     } catch (error) {
       console.error('Payment failed:', error);
       alert(language === 'ar' ? 'فشلت العملية' : 'Payment failed');
@@ -600,6 +649,8 @@ export default function PosPage() {
     }, 500);
   };
 
+  if (authLoading || !allowed) return null;
+
   return (
     <div className="min-h-screen bg-black text-white flex" dir={direction}>
       <Sidebar />
@@ -609,6 +660,54 @@ export default function PosPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Store Alerts Panel - visible to cashier, branch_manager, multi_branch_manager */}
+          {alerts && (alerts.lowStockCount > 0 || alerts.slowSummary.deadCount > 0 || alerts.slowSummary.slowCount > 0) && (
+            <div className="lg:col-span-3 neon-box rounded-xl p-4 border-amber-500/30">
+              <h2 className="text-lg font-bold text-amber-300 mb-3 flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5" />
+                {language === 'ar' ? 'تنبيهات المتجر' : 'Store Alerts'}
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <div className="text-sm font-semibold text-cyan-300 mb-2">
+                    {language === 'ar' ? 'قليلة المخزون' : 'Low Stock'} ({alerts.lowStockCount})
+                  </div>
+                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                    {alerts.lowStock.slice(0, 10).map((p) => (
+                      <div key={p.id} className="flex justify-between text-xs py-1 border-b border-cyan-500/10">
+                        <span className="text-slate-200">{language === 'ar' ? p.name_ar : p.name_en}</span>
+                        <span className="text-red-400 font-bold">
+                          {p.stock_quantity} / {p.min_stock_level}
+                        </span>
+                      </div>
+                    ))}
+                    {alerts.lowStockCount > 10 && (
+                      <div className="text-xs text-slate-500">
+                        +{alerts.lowStockCount - 10} {language === 'ar' ? 'أخرى' : 'more'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-amber-300 mb-2">
+                    {language === 'ar' ? 'راكد/بطيء' : 'Dead / Slow'} ({alerts.slowSummary.deadCount} / {alerts.slowSummary.slowCount})
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    {language === 'ar'
+                      ? `راكد: ${alerts.slowSummary.deadCount} صنف — بطيء: ${alerts.slowSummary.slowCount} صنف`
+                      : `Dead: ${alerts.slowSummary.deadCount} — Slow: ${alerts.slowSummary.slowCount}`}
+                  </div>
+                  <a
+                    href="/store-admin/inventory/slow-moving"
+                    className="mt-2 inline-block text-xs text-cyan-400 hover:text-cyan-300"
+                  >
+                    {language === 'ar' ? 'عرض التفاصيل ←' : 'View details →'}
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Categories & Products */}
           <div className="lg:col-span-2 space-y-6">
             <div className="neon-box rounded-xl p-4">
@@ -682,12 +781,15 @@ export default function PosPage() {
               <h2 className="text-xl font-bold mb-4 text-cyan-400">{t('pos.products')}</h2>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-[600px] overflow-y-auto">
                 {filteredProducts.map((product) => (
-                  <button
+                  <div
                     key={product.id}
-                    onClick={() => addToCart(product)}
-                    disabled={(product.available_stock ?? product.stock_quantity) <= 0}
-                    className="p-4 bg-[#0d1422] rounded-xl hover:bg-[#111a2b] transition text-right disabled:opacity-50 disabled:cursor-not-allowed border border-cyan-500/20 hover:border-cyan-400/50"
+                    className="p-4 bg-[#0d1422] rounded-xl hover:bg-[#111a2b] transition text-right border border-cyan-500/20 hover:border-cyan-400/50 relative"
                   >
+                    <button
+                      onClick={() => addToCart(product)}
+                      disabled={(product.available_stock ?? product.stock_quantity) <= 0}
+                      className="w-full text-right disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
                     <div className="h-20 w-full rounded-lg border border-cyan-500/30 bg-black/60 flex items-center justify-center mb-3">
                       {product.image_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -721,6 +823,18 @@ export default function PosPage() {
                       </span>
                     </div>
                   </button>
+                    {planFeatures.branches && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); openAvailabilityModal(product); }}
+                        className="mt-2 w-full flex items-center justify-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 border border-cyan-500/20 rounded-lg py-1.5"
+                        title={language === 'ar' ? 'متوفر في فروع أخرى' : 'Available in other branches'}
+                      >
+                        <MapPin className="h-3.5 w-3.5" />
+                        {language === 'ar' ? 'متوفر في فروع أخرى' : 'Available in other branches'}
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
@@ -838,12 +952,45 @@ export default function PosPage() {
         </div>
       </div>
 
+      {availabilityModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => setAvailabilityModal(null)}>
+          <div
+            className="w-full max-w-md rounded-2xl bg-[#0b1220] border border-cyan-500/30 p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-cyan-200">
+                {language === 'ar' ? 'توفر في فروع أخرى' : 'Available in other branches'}
+              </h3>
+              <button onClick={() => setAvailabilityModal(null)} className="text-slate-400 hover:text-white">×</button>
+            </div>
+            <p className="text-sm text-slate-300 mb-4 truncate" title={availabilityModal.productName}>{availabilityModal.productName}</p>
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {availabilityData ? (
+                availabilityData.branches.length === 0 ? (
+                  <p className="text-slate-500 text-sm">{language === 'ar' ? 'لا توجد بيانات' : 'No data'}</p>
+                ) : (
+                  availabilityData.branches.map((b, i) => (
+                    <div key={i} className="flex justify-between py-2 border-b border-cyan-500/10">
+                      <span className="text-slate-200">{language === 'ar' ? b.branchNameAr : b.branchNameEn}</span>
+                      <span className="font-bold text-cyan-300">{b.qty}</span>
+                    </div>
+                  ))
+                )
+              ) : (
+                <p className="text-slate-500 text-sm">{language === 'ar' ? 'جاري التحميل...' : 'Loading...'}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <BarcodeScanner
         open={scanOpen}
-        onClose={() => setScanOpen(false)}
+        onClose={() => { setScanOpen(false); scanInputRef.current?.focus(); }}
         onDetected={handleScanMatch}
+        language={language === 'ar' ? 'ar' : 'en'}
         onError={(message) => {
-          // If camera scanning isn't available, keep POS ready for scanner guns.
           setScanMessage(
             language === 'ar'
               ? 'الكاميرا مش مدعومة هنا — استخدم جهاز الباركود أو اكتب الكود.'

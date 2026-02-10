@@ -4,10 +4,28 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { apiRequest, useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function RegisterPage() {
   const router = useRouter();
   const { login } = useAuth();
+  const { t, direction } = useLanguage();
+  const LABELS = {
+    title: t('register.title'),
+    subtitle: t('register.subtitle'),
+    businessName: t('register.businessName'),
+    ownerName: t('register.ownerName'),
+    activityType: t('register.activityType'),
+    address: t('register.address'),
+    contactEmail: t('register.contactEmail'),
+    contactPhone: t('register.contactPhone'),
+    username: t('register.username'),
+    password: t('register.password'),
+    create: t('register.create'),
+    creating: t('register.creating'),
+    already: t('register.already'),
+    errorDefault: t('register.errorDefault'),
+  };
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -19,7 +37,6 @@ export default function RegisterPage() {
     contactPhone: '',
     username: '',
     password: '',
-    package: 'bronze',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,33 +49,37 @@ export default function RegisterPage() {
         body: JSON.stringify({
           businessName: form.businessName,
           ownerName: form.ownerName,
-          activityType: form.activityType,
+          activity_type: form.activityType.trim().slice(0, 128),
           address: form.address,
           contactEmail: form.contactEmail,
           contactPhone: form.contactPhone,
           username: form.username,
           password: form.password,
-          package: form.package,
         }),
       });
       await login(form.username, form.password);
+      try {
+        sessionStorage.setItem('crown-trial-toast', '1');
+      } catch {
+        // ignore
+      }
       router.push('/dashboard');
     } catch (err: any) {
-      setError(err.message || 'Registration failed');
+      setError(err.message || LABELS.errorDefault);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-black text-white flex items-center justify-center px-6">
+    <main className="min-h-screen bg-black text-white flex items-center justify-center px-6" dir={direction}>
       <form
         onSubmit={handleSubmit}
         className="w-full max-w-2xl bg-[#0b1220] border border-cyan-500/30 rounded-2xl p-8 space-y-5"
       >
         <div className="text-center space-y-1">
-          <h1 className="text-2xl font-bold text-cyan-200">Create your ERP account</h1>
-          <p className="text-sm text-slate-400">Set up your business profile in minutes</p>
+          <h1 className="text-2xl font-bold text-cyan-200">{LABELS.title}</h1>
+          <p className="text-sm text-slate-400">{LABELS.subtitle}</p>
         </div>
 
         {error && (
@@ -70,57 +91,49 @@ export default function RegisterPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <input
             className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-            placeholder="Business name"
+            placeholder={LABELS.businessName}
             value={form.businessName}
             onChange={(e) => setForm((prev) => ({ ...prev, businessName: e.target.value }))}
             required
           />
           <input
             className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-            placeholder="Business owner name"
+            placeholder={LABELS.ownerName}
             value={form.ownerName}
             onChange={(e) => setForm((prev) => ({ ...prev, ownerName: e.target.value }))}
           />
           <input
-            list="activity-types"
+            type="text"
             className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-            placeholder="Activity type"
+            placeholder={LABELS.activityType}
             value={form.activityType}
             onChange={(e) => setForm((prev) => ({ ...prev, activityType: e.target.value }))}
+            maxLength={128}
             required
           />
-          <datalist id="activity-types">
-            <option value="Auto Parts" />
-            <option value="Supermarket" />
-            <option value="Pharmacy" />
-            <option value="Cafe" />
-            <option value="Computer Shop" />
-            <option value="Clothing" />
-            <option value="Electronics" />
-          </datalist>
           <input
             className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm md:col-span-2"
-            placeholder="Business address"
+            placeholder={LABELS.address}
             value={form.address}
             onChange={(e) => setForm((prev) => ({ ...prev, address: e.target.value }))}
           />
           <input
             type="email"
             className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-            placeholder="Contact email"
+            placeholder={LABELS.contactEmail}
             value={form.contactEmail}
             onChange={(e) => setForm((prev) => ({ ...prev, contactEmail: e.target.value }))}
           />
           <input
             className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-            placeholder="Contact phone"
+            placeholder={LABELS.contactPhone}
             value={form.contactPhone}
             onChange={(e) => setForm((prev) => ({ ...prev, contactPhone: e.target.value }))}
           />
           <input
             type="email"
             className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-            placeholder="Login email"
+            placeholder={LABELS.username}
             value={form.username}
             onChange={(e) => setForm((prev) => ({ ...prev, username: e.target.value }))}
             required
@@ -128,25 +141,16 @@ export default function RegisterPage() {
           <input
             type="password"
             className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-            placeholder="Password"
+            placeholder={LABELS.password}
             value={form.password}
             onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
             required
           />
-          <select
-            className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-            value={form.package}
-            onChange={(e) => setForm((prev) => ({ ...prev, package: e.target.value }))}
-          >
-            <option value="bronze">Bronze</option>
-            <option value="silver">Silver</option>
-            <option value="gold">Gold</option>
-          </select>
         </div>
 
         <div className="flex items-center justify-between text-xs text-slate-400">
           <Link href="/login" className="hover:text-cyan-300">
-            Already have an account?
+            {LABELS.already}
           </Link>
         </div>
 
@@ -155,7 +159,7 @@ export default function RegisterPage() {
           disabled={loading}
           className="w-full py-2 rounded bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-sm disabled:opacity-60"
         >
-          {loading ? 'Creating account...' : 'Create account'}
+          {loading ? LABELS.creating : LABELS.create}
         </button>
       </form>
     </main>

@@ -50,12 +50,34 @@ if (process.env.NODE_ENV !== 'production') {
 app.use((req: Request, res: Response, next: NextFunction) => {
   const origin = req.headers.origin as string | undefined;
 
+  // Only log detailed CORS decisions for preflight on /api/auth/login
+  const isLoginPreflight =
+    req.method === 'OPTIONS' && req.path === '/api/auth/login';
+
+  if (isLoginPreflight) {
+    console.log('[CORS] Preflight /api/auth/login', {
+      requestOrigin: origin,
+      allowedOrigins,
+    });
+  }
+
   if (origin && allowedOrigins.includes(origin)) {
     res.header('Access-Control-Allow-Origin', origin);
     res.header('Vary', 'Origin');
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+
+    if (isLoginPreflight) {
+      console.log('[CORS] Applied headers for /api/auth/login preflight', {
+        origin,
+        'Access-Control-Allow-Origin': origin,
+      });
+    }
+  } else if (isLoginPreflight) {
+    console.log('[CORS] Origin NOT allowed for /api/auth/login preflight', {
+      requestOrigin: origin,
+    });
   }
 
   if (req.method === 'OPTIONS') {

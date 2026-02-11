@@ -20,7 +20,7 @@ import { GoogleGenAI } from '@google/genai';
 import { domainToASCII } from 'url';
 import { loadSystemKnowledge } from './loadKnowledge';
 import { getLocalHelp } from './localHelp';
-import { getPlanFeaturesForBackend, PLANS } from '../shared/plans';
+import { getPlanFeaturesForBackend, PLANS } from './shared/plans';
 
 declare global {
   namespace Express {

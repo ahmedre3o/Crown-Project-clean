@@ -175,7 +175,7 @@ export default function ReportsCenterPage() {
     }
   }, [salesView]);
 
-  const handleLegendClick = useCallback((o: { dataKey?: string }) => {
+  const handleLegendClick = useCallback((o: any) => {
     const key = o.dataKey as 'total' | 'online' | 'pos' | 'onlineConfirmed';
     const seriesKey = key === 'onlineConfirmed' ? 'online' : key;
     if (seriesKey !== 'total' && seriesKey !== 'online' && seriesKey !== 'pos') return;

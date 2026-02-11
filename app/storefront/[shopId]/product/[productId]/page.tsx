@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ShoppingCart, ChevronLeft, ChevronDown, ChevronUp } from 'lucide-react';
+import { ShoppingCart, ChevronLeft, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
 import { API_BASE_URL } from '../../../../api-config';
 
 interface Product {

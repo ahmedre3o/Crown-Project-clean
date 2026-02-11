@@ -104,7 +104,10 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useBranch() {
+export function useBranch(): BranchContextType {
   const ctx = useContext(BranchContext);
+  if (!ctx) {
+    throw new Error('useBranch must be used within a BranchProvider');
+  }
   return ctx;
 }

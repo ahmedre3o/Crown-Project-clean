@@ -30,6 +30,7 @@ export type NavItemId =
   | 'branches'
   | 'users'
   | 'domains'
+  | 'settings'
   | 'store_management'
   | 'admin'
   | 'admin_codes';
@@ -171,7 +172,8 @@ export function canAccess(
 
     case 'admin':
     case 'admin_codes':
-      return role === 'super_admin';
+      // super_admin is already granted full access at the top of this function
+      return false;
 
     case 'branch_availability':
       return branches && ['shop_owner', 'branch_manager', 'multi_branch_manager', 'cashier', 'warehouse'].includes(role);

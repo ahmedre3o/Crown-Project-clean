@@ -53,9 +53,9 @@ A comprehensive SaaS ERP system for auto parts and services management with mult
 - MySQL database (Google Cloud SQL)
 - TypeScript
 
-### Installation
+### Installation (Monorepo: Next.js + Backend)
 
-1. **Install dependencies:**
+1. **Install root (Next.js app) dependencies:**
 ```bash
 npm install
 ```
@@ -66,13 +66,9 @@ cd backend
 npm install bcryptjs jsonwebtoken @types/bcryptjs @types/jsonwebtoken
 ```
 
-3. **Frontend dependencies:**
-```bash
-cd frontend
-npm install react-router-dom
-```
+3. **(Legacy) `frontend/` Vite app is no longer used for production. Vercel should use the repo root (Next.js app) as the project directory.**
 
-### Database Configuration
+### Backend Configuration (.env for Cloud Run / local)
 
 Update `backend/.env` with your Google Cloud SQL connection details:
 ```env
@@ -86,19 +82,33 @@ JWT_SECRET=crown-services-secret-key-2026
 GEMINI_API_KEY=AIzaSyD3zXRza2kSUTyT34SRvf_hPCx6SDK3F3E
 ```
 
+### Required Environment Variables
+
+#### Frontend (Vercel / Next.js)
+
+- `NEXT_PUBLIC_API_URL` – Base URL of the backend API (Cloud Run), e.g. `https://api.crowncs.org/api`
+
+#### Backend (Cloud Run / Node)
+
+- `PORT` – Provided by Cloud Run (defaults to `8080` in code)
+- `CORS_ORIGIN` – Comma-separated allowed origins, e.g. `https://crown-project.vercel.app`
+- `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSL`
+- `JWT_SECRET`
+- `GEMINI_API_KEY`
+
 ### Running the Application
 
-1. **Start Backend:**
+1. **Start Backend (local dev):**
 ```bash
 npm run backend:dev
 ```
 Backend runs on `http://localhost:5000`
 
-2. **Start Frontend:**
+2. **Start Next.js Frontend (local dev):**
 ```bash
-npm run frontend
+npm run dev
 ```
-Frontend runs on `http://localhost:3000`
+Frontend runs on `http://localhost:3000` and talks to backend via `NEXT_PUBLIC_API_URL`.
 
 ## API Endpoints
 

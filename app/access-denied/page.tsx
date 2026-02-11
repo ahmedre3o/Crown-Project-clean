@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ShieldX } from 'lucide-react';
@@ -10,7 +10,7 @@ import { getDefaultRedirect } from '../permissions';
 import { useAuth } from '../contexts/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 
-export default function AccessDeniedPage() {
+function AccessDeniedContent() {
   const { language, direction } = useLanguage();
   const searchParams = useSearchParams();
   const { user, effectiveRole } = useAuth();
@@ -48,5 +48,13 @@ export default function AccessDeniedPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AccessDeniedPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>}>
+      <AccessDeniedContent />
+    </Suspense>
   );
 }

@@ -1,5 +1,4 @@
-import express, { Request, Response } from 'express';
-import cors from 'cors';
+import express, { Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
 import { Readable } from 'stream';
@@ -47,30 +46,29 @@ if (process.env.NODE_ENV !== 'production') {
     next();
   });
 }
-// Public APIs (storefront) must be accessible from any domain
-app.use(
-  '/api/public',
-  cors({
-    origin: true,
-    credentials: false,
-    allowedHeaders: ['Content-Type', 'x-forwarded-host', 'x-shop-domain', 'x-shop-id'],
-    methods: ['GET', 'POST', 'OPTIONS'],
-  })
-);
-// Storefront orders (public)
-app.use(
-  '/api/storefront',
-  cors({
-    origin: true,
-    credentials: false,
-    allowedHeaders: ['Content-Type', 'x-shop-id'],
-    methods: ['GET', 'POST', 'OPTIONS'],
-  })
-);
-// ERP (authenticated) APIs - lock down origins in production
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api/public') || req.path.startsWith('/api/storefront')) return next();
-  return cors({ origin: 'http://localhost:3000', credentials: true })(req, res, next);
+
+// Dynamic CORS handling based on process.env.CORS_ORIGIN (comma separated)
+const allowedOrigins = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const origin = req.headers.origin as string | undefined;
+
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Vary', 'Origin');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  }
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+
+  next();
 });
 
 app.get('/api/plans', (req: Request, res: Response) => {

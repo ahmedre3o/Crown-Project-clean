@@ -60,7 +60,7 @@ export const OfflineProvider: React.FC<{ children: React.ReactNode }> = ({ child
       try {
         const res = await fetch(`${API_BASE_URL}${item.endpoint}`, {
           method: item.method,
-          credentials: 'include',
+          credentials: 'same-origin',
           headers: {
             'Content-Type': 'application/json',
             ...(token && { Authorization: `Bearer ${token}` }),

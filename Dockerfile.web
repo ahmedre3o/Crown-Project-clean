@@ -1,0 +1,21 @@
+# Crown Web (Next.js) - Cloud Run
+FROM node:20-slim
+
+WORKDIR /app
+
+# Build-time env for Next.js (NEXT_PUBLIC_* inlined at build)
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
+COPY package*.json ./
+RUN npm install --omit=dev
+
+COPY . .
+RUN npm run build
+
+ENV NODE_ENV=production
+# Cloud Run sets PORT; fallback for local docker run
+ENV PORT=8080
+EXPOSE 8080
+
+CMD ["npm", "start"]

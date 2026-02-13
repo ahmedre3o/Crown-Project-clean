@@ -159,8 +159,13 @@ export async function testConnection() {
       connection.release();
     }
     return true;
-  } catch (error) {
-    console.error('❌ Database connection error:', error);
+  } catch (error: any) {
+    console.error('❌ Database connection error:', {
+      DB_HOST: process.env.DB_HOST ?? '(not set)',
+      DB_MODE: process.env.DB_MODE ?? '(not set)',
+      code: error?.code ?? '(no code)',
+      message: error?.message ?? String(error),
+    });
     return false;
   }
 }
@@ -485,10 +490,12 @@ export async function initializeDatabase() {
       if (e?.code !== 'ER_DUP_KEYNAME') {}
     }
 
-    await pool.execute(`
-      ALTER TABLE sales
-      MODIFY COLUMN user_id BIGINT UNSIGNED NULL;
-    `);
+    // sales.user_id must stay BIGINT UNSIGNED (match users.id); never INT. Idempotent.
+    try {
+      await pool.execute('ALTER TABLE sales MODIFY COLUMN user_id BIGINT UNSIGNED NULL');
+    } catch (e: any) {
+      if (!['ER_BAD_FIELD_ERROR', 'ER_FK_INCOMPATIBLE_COLUMNS'].includes(e?.code)) throw e;
+    }
 
     try {
       await pool.execute(`ALTER TABLE products ADD COLUMN image_url TEXT NULL;`);
@@ -750,13 +757,19 @@ export async function initializeDatabase() {
         shop_id BIGINT UNSIGNED NOT NULL,
         invoice_id BIGINT UNSIGNED NOT NULL,
         invoice_type ENUM('pos', 'online') DEFAULT 'pos',
-        printed_by_user_id INT NULL,
+        printed_by_user_id BIGINT UNSIGNED NULL,
         printed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         print_count_after INT NOT NULL,
         INDEX idx_ipl_shop_invoice (shop_id, invoice_id),
         INDEX idx_ipl_printed_at (printed_at)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
+    try {
+      await pool.execute('ALTER TABLE invoice_print_log MODIFY COLUMN printed_by_user_id BIGINT UNSIGNED NULL');
+    } catch (e: any) {
+      // ignore if column missing / already correct
+      if (!['ER_BAD_FIELD_ERROR', 'ER_FK_INCOMPATIBLE_COLUMNS'].includes(e?.code)) throw e;
+    }
 
     // Licenses table
     await pool.execute(`
@@ -1024,11 +1037,7 @@ export async function initializeDatabase() {
     }
 
     // Stock reservations for online orders (prevent overselling)
-    // Ensure PK/FK types match BIGINT UNSIGNED IDs in shops / online_orders / products
-    if (process.env.NODE_ENV !== 'production' && (process.env.DB_NAME || '').includes('_dev')) {
-      // In dev-only databases, drop any legacy table with wrong types so we can recreate cleanly
-      await pool.execute('DROP TABLE IF EXISTS stock_reservations');
-    }
+    // FK columns must match referenced PK types (shops.id, online_orders.id, products.id)
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS stock_reservations (
         id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -1049,6 +1058,21 @@ export async function initializeDatabase() {
       await pool.execute('ALTER TABLE stock_reservations ADD COLUMN branch_id BIGINT UNSIGNED NULL');
     } catch (e: any) {
       if (e?.code !== 'ER_DUP_FIELDNAME') throw e;
+    }
+    try {
+      await pool.execute('ALTER TABLE stock_reservations MODIFY COLUMN shop_id BIGINT UNSIGNED NOT NULL');
+    } catch (e: any) {
+      if (!['ER_BAD_FIELD_ERROR', 'ER_FK_INCOMPATIBLE_COLUMNS'].includes(e?.code)) throw e;
+    }
+    try {
+      await pool.execute('ALTER TABLE stock_reservations MODIFY COLUMN order_id BIGINT UNSIGNED NOT NULL');
+    } catch (e: any) {
+      if (!['ER_BAD_FIELD_ERROR', 'ER_FK_INCOMPATIBLE_COLUMNS'].includes(e?.code)) throw e;
+    }
+    try {
+      await pool.execute('ALTER TABLE stock_reservations MODIFY COLUMN product_id BIGINT UNSIGNED NOT NULL');
+    } catch (e: any) {
+      if (!['ER_BAD_FIELD_ERROR', 'ER_FK_INCOMPATIBLE_COLUMNS'].includes(e?.code)) throw e;
     }
 
     // Backfill default branch for existing shops (multi-branch)

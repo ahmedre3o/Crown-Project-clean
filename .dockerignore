@@ -1,0 +1,25 @@
+# Dependencies and build
+node_modules
+.next
+backend
+frontend
+
+# Git and IDE
+.git
+.gitignore
+.cursor
+*.md
+
+# Env and secrets
+.env
+.env.*
+!.env.example
+
+# Cloud Build (avoid copying into image)
+cloudbuild.yaml
+cloudbuild-*.yaml
+Dockerfile
+
+# Misc
+*.log
+.DS_Store

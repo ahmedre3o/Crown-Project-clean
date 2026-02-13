@@ -1,6 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
+import https from 'https';
 import { Readable } from 'stream';
 import { pool, testConnection, initializeDatabase } from './db';
 import type { RowDataPacket } from 'mysql2/promise';
@@ -30,14 +31,46 @@ declare global {
   }
 }
 
-const localEnvPath = path.resolve(__dirname, '.env');
-const rootEnvPath = path.resolve(__dirname, '../.env');
-dotenv.config({ path: localEnvPath });
-dotenv.config({ path: rootEnvPath });
+// Load env: backend/.env then backend/dist/.env (Cloud Run env overrides)
+const backendRootEnv = path.resolve(__dirname, '..', '.env');
+const distEnv = path.resolve(__dirname, '.env');
+dotenv.config({ path: backendRootEnv });
+dotenv.config({ path: distEnv });
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// CORS origins: from CORS_ORIGIN (comma-separated) + dev defaults
+const rawCorsOrigins = process.env.CORS_ORIGIN || '';
+const allowedOriginsList = rawCorsOrigins
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+// Dev: localhost + Cloud Shell (https://3000-*.cloudshell.dev)
+if (process.env.NODE_ENV !== 'production') {
+  const devOrigins = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+  ];
+  for (const origin of devOrigins) {
+    if (!allowedOriginsList.includes(origin)) {
+      allowedOriginsList.push(origin);
+    }
+  }
+}
+
+function isOriginAllowed(origin: string | undefined): boolean {
+  if (!origin) return false;
+  if (allowedOriginsList.includes(origin)) return true;
+  // Cloud Shell: https://3000-<id>.cloudshell.dev (and regional variants)
+  if (/^https:\/\/3000-[^.]+\.cloudshell\.dev$/.test(origin)) return true;
+  return false;
+}
+
+console.log('CORS_ORIGIN env:', rawCorsOrigins || '(not set)');
+console.log('Allowed origins:', allowedOriginsList);
 
 // Dev-only request logger to confirm active routes and hits
 if (process.env.NODE_ENV !== 'production') {
@@ -50,38 +83,17 @@ if (process.env.NODE_ENV !== 'production') {
 app.use((req: Request, res: Response, next: NextFunction) => {
   const origin = req.headers.origin as string | undefined;
 
-  // Only log detailed CORS decisions for preflight on /api/auth/login
-  const isLoginPreflight =
-    req.method === 'OPTIONS' && req.path === '/api/auth/login';
-
-  if (isLoginPreflight) {
-    console.log('[CORS] Preflight /api/auth/login', {
-      requestOrigin: origin,
-      allowedOrigins,
-    });
-  }
-
-  if (origin && allowedOrigins.includes(origin)) {
+  if (origin && isOriginAllowed(origin)) {
     res.header('Access-Control-Allow-Origin', origin);
     res.header('Vary', 'Origin');
     res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-shop-id, x-branch-id');
     res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-
-    if (isLoginPreflight) {
-      console.log('[CORS] Applied headers for /api/auth/login preflight', {
-        origin,
-        'Access-Control-Allow-Origin': origin,
-      });
-    }
-  } else if (isLoginPreflight) {
-    console.log('[CORS] Origin NOT allowed for /api/auth/login preflight', {
-      requestOrigin: origin,
-    });
   }
 
+  // OPTIONS preflight: 204, no redirect
   if (req.method === 'OPTIONS') {
-    return res.sendStatus(204);
+    return res.status(204).end();
   }
 
   next();
@@ -100,6 +112,18 @@ app.get('/api/plans', (req: Request, res: Response) => {
 
 app.get('/api/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok' });
+});
+
+// Diagnostic: Cloud Run egress IP (debugging only)
+app.get('/api/egress-ip', (req: Request, res: Response) => {
+  const url = 'https://ifconfig.me/ip';
+  https
+    .get(url, (r) => {
+      let body = '';
+      r.on('data', (ch) => (body += ch));
+      r.on('end', () => res.json({ ip: (body || '').trim() || 'unknown' }));
+    })
+    .on('error', (err) => res.status(502).json({ ip: null, error: err?.message || 'Failed to fetch IP' }));
 });
 
 app.get('/api/health/db', async (_req: Request, res: Response) => {
@@ -154,15 +178,7 @@ app.get('/api/setup-admin', async (_req: Request, res: Response) => {
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const JWT_SECRET = process.env.JWT_SECRET || 'crown-services-secret-key-2026';
-const PORT = parseInt(process.env.PORT || '8080', 10);
-
-// Log CORS configuration at startup
-console.log('CORS_ORIGIN env:', process.env.CORS_ORIGIN || '(not set)');
-const allowedOrigins = (process.env.CORS_ORIGIN || '')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-console.log('Allowed origins:', allowedOrigins);
+const PORT = Number(process.env.PORT) || 8080;
 
 // Masked Gemini key log (no full key ever printed)
 if (process.env.NODE_ENV !== 'production') {
@@ -233,20 +249,37 @@ const ensureSuperAdmin = async () => {
   }
 };
 
-// Initialize database on startup
-testConnection().then(async () => {
+// Initialize database on startup (do not crash server if DB is down)
+(async () => {
   try {
-    await initializeDatabase();
+    await testConnection();
+
+    try {
+      await initializeDatabase();
+    } catch (error) {
+      console.error('⚠️ Database initialization error (continuing):', error);
+    }
+
     try {
       await pool.execute('ALTER TABLE shops MODIFY COLUMN logo_url LONGTEXT');
     } catch (migrationError) {
-      console.error('❌ logo_url migration error:', (migrationError as any)?.message || migrationError);
+      console.error(
+        '⚠️ logo_url migration error (continuing):',
+        (migrationError as any)?.message || migrationError
+      );
     }
-    await ensureSuperAdmin();
+
+    try {
+      await ensureSuperAdmin();
+    } catch (error) {
+      console.error('⚠️ ensureSuperAdmin error (continuing):', error);
+    }
+
+    console.log('✅ DB bootstrap finished (or skipped with warnings)');
   } catch (error) {
-    console.error(error);
+    console.error('⚠️ DB not reachable, server continues without DB:', error);
   }
-});
+})();
 
 // Middleware for authentication
 const authenticateToken = async (req: any, res: Response, next: any) => {
@@ -500,9 +533,19 @@ const verifyDomainDns = async (domain: string, method: 'txt' | 'cname', token: s
 };
 
 // Public resolver: map Host header -> shop_id (reject unknown or inactive domains)
+const pickFirst = (v?: string): string =>
+  (v || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)[0] || '';
+
 const resolveShopByDomainHost = async (req: any, res: Response, next: any) => {
-  const forwardedHost = req.headers?.['x-forwarded-host'] || req.headers?.['x-shop-domain'];
-  const host = normalizeHostHeader(forwardedHost || req.headers?.host);
+  const domainOverride = (process.env.DOMAIN_OVERRIDE || '').trim().toLowerCase();
+  const headerShopDomain = pickFirst(req.headers?.['x-shop-domain'] as string | undefined);
+  const headerForwardedHost = pickFirst(req.headers?.['x-forwarded-host'] as string | undefined);
+  const rawHost =
+    domainOverride || headerShopDomain || headerForwardedHost || (req.headers?.host as string | undefined);
+  const host = normalizeHostHeader(rawHost);
   if (!host) return res.status(400).json({ error: 'Host header required' });
 
   const candidateA = host;
@@ -7970,6 +8013,13 @@ app.use((_req: Request, res: Response) => {
 
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
+  console.log('[STARTUP]', {
+    NODE_ENV: process.env.NODE_ENV ?? '(not set)',
+    PORT,
+    DB_HOST: process.env.DB_HOST ?? '(not set)',
+    DB_USER_set: !!process.env.DB_USER,
+    DB_PASSWORD_set: !!process.env.DB_PASSWORD,
+  });
 });
 
 server.on('error', (error) => {

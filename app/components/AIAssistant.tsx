@@ -114,7 +114,7 @@ export function AIAssistant() {
         const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
         const resp = await fetch(`${API_BASE_URL}/ai/status`, {
           method: 'GET',
-          credentials: 'include',
+          credentials: 'same-origin',
           headers: {
             'Content-Type': 'application/json',
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -165,7 +165,7 @@ export function AIAssistant() {
 
         const response = await fetch(`${API_BASE_URL}/chat`, {
           method: 'POST',
-          credentials: 'include',
+          credentials: 'same-origin',
           headers: {
             'Content-Type': 'application/json',
             ...(token ? { Authorization: `Bearer ${token}` } : {}),

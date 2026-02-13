@@ -1,0 +1,52 @@
+# Crown Web (Next.js) - Cloud Run service: crown-web
+# No custom domain; listens on process.env.PORT
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - Dockerfile.web
+      - --build-arg
+      - NEXT_PUBLIC_API_URL=${_NEXT_PUBLIC_API_URL}
+      - -t
+      - $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/crown-web:$COMMIT_SHA
+      - .
+    id: Build
+
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/crown-web:$COMMIT_SHA
+    id: Push
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - crown-web
+      - --image=$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/crown-web:$COMMIT_SHA
+      - --platform=managed
+      - --region=$_DEPLOY_REGION
+      - --quiet
+    id: Deploy
+
+images:
+  - $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/crown-web:$COMMIT_SHA
+
+options:
+  substitutionOption: ALLOW_LOOSE
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  REPO_NAME: crown-project-clean
+  _DEPLOY_REGION: us-central1
+  _AR_HOSTNAME: us-central1-docker.pkg.dev
+  _AR_REPOSITORY: cloud-run-source-deploy
+  _AR_PROJECT_ID: gen-lang-client-0711622878
+  _NEXT_PUBLIC_API_URL: ''
+
+tags:
+  - gcp-cloud-build-deploy-cloud-run
+  - crown-web

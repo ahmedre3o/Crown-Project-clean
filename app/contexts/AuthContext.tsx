@@ -80,7 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       try {
         const response = await fetch(`${API_BASE_URL}/auth/me`, {
-          credentials: 'include',
+          credentials: 'same-origin',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${savedToken}`,
@@ -123,7 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (username: string, password: string) => {
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
-      credentials: 'include',
+      credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identifier: username, username, password }),
     });
@@ -195,7 +195,7 @@ export const apiRequest = async (url: string, options: RequestInit = {}) => {
 
   const response = await fetch(`${API_BASE_URL}${url}`, {
     ...options,
-    credentials: 'include',
+    credentials: 'same-origin',
     headers: {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),

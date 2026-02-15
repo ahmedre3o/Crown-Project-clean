@@ -1107,6 +1107,11 @@ export async function initializeDatabase() {
       if (e?.code !== 'ER_DUP_KEYNAME') {}
     }
     try {
+      await pool.execute('CREATE UNIQUE INDEX ux_users_shop_employee_id ON users (shop_id, employee_id)');
+    } catch (e: any) {
+      if (e?.code !== 'ER_DUP_KEYNAME' && e?.code !== 'ER_DUP_ENTRY') {}
+    }
+    try {
       await pool.execute('CREATE INDEX idx_users_email ON users (email)');
     } catch (e: any) {
       if (e?.code !== 'ER_DUP_KEYNAME') {}
@@ -1147,6 +1152,28 @@ export async function initializeDatabase() {
       if (e?.code !== 'ER_DUP_ENTRY' && e?.code !== 'ER_DUP_KEYNAME') {
         console.error('Username backfill warning:', e?.message || e);
       }
+    }
+
+    // user_invites: shop_id same type as shops.id (BIGINT UNSIGNED) for FK compatibility; idempotent
+    try {
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS user_invites (
+          id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          shop_id BIGINT UNSIGNED NOT NULL,
+          role VARCHAR(32) NOT NULL,
+          employee_id VARCHAR(64) NULL,
+          email VARCHAR(255) NULL,
+          invite_code VARCHAR(64) NOT NULL,
+          expires_at TIMESTAMP NOT NULL,
+          used_at TIMESTAMP NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_user_invites_shop_code (shop_id, invite_code),
+          INDEX idx_user_invites_expires (expires_at),
+          CONSTRAINT fk_user_invites_shop FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+      `);
+    } catch (e: any) {
+      if (e?.code !== 'ER_TABLE_EXISTS_ERROR' && e?.code !== 'ER_FK_DUP_NAME') {}
     }
 
     // Idempotency for offline sync (POS sales/invoices)

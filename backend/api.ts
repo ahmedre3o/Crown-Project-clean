@@ -1,4 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
+import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { Readable } from 'stream';
@@ -47,45 +48,24 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
-app.use((req: Request, res: Response, next: NextFunction) => {
-  const origin = req.headers.origin as string | undefined;
+const allowedOrigins = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
 
-  // Only log detailed CORS decisions for preflight on /api/auth/login
-  const isLoginPreflight =
-    req.method === 'OPTIONS' && req.path === '/api/auth/login';
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(new Error('CORS blocked: ' + origin));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
 
-  if (isLoginPreflight) {
-    console.log('[CORS] Preflight /api/auth/login', {
-      requestOrigin: origin,
-      allowedOrigins,
-    });
-  }
-
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Vary', 'Origin');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-
-    if (isLoginPreflight) {
-      console.log('[CORS] Applied headers for /api/auth/login preflight', {
-        origin,
-        'Access-Control-Allow-Origin': origin,
-      });
-    }
-  } else if (isLoginPreflight) {
-    console.log('[CORS] Origin NOT allowed for /api/auth/login preflight', {
-      requestOrigin: origin,
-    });
-  }
-
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(204);
-  }
-
-  next();
-});
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 app.get('/api/plans', (req: Request, res: Response) => {
   const lang = (req.query.lang === 'en' ? 'en' : 'ar') as 'ar' | 'en';
@@ -154,15 +134,7 @@ app.get('/api/setup-admin', async (_req: Request, res: Response) => {
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const JWT_SECRET = process.env.JWT_SECRET || 'crown-services-secret-key-2026';
-const PORT = parseInt(process.env.PORT || '8080', 10);
-
-// Log CORS configuration at startup
-console.log('CORS_ORIGIN env:', process.env.CORS_ORIGIN || '(not set)');
-const allowedOrigins = (process.env.CORS_ORIGIN || '')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-console.log('Allowed origins:', allowedOrigins);
+const port = Number(process.env.PORT || 8080);
 
 // Masked Gemini key log (no full key ever printed)
 if (process.env.NODE_ENV !== 'production') {
@@ -7968,8 +7940,8 @@ app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: 'Not found', code: 'NOT_FOUND' });
 });
 
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+const server = app.listen(port, '0.0.0.0', () => {
+  console.log(`Server running on port ${port}`);
 });
 
 server.on('error', (error) => {

@@ -1,7 +1,7 @@
 steps:
   - name: gcr.io/cloud-builders/docker
     dir: .
-    args: ["build", "-f", "frontend/Dockerfile.web", "-t", "gcr.io/$PROJECT_ID/crown-web", "--build-arg=NEXT_PUBLIC_API_URL=$_NEXT_PUBLIC_API_URL", "."]
+    args: ["build", "-f", "frontend/Dockerfile.web", "-t", "gcr.io/$PROJECT_ID/crown-web", "--build-arg=NEXT_PUBLIC_API_URL=https://crown-api-av27y5zkga-uc.a.run.app/api", "."]
   - name: gcr.io/cloud-builders/docker
     args: ["push", "gcr.io/$PROJECT_ID/crown-web"]
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
@@ -16,9 +16,7 @@ steps:
       - us-central1
       - --allow-unauthenticated
       - --set-env-vars
-      - VITE_API_URL=https://api.crowncs.org
-      - --set-env-vars
-      - NEXT_PUBLIC_API_URL=$_NEXT_PUBLIC_API_URL
+      - NEXT_PUBLIC_API_URL=https://crown-api-av27y5zkga-uc.a.run.app/api
 
 options:
   logging: CLOUD_LOGGING_ONLY

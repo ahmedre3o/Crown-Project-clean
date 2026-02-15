@@ -1,4 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
+import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { Readable } from 'stream';
@@ -47,45 +48,25 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
-app.use((req: Request, res: Response, next: NextFunction) => {
-  const origin = req.headers.origin as string | undefined;
+const defaultOrigins = ['https://crowncs.org', 'http://localhost:3000'];
+const allowedOrigins = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+const origins = allowedOrigins.length > 0 ? allowedOrigins : defaultOrigins;
 
-  // Only log detailed CORS decisions for preflight on /api/auth/login
-  const isLoginPreflight =
-    req.method === 'OPTIONS' && req.path === '/api/auth/login';
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true);
+    if (origins.includes(origin)) return cb(null, true);
+    return cb(new Error('CORS blocked: ' + origin));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Shop-Id'],
+};
 
-  if (isLoginPreflight) {
-    console.log('[CORS] Preflight /api/auth/login', {
-      requestOrigin: origin,
-      allowedOrigins,
-    });
-  }
-
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Vary', 'Origin');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-
-    if (isLoginPreflight) {
-      console.log('[CORS] Applied headers for /api/auth/login preflight', {
-        origin,
-        'Access-Control-Allow-Origin': origin,
-      });
-    }
-  } else if (isLoginPreflight) {
-    console.log('[CORS] Origin NOT allowed for /api/auth/login preflight', {
-      requestOrigin: origin,
-    });
-  }
-
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(204);
-  }
-
-  next();
-});
+app.use(cors(corsOptions));
 
 app.get('/api/plans', (req: Request, res: Response) => {
   const lang = (req.query.lang === 'en' ? 'en' : 'ar') as 'ar' | 'en';
@@ -154,15 +135,7 @@ app.get('/api/setup-admin', async (_req: Request, res: Response) => {
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const JWT_SECRET = process.env.JWT_SECRET || 'crown-services-secret-key-2026';
-const PORT = parseInt(process.env.PORT || '8080', 10);
-
-// Log CORS configuration at startup
-console.log('CORS_ORIGIN env:', process.env.CORS_ORIGIN || '(not set)');
-const allowedOrigins = (process.env.CORS_ORIGIN || '')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-console.log('Allowed origins:', allowedOrigins);
+const port = Number(process.env.PORT || 8080);
 
 // Masked Gemini key log (no full key ever printed)
 if (process.env.NODE_ENV !== 'production') {
@@ -248,8 +221,17 @@ testConnection().then(async () => {
   }
 });
 
-// Middleware for authentication
+// Middleware for authentication: /api/auth/* public except /api/auth/me; /api/health, /api/public, /api/storefront, /api/setup public
 const authenticateToken = async (req: any, res: Response, next: any) => {
+  if (req.path.startsWith('/api/auth/') && req.path !== '/api/auth/me') {
+    return next();
+  }
+  if (req.path === '/api/health' || req.path.startsWith('/api/health/') ||
+      req.path.startsWith('/api/public') || req.path.startsWith('/api/storefront') ||
+      req.path === '/api/setup' || req.path.startsWith('/api/setup')) {
+    return next();
+  }
+
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -1658,22 +1640,32 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
   }
 });
 
-/** Resolve user by identifier: numeric id, email, or username. Optional shopId for shop-scoped lookup. */
-async function findUserByIdentifier(identifier: string, shopId?: number | null): Promise<any | null> {
+/** Resolve user by identifier for login: email (or username case-insensitive), employee_id (numeric), or username. shopId required for non-email. */
+async function findUserByIdentifier(identifier: string, resolvedShopId: number | null | undefined): Promise<any | null> {
   const raw = String(identifier || '').trim();
   if (!raw) return null;
-  const shopFilter = shopId != null ? ' AND (shop_id = ? OR shop_id IS NULL)' : '';
-  const shopArgs = shopId != null ? [shopId] : [];
-  const cols = 'id, email, username, password, role, package, shop_id';
   let rows: any[] = [];
-  if (/^\d+$/.test(raw)) {
-    const [r] = await pool.execute(`SELECT ${cols} FROM users WHERE id = ?${shopFilter}`, [raw, ...shopArgs]);
+  if (raw.includes('@')) {
+    const shopFilter = resolvedShopId != null ? ' AND (shop_id = ? OR shop_id IS NULL)' : '';
+    const shopArgs = resolvedShopId != null ? [resolvedShopId] : [];
+    const [r] = await pool.execute(
+      `SELECT * FROM users WHERE (LOWER(COALESCE(email,'')) = LOWER(?) OR LOWER(username) = LOWER(?))${shopFilter}`,
+      [raw, raw, ...shopArgs]
+    );
     rows = r as any[];
-  } else if (raw.includes('@')) {
-    const [r] = await pool.execute(`SELECT ${cols} FROM users WHERE LOWER(email) = LOWER(?)${shopFilter}`, [raw, ...shopArgs]);
+  } else if (/^\d+$/.test(raw)) {
+    if (resolvedShopId == null) return null;
+    const [r] = await pool.execute(
+      'SELECT * FROM users WHERE CAST(COALESCE(employee_id, 0) AS CHAR) = ? AND shop_id = ?',
+      [raw, resolvedShopId]
+    );
     rows = r as any[];
   } else {
-    const [r] = await pool.execute(`SELECT ${cols} FROM users WHERE username = ?${shopFilter}`, [raw, ...shopArgs]);
+    if (resolvedShopId == null) return null;
+    const [r] = await pool.execute(
+      'SELECT * FROM users WHERE username = ? AND shop_id = ?',
+      [raw, resolvedShopId]
+    );
     rows = r as any[];
   }
   return rows.length > 0 ? rows[0] : null;
@@ -1712,100 +1704,42 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Missing credentials' });
   }
 
-  await ensureUserColumnsLoaded();
+  const resolvedShopId: number | null =
+    body.shopId != null ? Number(body.shopId) : req.query.shopId != null ? Number(req.query.shopId) : (() => {
+      const h = req.headers['x-shop-id'];
+      const v = Array.isArray(h) ? h[0] : h;
+      return v != null ? Number(v) : null;
+    })();
+  const shopIdNum = Number(resolvedShopId);
+  const hasValidShopId = Number.isFinite(shopIdNum) && shopIdNum > 0;
 
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('[login] DB:', {
-      DB_HOST: process.env.DB_HOST,
-      DB_NAME: process.env.DB_NAME,
-      DB_USER: process.env.DB_USER,
+  if (!identifier.includes('@') && !hasValidShopId) {
+    return res.status(400).json({
+      error: 'SHOP_ID_REQUIRED',
+      message_ar: 'معرف المتجر مطلوب عند تسجيل الدخول برقم الموظف أو اسم المستخدم.',
+      message_en: 'Shop ID is required when logging in with employee ID or username.',
     });
   }
 
-  // Build SELECT columns dynamically based on existing schema
-  const cols: string[] = ['id', 'role'];
-  if (hasUserColumn('email')) cols.push('email');
-  if (hasUserColumn('username')) cols.push('username');
-  if (hasUserColumn('employee_id')) cols.push('employee_id');
-  if (hasUserColumn('shop_id')) cols.push('shop_id');
-  if (hasUserColumn('package')) cols.push('package');
-  if (hasUserColumn('is_active')) cols.push('is_active');
-  if (hasUserColumn('password_hash')) cols.push('password_hash');
-  if (hasUserColumn('password')) cols.push('password');
-
-  const sqlCols = cols.join(', ');
-
   let user: any = null;
-  let identifierType: 'id' | 'email' | 'username' = 'username';
-
   try {
-    let sql: string;
-    let params: (string | number)[];
-
-    if (/^\d+$/.test(identifier)) {
-      identifierType = 'id';
-      sql = `SELECT ${sqlCols} FROM users WHERE id = ?`;
-      params = [identifier];
-    } else if (identifier.includes('@') && hasUserColumn('email')) {
-      identifierType = 'email';
-      sql = `SELECT ${sqlCols} FROM users WHERE LOWER(email) = LOWER(?)`;
-      params = [identifier];
-    } else {
-      identifierType = 'username';
-      if (hasUserColumn('username') && hasUserColumn('employee_id')) {
-        sql = `SELECT ${sqlCols} FROM users WHERE (username = ? OR employee_id = ?)`;
-        params = [identifier, identifier];
-      } else {
-        sql = `SELECT ${sqlCols} FROM users WHERE username = ?`;
-        params = [identifier];
-      }
-    }
-
-    const [rows] = await pool.execute<RowDataPacket[]>(sql, params);
-    user = (rows as any[])[0];
+    user = await findUserByIdentifier(identifier, hasValidShopId ? shopIdNum : undefined);
   } catch (err: any) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.log(
-        '[login] SELECT_FAILED',
-        'identifierType=',
-        identifierType,
-        'code=',
-        err?.code,
-        'message=',
-        err?.message
-      );
-    }
+    if (process.env.NODE_ENV !== 'production') console.log('[login] findUserByIdentifier error', err?.message);
     return res.status(500).json({ error: 'SERVER_ERROR', code: 'SELECT_FAILED' });
   }
 
-  if (process.env.NODE_ENV !== 'production') {
-    const ph =
-      user?.password_hash ??
-      user?.passwordHash ??
-      (user as any)?.PASSWORD_HASH ??
-      user?.password ??
-      null;
-    console.log('[login] resolved identifierType=', identifierType);
-    console.log('[login] userFound=', !!user);
-    console.log('[login] hashLen=', typeof ph === 'string' ? ph.length : null);
-  }
-
   if (!user) {
-    return res.status(401).json({ error: 'Invalid credentials', code: 'USER_NOT_FOUND' });
+    return res.status(404).json({
+      error: 'USER_NOT_FOUND',
+      message_ar: 'الحساب غير موجود. اطلب من مديرك إنشاء حساب لك.',
+      message_en: 'User not found. Ask your manager to create an account for you.',
+    });
   }
 
-  // Prefer password_hash, then bcrypt-style password, then plaintext fallback
   const rawHash =
-    user?.password_hash ??
-    user?.passwordHash ??
-    (user as any)?.PASSWORD_HASH ??
-    user?.password ??
-    null;
-
-  let hash: string | null = null;
-  if (typeof rawHash === 'string' && rawHash.trim().length > 0) {
-    hash = rawHash;
-  }
+    user.password_hash ?? user.passwordHash ?? (user as any).PASSWORD_HASH ?? user.password ?? null;
+  const hash = typeof rawHash === 'string' && rawHash.trim().length > 0 ? rawHash : null;
 
   if (!hash) {
     return res.status(401).json({ error: 'Invalid credentials', code: 'HASH_MISSING' });
@@ -1825,21 +1759,13 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
 
   let ok = false;
   try {
-    // If hash looks like bcrypt, compare via bcrypt; otherwise fallback to plain equality (legacy)
     if (hash.startsWith('$2a$') || hash.startsWith('$2b$') || hash.startsWith('$2y$')) {
       ok = await bcrypt.compare(password, hash);
     } else {
       ok = password === hash;
     }
   } catch (e: any) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[login] COMPARE_THROW', e?.message);
-    }
     return res.status(500).json({ error: 'SERVER_ERROR', code: 'COMPARE_THROW' });
-  }
-
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('[login] compareOk=', ok);
   }
 
   if (!ok) {
@@ -1847,29 +1773,20 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
   }
 
   if (!process.env.JWT_SECRET) {
-    return res
-      .status(500)
-      .json({ error: 'SERVER_ERROR', code: 'JWT_SECRET_MISSING' });
+    return res.status(500).json({ error: 'SERVER_ERROR', code: 'JWT_SECRET_MISSING' });
   }
 
-  let shopId: number | null =
-    (user as any).shop_id ??
-    (user as any).shopId ??
-    null;
+  let shopId: number | null = (user.shop_id ?? user.shopId) ?? null;
 
-  // For super_admin: ensure shop exists at login so token has a valid shopId
   if (!shopId && user.role === 'super_admin') {
     try {
       shopId = await resolveOrCreateShopForUser(user);
-      (user as any).shop_id = shopId;
+      user.shop_id = shopId;
     } catch (e: any) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[login] resolveOrCreateShopForUser failed:', e?.message || e);
-      }
+      if (process.env.NODE_ENV !== 'production') console.log('[login] resolveOrCreateShopForUser failed:', (e as any)?.message);
     }
   }
 
-  // Determine effective plan (role + subscriptions)
   const effective = await getEffectivePlanForUser({ ...user, shop_id: shopId });
 
   const token = jwt.sign(
@@ -1877,7 +1794,7 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
       userId: user.id,
       role: user.role,
       package: effective.planId,
-      shopId,
+      shopId: user.shop_id ?? shopId,
     },
     JWT_SECRET,
     { expiresIn: '7d' }
@@ -1891,7 +1808,7 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
       username: user.username,
       role: user.role,
       package: effective.planId,
-      shopId,
+      shopId: user.shop_id ?? shopId,
     },
   });
 });
@@ -1925,6 +1842,158 @@ app.get('/api/auth/me', authenticateToken, async (req: any, res: Response) => {
         package: effective.planId,
         shopId,
       },
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/auth/signup', async (req: Request, res: Response) => {
+  try {
+    const { username, password, email, businessName, ownerName } = req.body || {};
+    const u = String(username ?? '').trim();
+    const p = String(password ?? '').trim();
+    const e = email != null ? String(email).trim() : null;
+    const biz = businessName != null ? String(businessName).trim() : null;
+    const owner = ownerName != null ? String(ownerName).trim() : null;
+
+    if (!u || !p) {
+      return res.status(400).json({ error: 'Username and password required' });
+    }
+
+    if (!JWT_SECRET) {
+      return res.status(500).json({ error: 'SERVER_ERROR', code: 'JWT_SECRET_MISSING' });
+    }
+
+    const hashedPassword = await bcrypt.hash(p, 10);
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [userResult] = await connection.execute(
+        'INSERT INTO users (username, email, password, role, package, shop_id) VALUES (?, ?, ?, ?, ?, ?)',
+        [u, e || null, hashedPassword, 'shop_owner', 'bronze', null]
+      );
+      const userInsert = userResult as any;
+      const userId = userInsert.insertId;
+
+      const displayName = biz || e || u;
+      const ownerDisplay = owner || e || u;
+      const [shopResult] = await connection.execute(
+        `INSERT INTO shops (name, business_name, owner_name, owner_id, package, plan_type, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)`,
+        [displayName, displayName || null, ownerDisplay, userId, 'bronze', 'bronze']
+      );
+      const shopId = (shopResult as any).insertId;
+
+      await connection.execute('UPDATE users SET shop_id = ? WHERE id = ?', [shopId, userId]);
+      await connection.commit();
+
+      const token = jwt.sign(
+        { userId, role: 'shop_owner', package: 'bronze', shopId },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
+      return res.status(201).json({
+        token,
+        user: { id: userId, username: u, email: e || null, role: 'shop_owner', package: 'bronze', shopId },
+      });
+    } catch (err: any) {
+      await connection.rollback().catch(() => {});
+      if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'Username or email already exists' });
+      throw err;
+    } finally {
+      connection.release();
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/auth/accept-invite', async (req: Request, res: Response) => {
+  try {
+    const { shopId, inviteCode, password, identifier } = req.body || {};
+    const sid = Number(shopId);
+    const code = String(inviteCode ?? '').trim();
+    const pwd = String(password ?? '').trim();
+
+    if (!Number.isFinite(sid) || sid <= 0 || !code || !pwd) {
+      return res.status(400).json({ error: 'shopId, inviteCode, and password required' });
+    }
+
+    if (!JWT_SECRET) return res.status(500).json({ error: 'SERVER_ERROR', code: 'JWT_SECRET_MISSING' });
+
+    const [invRows] = await pool.execute(
+      'SELECT id, shop_id, role, employee_id, email, expires_at, used_at FROM user_invites WHERE shop_id = ? AND invite_code = ? LIMIT 1',
+      [sid, code]
+    );
+    const inv = (invRows as any[])[0];
+    if (!inv) return res.status(404).json({ error: 'INVITE_NOT_FOUND', message_ar: 'الدعوة غير موجودة أو غير صالحة.', message_en: 'Invite not found or invalid.' });
+    if (inv.used_at != null) return res.status(400).json({ error: 'INVITE_ALREADY_USED', message_ar: 'تم استخدام هذه الدعوة مسبقاً.', message_en: 'This invite has already been used.' });
+    if (new Date(inv.expires_at) < new Date()) return res.status(400).json({ error: 'INVITE_EXPIRED', message_ar: 'انتهت صلاحية الدعوة.', message_en: 'Invite has expired.' });
+
+    const [shopRows] = await pool.execute('SELECT package FROM shops WHERE id = ?', [sid]);
+    const shopPkg = (shopRows as any[])[0]?.package || 'bronze';
+
+    let username: string;
+    let email: string | null = null;
+    let employee_id: string | null = null;
+
+    const idRaw = identifier != null ? String(identifier).trim() : null;
+    if (idRaw) {
+      if (idRaw.includes('@')) {
+        username = idRaw.toLowerCase();
+        email = idRaw;
+      } else if (/^\d+$/.test(idRaw)) {
+        username = 'emp_' + idRaw;
+        employee_id = idRaw;
+      } else {
+        username = idRaw;
+      }
+    } else {
+      if (inv.email) {
+        username = inv.email.toLowerCase();
+        email = inv.email;
+      } else if (inv.employee_id) {
+        username = 'emp_' + String(inv.employee_id);
+        employee_id = String(inv.employee_id);
+      } else {
+        return res.status(400).json({ error: 'identifier required when invite has no email/employee_id' });
+      }
+    }
+
+    const [existingByEmail] = email ? await pool.execute('SELECT id FROM users WHERE LOWER(email) = LOWER(?)', [email]) : [[]];
+    if (email && (existingByEmail as any[]).length > 0) {
+      return res.status(400).json({ error: 'USER_EXISTS', message_ar: 'يوجد حساب بهذا البريد مسبقاً.', message_en: 'An account with this email already exists.' });
+    }
+    const [existingByUsername] = await pool.execute('SELECT id FROM users WHERE username = ? AND shop_id = ?', [username, sid]);
+    if ((existingByUsername as any[]).length > 0) {
+      return res.status(400).json({ error: 'USER_EXISTS', message_ar: 'يوجد حساب بهذا الاسم في المتجر.', message_en: 'An account with this username already exists in this shop.' });
+    }
+    if (employee_id) {
+      const [existingByEmp] = await pool.execute('SELECT id FROM users WHERE employee_id = ? AND shop_id = ?', [employee_id, sid]);
+      if ((existingByEmp as any[]).length > 0) {
+        return res.status(400).json({ error: 'USER_EXISTS', message_ar: 'يوجد حساب برقم هذا الموظف في المتجر.', message_en: 'An account with this employee ID already exists in this shop.' });
+      }
+    }
+
+    const hashedPassword = await bcrypt.hash(pwd, 10);
+    const [insertResult] = await pool.execute(
+      'INSERT INTO users (username, email, employee_id, password, role, package, shop_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [username, email, employee_id, hashedPassword, inv.role, shopPkg, sid]
+    );
+    const userId = (insertResult as any).insertId;
+
+    await pool.execute('UPDATE user_invites SET used_at = NOW() WHERE id = ?', [inv.id]);
+
+    const token = jwt.sign(
+      { userId, role: inv.role, package: shopPkg, shopId: sid },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    return res.status(201).json({
+      token,
+      user: { id: userId, username, email, employee_id, role: inv.role, package: shopPkg, shopId: sid },
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -3281,6 +3350,54 @@ app.post('/api/users', authenticateToken, requireRole('super_admin', 'shop_owner
     res.status(201).json({ id: userId, username, email, employee_id, role: requestedRole });
   } catch (error: any) {
     if (error.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'Username, email, or employee ID already exists' });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/users/invite', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'), async (req: any, res: Response) => {
+  try {
+    const { role, employee_id, email, expiresHours } = req.body || {};
+    const requestedRole = String(role ?? '').trim().toLowerCase();
+    const allowedInviteRoles = ['shop_owner', 'branch_manager', 'multi_branch_manager', 'super_admin'];
+    if (!allowedInviteRoles.includes(requestedRole)) {
+      return res.status(400).json({ error: 'Invalid role for invite' });
+    }
+
+    const creatorRole = (req.user?.role || '') as string;
+    const allowed = CREATABLE_ROLES[creatorRole];
+    if (!allowed || !allowed.includes(requestedRole)) {
+      return res.status(403).json({ error: `You cannot invite role ${requestedRole}` });
+    }
+
+    const shopId = resolveShopId(req) ?? (req.user.role === 'shop_owner' ? req.user.shop_id : null);
+    if (!shopId && req.user?.role !== 'super_admin') {
+      return res.status(400).json({ error: 'SHOP_ID_REQUIRED', message_ar: 'اختر المتجر أولاً', message_en: 'Please select a shop first' });
+    }
+    if (req.user?.role === 'super_admin' && !shopId) {
+      return res.status(400).json({ error: 'SHOP_ID_REQUIRED', message_ar: 'اختر المتجر أولاً', message_en: 'Please select a shop first' });
+    }
+    const resolvedShopId = Number(shopId);
+    if (!Number.isFinite(resolvedShopId) || resolvedShopId <= 0) {
+      return res.status(400).json({ error: 'Valid shopId required' });
+    }
+
+    const empId = employee_id != null ? String(employee_id).trim() || null : null;
+    const em = email != null ? String(email).trim() || null : null;
+    if (!empId && !em) {
+      return res.status(400).json({ error: 'Either employee_id or email required for invite' });
+    }
+
+    const hours = expiresHours != null ? Math.min(720, Math.max(1, Number(expiresHours))) : 24;
+    const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000);
+    const inviteCode = crypto.randomBytes(32).toString('hex');
+
+    await pool.execute(
+      'INSERT INTO user_invites (shop_id, role, employee_id, email, invite_code, expires_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [resolvedShopId, requestedRole, empId, em, inviteCode, expiresAt]
+    );
+
+    return res.status(201).json({ invite_code: inviteCode, shopId: resolvedShopId, role: requestedRole, expires_at: expiresAt.toISOString() });
+  } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
@@ -7968,8 +8085,8 @@ app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: 'Not found', code: 'NOT_FOUND' });
 });
 
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+const server = app.listen(port, '0.0.0.0', () => {
+  console.log(`Server running on port ${port}`);
 });
 
 server.on('error', (error) => {

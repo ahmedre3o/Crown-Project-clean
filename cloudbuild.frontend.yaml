@@ -1,0 +1,33 @@
+# Frontend build for crown-web (Artifact Registry). Single source of truth: GitHub Crown-Project-clean.
+# Trigger: branch deploy/frontend, substitution _NEXT_PUBLIC_API_URL=https://api.crowncs.org/api
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --build-arg=NEXT_PUBLIC_API_URL=$_NEXT_PUBLIC_API_URL
+      - -t
+      - $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/crown-web:$COMMIT_SHA
+      - .
+    id: Build
+
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/crown-web:$COMMIT_SHA
+    id: Push
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - crown-web
+      - --image=$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/crown-web:$COMMIT_SHA
+      - --region=us-central1
+      - --platform=managed
+      - --allow-unauthenticated
+      - --quiet
+    id: Deploy
+
+images:
+  - $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/crown-web:$COMMIT_SHA

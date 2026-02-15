@@ -2,14 +2,13 @@
   "name": "crown-backend",
   "version": "1.0.0",
   "private": true,
-  "engines": {
-    "node": ">=18"
-  },
+  "engines": { "node": ">=18" },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/api.js"
   },
   "dependencies": {
+    "cookie-parser": "^1.4.7",
     "@google/genai": "^1.39.0",
     "bcryptjs": "^2.4.3",
     "busboy": "^1.6.0",
@@ -27,6 +26,7 @@
     "zod": "3.25.76"
   },
   "devDependencies": {
+    "@types/cookie-parser": "^1.4.7",
     "@types/bcryptjs": "^2.4.6",
     "@types/busboy": "^1.5.4",
     "@types/express": "^5.0.6",

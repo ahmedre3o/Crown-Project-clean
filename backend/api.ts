@@ -14,6 +14,7 @@ import multer from 'multer';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import csvParser from 'csv-parser';
+import cookieParser from 'cookie-parser';
 
 const upload = multer({ storage: multer.memoryStorage() });
 import { GoogleGenAI } from '@google/genai';
@@ -38,6 +39,7 @@ dotenv.config({ path: rootEnvPath });
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 // Dev-only request logger to confirm active routes and hits
 if (process.env.NODE_ENV !== 'production') {
@@ -85,6 +87,22 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   }
 
   next();
+});
+
+// Debug: inspect headers/cookies (no auth) — remove in production
+app.get('/api/_debug/headers', (req: any, res: Response) => {
+  const authorization = (req.headers?.authorization ?? req.header?.('Authorization')) ?? undefined;
+  const x_access_token = req.headers?.['x-access-token'] ?? undefined;
+  const cookie = req.headers?.cookie ?? undefined;
+  const cookiesParsed = req.cookies ?? undefined;
+  res.json({
+    method: req.method,
+    path: req.path,
+    authorization,
+    x_access_token,
+    cookie,
+    cookiesParsed,
+  });
 });
 
 app.get('/api/plans', (req: Request, res: Response) => {
@@ -248,10 +266,33 @@ testConnection().then(async () => {
   }
 });
 
-// Middleware for authentication
+/** Unified token extraction: Authorization Bearer, x-access-token, cookies, query. Returns string or null. */
+function getAccessToken(req: any): string | null {
+  const authHeader = (req.headers?.authorization ?? req.header?.('Authorization')) as string | undefined;
+  if (authHeader?.startsWith('Bearer ')) {
+    const t = authHeader.slice(7).trim();
+    if (t) return t;
+  }
+  const xToken = req.headers?.['x-access-token'];
+  const xVal = typeof xToken === 'string' ? xToken : Array.isArray(xToken) ? xToken[0] : undefined;
+  if (typeof xVal === 'string' && xVal.trim()) return xVal.trim();
+
+  const cookies = req.cookies ?? {};
+  for (const name of ['access_token', 'accessToken', 'token', 'jwt']) {
+    const v = cookies[name];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+
+  const q = req.query?.access_token;
+  const qVal = typeof q === 'string' ? q : Array.isArray(q) ? q[0] : undefined;
+  if (typeof qVal === 'string' && qVal.trim()) return qVal.trim();
+
+  return null;
+}
+
+// Middleware for authentication (uses getAccessToken)
 const authenticateToken = async (req: any, res: Response, next: any) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const token = getAccessToken(req);
 
   if (!token) {
     return res.status(401).json({ error: 'Access token required' });
@@ -261,7 +302,7 @@ const authenticateToken = async (req: any, res: Response, next: any) => {
     const decoded: any = jwt.verify(token, JWT_SECRET);
     const [users] = await pool.execute('SELECT * FROM users WHERE id = ?', [decoded.userId]);
     const userArray = users as any[];
-    
+
     if (userArray.length === 0) {
       return res.status(401).json({ error: 'User not found' });
     }
@@ -282,7 +323,7 @@ const authenticateToken = async (req: any, res: Response, next: any) => {
     req.user = user;
     next();
   } catch (error) {
-    return res.status(403).json({ error: 'Invalid or expired token' });
+    return res.status(401).json({ error: 'Invalid access token' });
   }
 };
 

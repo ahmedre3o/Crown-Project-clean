@@ -16,3 +16,6 @@ steps:
       - --allow-unauthenticated
 images:
   - 'gcr.io/$PROJECT_ID/crown-api'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

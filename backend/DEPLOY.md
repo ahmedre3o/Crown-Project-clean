@@ -65,19 +65,20 @@ gcloud run deploy crown-api \
 
 ## 4) ضبط Env Vars (CORS + API URL وغيرها)
 
-- **CORS_ORIGIN**: قائمة المنشآت المسموح بها (مفصولة بفاصلة)، مثال:  
-  `https://crown-web-xxxxx.run.app,http://localhost:3000`
+**Canonical domains:** API `https://api.crowncs.org`, Frontend `https://crowncs.org`. الـ backend يسمح مبدئياً بـ `https://crowncs.org` و `http://localhost:3000` ويسمح بالهيدر `X-Shop-Id` مع `Content-Type` و `Authorization` و `credentials: true`.
+
+- **CORS_ORIGIN** (اختياري): إذا مُعرّف يُستبدل الافتراضي. مثال:  
+  `https://crowncs.org,http://localhost:3000`
 - **JWT_SECRET**: من Secret Manager أو متغير بيئة (لا تخزينه في كود).
 - **DB_HOST, DB_NAME, DB_USER, DB_PASSWORD** (واختياري DB_SSL, DB_PORT, DB_MODE).
-- **NEXT_PUBLIC_API_URL** (للفرونتند crown-web / Next.js): يُضبط عند **بناء** الفرونت أو كـ env في Cloud Run للفرونت. بعد نشر crown-api احصل على URL الخدمة ثم عند نشر crown-web مرّر نفس الرابط كـ build-arg أو env (مثال: `NEXT_PUBLIC_API_URL=https://crown-api-xxxxx.run.app`). في cloudbuild.frontend.yaml استخدم `--build-arg=NEXT_PUBLIC_API_URL=...` و `--set-env-vars=NEXT_PUBLIC_API_URL=...` إن لزم.
+- **Frontend (crown-web):** يُبنى بـ substitution في Cloud Build: `_NEXT_PUBLIC_API_URL=https://api.crowncs.org/api`. لا تستخدم *.run.app في الإنتاج.
 
-تحديث CORS فقط (استخدم delimiter إذا القيمة تحتوي فاصلة):
+تحديث CORS فقط (اختياري):
 
 ```bash
-# مثال: قيمتان للمنشأ (استخدم ملف أو delimiter حسب بيئتك)
 gcloud run services update crown-api \
   --region us-central1 \
-  --update-env-vars "CORS_ORIGIN=https://crown-web-xxxxx.run.app,http://localhost:3000"
+  --update-env-vars "CORS_ORIGIN=https://crowncs.org,http://localhost:3000"
 ```
 
 ضبط JWT من Secret Manager:

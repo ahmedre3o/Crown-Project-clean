@@ -1,7 +1,16 @@
+# Frontend build for crown-web. Single source of truth: GitHub Crown-Project-clean.
+# Trigger must use branch: deploy/frontend and substitution: _NEXT_PUBLIC_API_URL=https://api.crowncs.org/api
 steps:
   - name: gcr.io/cloud-builders/docker
     dir: .
-    args: ["build", "-f", "frontend/Dockerfile.web", "-t", "gcr.io/$PROJECT_ID/crown-web", "--build-arg=NEXT_PUBLIC_API_URL=https://crown-api-av27y5zkga-uc.a.run.app/api", "."]
+    args:
+      - build
+      - -f
+      - frontend/Dockerfile.web
+      - -t
+      - gcr.io/$PROJECT_ID/crown-web
+      - --build-arg=NEXT_PUBLIC_API_URL=$_NEXT_PUBLIC_API_URL
+      - .
   - name: gcr.io/cloud-builders/docker
     args: ["push", "gcr.io/$PROJECT_ID/crown-web"]
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
@@ -16,7 +25,7 @@ steps:
       - us-central1
       - --allow-unauthenticated
       - --set-env-vars
-      - NEXT_PUBLIC_API_URL=https://crown-api-av27y5zkga-uc.a.run.app/api
+      - NEXT_PUBLIC_API_URL=$_NEXT_PUBLIC_API_URL
 
 options:
   logging: CLOUD_LOGGING_ONLY

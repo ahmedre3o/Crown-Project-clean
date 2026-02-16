@@ -25,6 +25,8 @@ steps:
       - $_SERVICE_NAME
       - --platform=managed
       - --image=$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+      - --add-cloudsql-instances=gen-lang-client-0711622878:us-central1:crown-services-last-project-db
+      - --env-vars-file=backend/cloudrun.env.yaml
       - --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID
       - --region=$_DEPLOY_REGION
       - --quiet

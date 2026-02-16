@@ -48,24 +48,33 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
-const defaultOrigins = ['https://crowncs.org', 'http://localhost:3000'];
+function normalizeOrigin(url: string): string {
+  if (!url || typeof url !== 'string') return '';
+  return url.toLowerCase().trim().replace(/\/+$/, '');
+}
+
+const defaultOrigins = ['https://crowncs.org', 'http://localhost:3000'].map(normalizeOrigin);
 const allowedOrigins = (process.env.CORS_ORIGIN || '')
   .split(',')
   .map((o) => o.trim())
-  .filter(Boolean);
+  .filter(Boolean)
+  .map(normalizeOrigin);
 const origins = allowedOrigins.length > 0 ? allowedOrigins : defaultOrigins;
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, cb) => {
     if (!origin) return cb(null, true);
-    if (origins.includes(origin)) return cb(null, true);
-    return cb(new Error('CORS blocked: ' + origin));
+    const normalized = normalizeOrigin(origin);
+    if (!normalized) return cb(null, true);
+    if (origins.includes(normalized)) return cb(null, true);
+    return cb(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Shop-Id'],
 };
 
+app.options(/(.*)/, cors(corsOptions));
 app.use(cors(corsOptions));
 
 app.get('/api/plans', (req: Request, res: Response) => {

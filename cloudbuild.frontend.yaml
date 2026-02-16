@@ -1,5 +1,6 @@
 # Frontend build for crown-web (Artifact Registry). Branch: master.
-# NEXT_PUBLIC_API_URL injected at build time (canonical: https://api.crowncs.org/api)
+# NEXT_PUBLIC_API_URL baked into Next.js bundle at build time.
+steps:
   - name: gcr.io/cloud-builders/docker
     args:
       - build

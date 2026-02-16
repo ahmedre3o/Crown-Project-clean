@@ -1,5 +1,6 @@
-# Frontend build for crown-web. Single source of truth: GitHub Crown-Project-clean. Branch: master.
-# NEXT_PUBLIC_API_URL injected at build time via build-arg (canonical: https://api.crowncs.org/api)
+# Frontend build for crown-web. Branch: master.
+# NEXT_PUBLIC_API_URL baked into Next.js bundle at build time.
+steps:
   - name: gcr.io/cloud-builders/docker
     dir: .
     args:

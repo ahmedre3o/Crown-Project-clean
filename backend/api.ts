@@ -8085,9 +8085,7 @@ app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: 'Not found', code: 'NOT_FOUND' });
 });
 
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`API running on ${PORT}`);
-});
+const server = app.listen(PORT, '0.0.0.0', () => console.log('listening', PORT));
 
 server.on('error', (error) => {
   console.error('❌ Server error:', error);

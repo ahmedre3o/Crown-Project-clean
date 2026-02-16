@@ -40,29 +40,35 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ✅ CORS preflight handler (must be before cors + routes)
+// ✅ Hard stop for preflight (must be BEFORE any cors() middleware or routes)
 app.use((req, res, next) => {
-  if (req.method === "OPTIONS") {
-    const origin = req.headers.origin as string | undefined;
+  if (req.method !== 'OPTIONS') return next();
 
-    if (origin) {
-      res.setHeader("Access-Control-Allow-Origin", origin);
-      res.setHeader("Vary", "Origin");
-      res.setHeader("Access-Control-Allow-Credentials", "true");
-    }
+  const origin = (req.headers.origin as string | undefined) || '';
+  const normalize = (u: string) => u.toLowerCase().trim().replace(/\/+$/, '');
 
-    res.setHeader(
-      "Access-Control-Allow-Methods",
-      "GET,POST,PUT,PATCH,DELETE,OPTIONS"
-    );
-    res.setHeader(
-      "Access-Control-Allow-Headers",
-      "Content-Type, Authorization"
-    );
+  const raw = process.env.CORS_ORIGIN || '';
+  const allowed = raw
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .map(normalize);
 
-    return res.status(204).end();
+  const o = normalize(origin);
+
+  // only echo allowed origins (and keep credentials)
+  if (origin && allowed.includes(o)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
   }
-  next();
+
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+
+  const reqHeaders = (req.headers['access-control-request-headers'] as string | undefined);
+  res.setHeader('Access-Control-Allow-Headers', reqHeaders || 'Content-Type, Authorization');
+
+  return res.status(204).end();
 });
 
 // Dev-only request logger to confirm active routes and hits
@@ -99,7 +105,6 @@ const corsOptions: cors.CorsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Shop-Id'],
 };
 
-app.options(/(.*)/, cors(corsOptions));
 app.use(cors(corsOptions));
 
 app.get('/api/plans', (req: Request, res: Response) => {

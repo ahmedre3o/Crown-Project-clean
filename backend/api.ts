@@ -40,15 +40,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use((req, _res, next) => {
-  if (req.method === 'OPTIONS') {
-    console.log('[PREFLIGHT]', req.method, req.path, 'origin=', req.headers.origin);
-    console.log('[PREFLIGHT] CORS_ORIGIN env =', process.env.CORS_ORIGIN);
-  }
-  next();
-});
-
-// ✅ Hard stop for preflight (must be BEFORE any cors() middleware or routes)
+// ✅ Hard stop for preflight (must be BEFORE any cors() middleware or routes). Never throw.
 app.use((req, res, next) => {
   if (req.method !== 'OPTIONS') return next();
 
@@ -56,15 +48,15 @@ app.use((req, res, next) => {
   const normalize = (u: string) => u.toLowerCase().trim().replace(/\/+$/, '');
 
   const raw = process.env.CORS_ORIGIN || '';
-  const allowed = raw
+  const fromEnv = raw
     .split(',')
     .map(s => s.trim())
     .filter(Boolean)
     .map(normalize);
+  const allowed = fromEnv.length > 0 ? fromEnv : ['https://crowncs.org', 'http://localhost:3000'].map(normalize);
 
   const o = normalize(origin);
 
-  // only echo allowed origins (and keep credentials)
   if (origin && allowed.includes(o)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
@@ -74,7 +66,7 @@ app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
 
   const reqHeaders = (req.headers['access-control-request-headers'] as string | undefined);
-  res.setHeader('Access-Control-Allow-Headers', reqHeaders || 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', reqHeaders || 'Content-Type, Authorization, X-Shop-Id');
 
   return res.status(204).end();
 });

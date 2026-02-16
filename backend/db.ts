@@ -435,11 +435,18 @@ export async function initializeDatabase() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
-    // Branch inventory (qty per branch; products remain global per shop)
+    // Branch inventory (qty per branch); shop_id must match shops.id type to avoid ER_FK_INCOMPATIBLE_COLUMNS
+    const [shopsIdCol] = await pool.execute<RowDataPacket[]>(
+      `SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'shops' AND COLUMN_NAME = 'id'`
+    );
+    const shopIdType = (shopsIdCol?.[0] as any)?.COLUMN_TYPE ?? 'bigint unsigned';
+    console.log('[db] shops.id type (for branch_inventory FK):', shopIdType);
+
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS branch_inventory (
         id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        shop_id BIGINT UNSIGNED NOT NULL,
+        shop_id ${shopIdType.toUpperCase()} NOT NULL,
         branch_id BIGINT UNSIGNED NOT NULL,
         product_id BIGINT UNSIGNED NOT NULL,
         qty INT NOT NULL DEFAULT 0,
@@ -453,6 +460,33 @@ export async function initializeDatabase() {
         INDEX idx_branch_inventory_branch (branch_id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
+
+    // If branch_inventory already existed with wrong shop_id type, fix it (safe migration)
+    try {
+      const [cols] = await pool.execute<RowDataPacket[]>(
+        `SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'branch_inventory' AND COLUMN_NAME = 'shop_id'`
+      );
+      const currentType = (cols?.[0] as any)?.COLUMN_TYPE ?? '';
+      const normalizedShopIdType = String(shopIdType).toLowerCase().replace(/\s+/g, ' ');
+      const normalizedCurrent = String(currentType).toLowerCase().replace(/\s+/g, ' ');
+      if (normalizedCurrent !== normalizedShopIdType) {
+        const [fkRows] = await pool.execute<RowDataPacket[]>(
+          `SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'branch_inventory' AND REFERENCED_TABLE_NAME = 'shops' AND COLUMN_NAME = 'shop_id'`
+        );
+        const fkName = (fkRows?.[0] as any)?.CONSTRAINT_NAME;
+        if (fkName) {
+          await pool.execute(`ALTER TABLE branch_inventory DROP FOREIGN KEY \`${fkName}\``);
+        }
+        await pool.execute(`ALTER TABLE branch_inventory MODIFY COLUMN shop_id ${shopIdType} NOT NULL`);
+        await pool.execute(`ALTER TABLE branch_inventory ADD CONSTRAINT branch_inventory_fk_shop FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE`);
+      }
+    } catch (e: any) {
+      if (e?.code !== 'ER_CANT_DROP_FIELD_OR_KEY' && e?.code !== 'ER_FK_INCOMPATIBLE_COLUMNS' && e?.code !== 'ER_DUP_KEYNAME') {
+        console.warn('[db] branch_inventory shop_id align:', e?.message || e);
+      }
+    }
 
     // Sales/Transactions table
     await pool.execute(`

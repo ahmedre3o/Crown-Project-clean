@@ -6,7 +6,7 @@
 const isProduction = process.env.NODE_ENV === "production";
 if (isProduction && !process.env.NEXT_PUBLIC_API_URL) {
   throw new Error(
-    "NEXT_PUBLIC_API_URL is required for production build (e.g. https://crown-api-av27y5zkga-uc.a.run.app/api)"
+    "NEXT_PUBLIC_API_URL is required for production build (e.g. https://api.crowncs.org/api)"
   );
 }
 export const API_BASE =

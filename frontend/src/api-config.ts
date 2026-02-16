@@ -1,5 +1,8 @@
-// رابط الاتصال بالباك إند اللي شغال على بورت 5001
-export const API_BASE_URL = 'http://localhost:5001/api';
+// Use env at build time; dev fallback only (production must set NEXT_PUBLIC_API_URL)
+export const API_BASE_URL =
+  typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_URL
+    ? process.env.NEXT_PUBLIC_API_URL
+    : "http://localhost:5001/api";
 
 // تعريف الباقات والصلاحيات
 export const PACKAGES = {

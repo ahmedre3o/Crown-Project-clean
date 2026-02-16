@@ -1,8 +1,5 @@
 # Frontend build for crown-web. Single source of truth: GitHub Crown-Project-clean. Branch: master.
 # NEXT_PUBLIC_API_URL injected at build time via build-arg (canonical: https://api.crowncs.org/api)
-substitutions:
-  _NEXT_PUBLIC_API_URL: "https://api.crowncs.org/api"
-steps:
   - name: gcr.io/cloud-builders/docker
     dir: .
     args:
@@ -11,7 +8,7 @@ steps:
       - frontend/Dockerfile.web
       - -t
       - gcr.io/$PROJECT_ID/crown-web
-      - --build-arg=NEXT_PUBLIC_API_URL=$_NEXT_PUBLIC_API_URL
+      - --build-arg=NEXT_PUBLIC_API_URL=https://api.crowncs.org/api
       - .
   - name: gcr.io/cloud-builders/docker
     args: ["push", "gcr.io/$PROJECT_ID/crown-web"]

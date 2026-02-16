@@ -1,12 +1,9 @@
 # Frontend build for crown-web (Artifact Registry). Branch: master.
 # NEXT_PUBLIC_API_URL injected at build time (canonical: https://api.crowncs.org/api)
-substitutions:
-  _NEXT_PUBLIC_API_URL: "https://api.crowncs.org/api"
-steps:
   - name: gcr.io/cloud-builders/docker
     args:
       - build
-      - --build-arg=NEXT_PUBLIC_API_URL=$_NEXT_PUBLIC_API_URL
+      - --build-arg=NEXT_PUBLIC_API_URL=https://api.crowncs.org/api
       - -t
       - $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/crown-web:$COMMIT_SHA
       - .

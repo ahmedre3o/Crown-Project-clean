@@ -135,7 +135,7 @@ app.get('/api/setup-admin', async (_req: Request, res: Response) => {
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const JWT_SECRET = process.env.JWT_SECRET || 'crown-services-secret-key-2026';
-const port = Number(process.env.PORT || 8080);
+const PORT = Number(process.env.PORT || 8080);
 
 // Masked Gemini key log (no full key ever printed)
 if (process.env.NODE_ENV !== 'production') {
@@ -8085,8 +8085,8 @@ app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: 'Not found', code: 'NOT_FOUND' });
 });
 
-const server = app.listen(port, '0.0.0.0', () => {
-  console.log(`Server running on port ${port}`);
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`API running on ${PORT}`);
 });
 
 server.on('error', (error) => {

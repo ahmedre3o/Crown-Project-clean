@@ -40,6 +40,14 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.use((req, _res, next) => {
+  if (req.method === 'OPTIONS') {
+    console.log('[PREFLIGHT]', req.method, req.path, 'origin=', req.headers.origin);
+    console.log('[PREFLIGHT] CORS_ORIGIN env =', process.env.CORS_ORIGIN);
+  }
+  next();
+});
+
 // ✅ Hard stop for preflight (must be BEFORE any cors() middleware or routes)
 app.use((req, res, next) => {
   if (req.method !== 'OPTIONS') return next();
@@ -8131,12 +8139,13 @@ server.on('error', (error) => {
 });
 
 app.use((err: any, _req: Request, res: Response, _next: any) => {
-  // Handle invalid JSON body (Express json parser)
   if (err instanceof SyntaxError && (err as any)?.type === 'entity.parse.failed') {
     return res.status(400).json({ error: 'Invalid JSON body' });
   }
 
   console.error('❌ Unhandled API error:', err?.message || err);
+  console.error('❌ Unhandled API error stack:', err?.stack || '(no stack)');
+
   res.status(500).json({ error: 'Internal server error' });
 });
 

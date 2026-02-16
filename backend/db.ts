@@ -440,7 +440,7 @@ export async function initializeDatabase() {
       `SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS
        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'shops' AND COLUMN_NAME = 'id'`
     );
-    const shopIdType = (shopsIdCol?.[0] as any)?.COLUMN_TYPE ?? 'bigint unsigned';
+    const shopIdType = (shopsIdCol?.[0] as any)?.COLUMN_TYPE ?? 'int';
     console.log('[db] shops.id type (for branch_inventory FK):', shopIdType);
 
     await pool.execute(`

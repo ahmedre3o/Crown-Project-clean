@@ -25,8 +25,9 @@ steps:
       - $_SERVICE_NAME
       - --platform=managed
       - --image=$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
-      - --add-cloudsql-instances=gen-lang-client-0711622878:us-central1:crown-services-last-project-db
+      - --add-cloudsql-instances=$_CLOUDSQL_INSTANCE
       - --env-vars-file=backend/cloudrun.env.yaml
+      - --set-secrets=DB_USER=$_SECRET_DB_USER,DB_PASSWORD=$_SECRET_DB_PASSWORD,JWT_SECRET=$_SECRET_JWT_SECRET,GEMINI_API_KEY=$_SECRET_GEMINI_API_KEY
       - --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID
       - --region=$_DEPLOY_REGION
       - --quiet
@@ -48,6 +49,11 @@ substitutions:
   _AR_REPOSITORY: cloud-run-source-deploy
   _AR_PROJECT_ID: gen-lang-client-0711622878
   _PLATFORM: managed
+  _CLOUDSQL_INSTANCE: gen-lang-client-0711622878:us-central1:crown-services-last-project-db
+  _SECRET_DB_USER: db-user:latest
+  _SECRET_DB_PASSWORD: db-password:latest
+  _SECRET_JWT_SECRET: jwt-secret:latest
+  _SECRET_GEMINI_API_KEY: gemini-api-key:latest
 
 tags:
   - gcp-cloud-build-deploy-cloud-run

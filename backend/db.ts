@@ -344,7 +344,7 @@ export async function initializeDatabase() {
       await pool.execute("UPDATE branches SET name_ar = name, name_en = CASE WHEN name = 'الفرع الرئيسي' THEN 'Main Branch' ELSE name END WHERE name_ar IS NULL OR name_en IS NULL");
     } catch (_) {}
     try {
-      await pool.execute('ALTER TABLE shops ADD COLUMN default_branch_id INT NULL');
+      await pool.execute('ALTER TABLE shops ADD COLUMN default_branch_id BIGINT UNSIGNED NULL');
     } catch (e: any) {
       if (e?.code !== 'ER_DUP_FIELDNAME') throw e;
     }
@@ -359,7 +359,7 @@ export async function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS user_branch_assignments (
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT NOT NULL,
-        branch_id INT NOT NULL,
+        branch_id BIGINT UNSIGNED NOT NULL,
         shop_id INT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -447,7 +447,7 @@ export async function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS branch_inventory (
         id INT NOT NULL AUTO_INCREMENT,
         shop_id INT NOT NULL,
-        branch_id INT NOT NULL,
+        branch_id BIGINT UNSIGNED NOT NULL,
         product_id INT NOT NULL,
         qty INT NOT NULL DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -483,7 +483,7 @@ export async function initializeDatabase() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
     try {
-      await pool.execute('ALTER TABLE sales ADD COLUMN branch_id INT NULL');
+      await pool.execute('ALTER TABLE sales ADD COLUMN branch_id BIGINT UNSIGNED NULL');
     } catch (e: any) {
       if (e?.code !== 'ER_DUP_FIELDNAME') throw e;
     }
@@ -495,7 +495,8 @@ export async function initializeDatabase() {
 
     await pool.execute(`
       ALTER TABLE sales
-      MODIFY COLUMN user_id INT NULL;
+      MODIFY COLUMN user_id BIGINT UNSIGNED NULL;
+
     `);
 
     try {
@@ -704,7 +705,7 @@ export async function initializeDatabase() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
     try {
-      await pool.execute('ALTER TABLE sale_items ADD COLUMN branch_id INT NULL');
+      await pool.execute('ALTER TABLE sale_items ADD COLUMN branch_id BIGINT UNSIGNED NULL');
     } catch (e: any) {
       if (e?.code !== 'ER_DUP_FIELDNAME') throw e;
     }
@@ -924,7 +925,7 @@ export async function initializeDatabase() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
     try {
-      await pool.execute('ALTER TABLE online_orders ADD COLUMN branch_id INT NULL');
+      await pool.execute('ALTER TABLE online_orders ADD COLUMN branch_id BIGINT UNSIGNED NULL');
     } catch (e: any) {
       if (e?.code !== 'ER_DUP_FIELDNAME') throw e;
     }
@@ -948,7 +949,7 @@ export async function initializeDatabase() {
         id INT AUTO_INCREMENT PRIMARY KEY,
         shop_id INT NOT NULL,
         order_id INT NOT NULL,
-        branch_id INT NULL,
+        branch_id BIGINT UNSIGNED NULL,
         method VARCHAR(64) NOT NULL,
         amount DECIMAL(12, 2) NOT NULL,
         reference VARCHAR(255) NULL,
@@ -1085,7 +1086,7 @@ export async function initializeDatabase() {
       if (!String(m?.message || m).includes('Duplicate')) console.error('notifications.idx_shop_source_created:', m?.message || m);
     }
     try {
-      await pool.execute('ALTER TABLE notifications ADD COLUMN branch_id INT NULL');
+      await pool.execute('ALTER TABLE notifications ADD COLUMN branch_id BIGINT UNSIGNED NULL');
     } catch (m: any) {
       if (m?.code !== 'ER_DUP_FIELDNAME') {}
     }
@@ -1113,7 +1114,7 @@ export async function initializeDatabase() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
     try {
-      await pool.execute('ALTER TABLE stock_reservations ADD COLUMN branch_id INT NULL');
+      await pool.execute('ALTER TABLE stock_reservations ADD COLUMN branch_id BIGINT UNSIGNED NULL');
     } catch (e: any) {
       if (e?.code !== 'ER_DUP_FIELDNAME') throw e;
     }

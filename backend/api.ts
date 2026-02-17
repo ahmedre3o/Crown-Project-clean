@@ -1,4 +1,4 @@
-import express, { Request, Response, NextFunction } from 'express';
+﻿import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -40,7 +40,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ✅ Hard stop for preflight (must be BEFORE any cors() middleware or routes). Never throw.
+// âœ… Hard stop for preflight (must be BEFORE any cors() middleware or routes). Never throw.
 app.use((req, res, next) => {
   if (req.method !== 'OPTIONS') return next();
 
@@ -113,7 +113,7 @@ app.get('/api/plans', (req: Request, res: Response) => {
     ...p,
     pricingForLang: p.pricing[lang],
     currency: lang === 'ar' ? 'EGP' : 'USD',
-    currencySymbol: lang === 'ar' ? 'ج.م' : '$',
+    currencySymbol: lang === 'ar' ? 'Ø¬.Ù…' : '$',
   }));
   res.json(plans);
 });
@@ -187,7 +187,7 @@ const genAI = (() => {
     // Use stable (v1) endpoints to avoid v1beta model issues.
     return new GoogleGenAI({ apiKey: GEMINI_API_KEY, apiVersion: 'v1' });
   } catch (error) {
-    console.error('❌ Gemini SDK init error:', error);
+    console.error('âŒ Gemini SDK init error:', error);
     return null;
   }
 })();
@@ -207,7 +207,7 @@ const ensureSuperAdmin = async () => {
     connection = await pool.getConnection();
     await connection.beginTransaction();
 
-    // اعتمد على الأعمدة الحالية في جدول users بدون فرض وجود password_hash / is_admin / is_super_admin
+    // Ø§Ø¹ØªÙ…Ø¯ Ø¹Ù„Ù‰ Ø§Ù„Ø£Ø¹Ù…Ø¯Ø© Ø§Ù„Ø­Ø§Ù„ÙŠØ© ÙÙŠ Ø¬Ø¯ÙˆÙ„ users Ø¨Ø¯ÙˆÙ† ÙØ±Ø¶ ÙˆØ¬ÙˆØ¯ password_hash / is_admin / is_super_admin
     const [userRows] = await connection.execute(
       'SELECT id, password FROM users WHERE email = ? OR username = ?',
       [SUPER_ADMIN_EMAIL, SUPER_ADMIN_EMAIL]
@@ -221,7 +221,7 @@ const ensureSuperAdmin = async () => {
          VALUES (?, ?, ?, 'super_admin', NOW())`,
         [SUPER_ADMIN_EMAIL, SUPER_ADMIN_EMAIL, hashed]
       );
-      console.log('✅ SUPER ADMIN READY (created)');
+      console.log('âœ… SUPER ADMIN READY (created)');
     } else {
       const forceReset = process.env.FORCE_SUPER_ADMIN_RESET === 'true';
       if (forceReset) {
@@ -233,13 +233,13 @@ const ensureSuperAdmin = async () => {
       } else {
         await connection.execute('UPDATE users SET role = ? WHERE id = ?', ['super_admin', existing.id]);
       }
-      console.log('✅ SUPER ADMIN READY (updated)');
+      console.log('âœ… SUPER ADMIN READY (updated)');
     }
 
     await connection.commit();
   } catch (error) {
     if (connection) await connection.rollback().catch(() => {});
-    console.error('❌ Failed to ensure super admin:', (error as any).message);
+    console.error('âŒ Failed to ensure super admin:', (error as any).message);
   } finally {
     if (connection) connection.release();
   }
@@ -252,7 +252,7 @@ testConnection().then(async () => {
     try {
       await pool.execute('ALTER TABLE shops MODIFY COLUMN logo_url LONGTEXT');
     } catch (migrationError) {
-      console.error('❌ logo_url migration error:', (migrationError as any)?.message || migrationError);
+      console.error('âŒ logo_url migration error:', (migrationError as any)?.message || migrationError);
     }
     await ensureSuperAdmin();
   } catch (error) {
@@ -320,11 +320,26 @@ function mustOne(v: unknown, fallback = ''): string {
 const resolveShopId = (req: any) => {
   const headerShop = req.headers['x-shop-id'];
   const headerShopId = Array.isArray(headerShop) ? headerShop[0] : headerShop;
-  const headerParsed = headerShopId ? Number(headerShopId) : null;
+  const headerParsed = headerShopId ? Number(headerShopId) : NaN;
+
+  const q = req.query?.shopId ?? req.query?.shop_id;
+  const b = req.body?.shopId ?? req.body?.shop_id;
+
+  const queryParsed = q != null && q !== '' ? Number(q) : NaN;
+  const bodyParsed = b != null && b !== '' ? Number(b) : NaN;
+
+  const explicit =
+    (Number.isFinite(queryParsed) && queryParsed > 0 ? queryParsed : null) ??
+    (Number.isFinite(bodyParsed) && bodyParsed > 0 ? bodyParsed : null) ??
+    (Number.isFinite(headerParsed) && headerParsed > 0 ? headerParsed : null);
+
+  const fromUser = req.user?.shop_id ?? req.user?.shopId ?? null;
+
   if (req.user?.role === 'super_admin') {
-    return req.query.shopId || req.body?.shopId || headerParsed || null;
+    return explicit ?? fromUser ?? null;
   }
-  return req.user?.shop_id || req.user?.shopId || headerParsed || null;
+
+  return fromUser ?? explicit ?? null;
 };
 
 /** Resolve active branch: x-branch-id header or body.branchId. Returns null if not sent; caller may use shop default. */
@@ -611,7 +626,7 @@ app.post('/api/products/bulk-delete', authenticateToken, requireRole('super_admi
       : [];
 
     if (!ids.length) {
-      return res.status(400).json({ ok: false, error: 'لم يتم تحديد أي صنف' });
+      return res.status(400).json({ ok: false, error: 'Ù„Ù… ÙŠØªÙ… ØªØ­Ø¯ÙŠØ¯ Ø£ÙŠ ØµÙ†Ù' });
     }
 
     const shopId = req.user?.shopId ?? req.user?.shop_id ?? resolveShopId(req);
@@ -627,7 +642,7 @@ app.post('/api/products/bulk-delete', authenticateToken, requireRole('super_admi
     );
     const ownedCount = (ownershipRows as any[])[0]?.c ?? 0;
     if (ownedCount < ids.length) {
-      return res.status(403).json({ ok: false, error: 'بعض المنتجات المحددة لا تنتمي للمتجر الحالي' });
+      return res.status(403).json({ ok: false, error: 'Ø¨Ø¹Ø¶ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª Ø§Ù„Ù…Ø­Ø¯Ø¯Ø© Ù„Ø§ ØªÙ†ØªÙ…ÙŠ Ù„Ù„Ù…ØªØ¬Ø± Ø§Ù„Ø­Ø§Ù„ÙŠ' });
     }
 
     const [result] = await pool.execute(
@@ -672,7 +687,7 @@ app.get('/api/models', authenticateToken, requireRole('super_admin'), async (req
 
     res.json({ count: models.length, models });
   } catch (error: any) {
-    console.error('❌ /api/models error:', { name: error?.name, status: error?.status, message: error?.message });
+    console.error('âŒ /api/models error:', { name: error?.name, status: error?.status, message: error?.message });
     res.status(500).json({ error: 'Failed to list models' });
   }
 });
@@ -874,7 +889,7 @@ const getTtsLocaleForLang = (lang: 'ar' | 'en') => {
   return lang === 'ar' ? 'ar-EG' : 'en-US';
 };
 
-/** Strip Markdown from assistant reply so users never see ** or ### etc.; also remove bullets that cause "نجوم" in TTS. */
+/** Strip Markdown from assistant reply so users never see ** or ### etc.; also remove bullets that cause "Ù†Ø¬ÙˆÙ…" in TTS. */
 function sanitizeReply(text: string): string {
   if (!text || typeof text !== 'string') return '';
   let s = text
@@ -886,7 +901,7 @@ function sanitizeReply(text: string): string {
     .replace(/^>\s?/gm, '')
     .replace(/```/g, '')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/[•]/g, '-')
+    .replace(/[â€¢]/g, '-')
     .replace(/\s+/g, ' ')
     .trim();
   return s;
@@ -915,18 +930,18 @@ const fieldMatchers: Record<string, string[]> = {
     'Part_Name',
     'description',
     'item name',
-    'اسم المنتج',
-    'المنتج',
-    'اسم',
-    'اسم الصنف',
-    'الوصف',
+    'Ø§Ø³Ù… Ø§Ù„Ù…Ù†ØªØ¬',
+    'Ø§Ù„Ù…Ù†ØªØ¬',
+    'Ø§Ø³Ù…',
+    'Ø§Ø³Ù… Ø§Ù„ØµÙ†Ù',
+    'Ø§Ù„ÙˆØµÙ',
   ],
-  nameAr: ['name_ar', 'name ar', 'arabic', 'arabicname', 'اسم عربي', 'اسم'],
-  brand: ['brand', 'Brand', 'manufacturer', 'company', 'mark', 'الماركة', 'العلامة'],
-  sku: ['sku', 'itemcode', 'code', 'partnumber', 'part', 'reference', 'ref', 'رقم الصنف'],
-  barcode: ['barcode', 'bar code', 'ean', 'upc', 'gtin', 'باركود', 'qr code', 'qr_code', 'qrcode', 'QR_Code'],
+  nameAr: ['name_ar', 'name ar', 'arabic', 'arabicname', 'Ø§Ø³Ù… Ø¹Ø±Ø¨ÙŠ', 'Ø§Ø³Ù…'],
+  brand: ['brand', 'Brand', 'manufacturer', 'company', 'mark', 'Ø§Ù„Ù…Ø§Ø±ÙƒØ©', 'Ø§Ù„Ø¹Ù„Ø§Ù…Ø©'],
+  sku: ['sku', 'itemcode', 'code', 'partnumber', 'part', 'reference', 'ref', 'Ø±Ù‚Ù… Ø§Ù„ØµÙ†Ù'],
+  barcode: ['barcode', 'bar code', 'ean', 'upc', 'gtin', 'Ø¨Ø§Ø±ÙƒÙˆØ¯', 'qr code', 'qr_code', 'qrcode', 'QR_Code'],
   qrCode: ['qr', 'qrcode', 'qr code'],
-  category: ['category', 'group', 'type', 'قسم', 'الفئة', 'تصنيف'],
+  category: ['category', 'group', 'type', 'Ù‚Ø³Ù…', 'Ø§Ù„ÙØ¦Ø©', 'ØªØµÙ†ÙŠÙ'],
   buyPrice: [
     'buy',
     'buy price',
@@ -937,10 +952,10 @@ const fieldMatchers: Record<string, string[]> = {
     'purchase',
     'purchaseprice',
     'costprice',
-    'سعر الشراء',
-    'شراء',
-    'تكلفة',
-    'سعر التكلفة',
+    'Ø³Ø¹Ø± Ø§Ù„Ø´Ø±Ø§Ø¡',
+    'Ø´Ø±Ø§Ø¡',
+    'ØªÙƒÙ„ÙØ©',
+    'Ø³Ø¹Ø± Ø§Ù„ØªÙƒÙ„ÙØ©',
   ],
   sellPrice: [
     'sell',
@@ -950,13 +965,13 @@ const fieldMatchers: Record<string, string[]> = {
     'selling price',
     'price',
     'unitprice',
-    'سعر البيع',
-    'بيع',
-    'السعر',
-    'سعر',
+    'Ø³Ø¹Ø± Ø§Ù„Ø¨ÙŠØ¹',
+    'Ø¨ÙŠØ¹',
+    'Ø§Ù„Ø³Ø¹Ø±',
+    'Ø³Ø¹Ø±',
   ],
-  stockQuantity: ['qty', 'quantity', 'stock', 'Stock', 'available', 'onhand', 'كمية', 'المخزون'],
-  minStockLevel: ['min', 'minimum', 'reorder', 'minstock', 'min stock', 'حد ادنى', 'حد أدنى'],
+  stockQuantity: ['qty', 'quantity', 'stock', 'Stock', 'available', 'onhand', 'ÙƒÙ…ÙŠØ©', 'Ø§Ù„Ù…Ø®Ø²ÙˆÙ†'],
+  minStockLevel: ['min', 'minimum', 'reorder', 'minstock', 'min stock', 'Ø­Ø¯ Ø§Ø¯Ù†Ù‰', 'Ø­Ø¯ Ø£Ø¯Ù†Ù‰'],
   imageUrl: ['image url', 'image_url', 'imageurl', 'img', 'photo', 'picture', 'Image_URL'],
 };
 
@@ -977,8 +992,8 @@ const buildProductImportMappingGuide = (headers: string[], columnMap: Record<str
     detectedHeaders: headers,
     currentMapping: columnMap,
     optionalFields: [
-      { field: 'name', note: 'Product name (empty → draft name).', acceptedHeaders: fieldMatchers.name },
-      { field: 'sellPrice', note: 'Sell price (empty → 0, row saved as draft).', acceptedHeaders: [...fieldMatchers.sellPrice, ...fieldMatchers.buyPrice] },
+      { field: 'name', note: 'Product name (empty â†’ draft name).', acceptedHeaders: fieldMatchers.name },
+      { field: 'sellPrice', note: 'Sell price (empty â†’ 0, row saved as draft).', acceptedHeaders: [...fieldMatchers.sellPrice, ...fieldMatchers.buyPrice] },
     ],
     suggestedHeaders: {
       name: fieldMatchers.name,
@@ -998,7 +1013,7 @@ const buildProductImportMappingGuide = (headers: string[], columnMap: Record<str
   };
 };
 
-// --- Power Query–style import: canonical keys + auto-mapping (no user mapping UI) ---
+// --- Power Queryâ€“style import: canonical keys + auto-mapping (no user mapping UI) ---
 const PRODUCT_IMPORT_CANONICAL_KEYS = [
   'partName',
   'nameAr',
@@ -1016,18 +1031,18 @@ const PRODUCT_IMPORT_CANONICAL_KEYS = [
 type CanonicalKey = (typeof PRODUCT_IMPORT_CANONICAL_KEYS)[number];
 
 const PRODUCT_IMPORT_ALIASES: Record<CanonicalKey, string[]> = {
-  partName: ['part_name', 'part name', 'product name', 'name', 'productname', 'item', 'title', 'description', 'اسم المنتج', 'اسم', 'الوصف'],
-  nameAr: ['name_ar', 'name ar', 'arabic name', 'namear', 'اسم عربي', 'الاسم'],
-  brand: ['brand', 'brand_name', 'manufacturer', 'company', 'mark', 'الماركة', 'الشركة', 'العلامة'],
-  category: ['category', 'group', 'type', 'قسم', 'الفئة', 'تصنيف'],
-  sellPrice: ['sellprice', 'sell_price', 'price', 'sale', 'سعر البيع', 'بيع', 'السعر', 'سعر'],
-  buyPrice: ['buyprice', 'buy_price', 'cost', 'purchase', 'سعر الشراء', 'شراء', 'تكلفة'],
-  stockQty: ['stock', 'stockqty', 'stock_qty', 'quantity', 'qty', 'الكمية', 'المخزون'],
-  sku: ['sku', 'sku_code', 'code', 'partnumber', 'رقم الصنف'],
-  barcode: ['barcode', 'bar_code', 'ean', 'upc', 'باركود'],
+  partName: ['part_name', 'part name', 'product name', 'name', 'productname', 'item', 'title', 'description', 'Ø§Ø³Ù… Ø§Ù„Ù…Ù†ØªØ¬', 'Ø§Ø³Ù…', 'Ø§Ù„ÙˆØµÙ'],
+  nameAr: ['name_ar', 'name ar', 'arabic name', 'namear', 'Ø§Ø³Ù… Ø¹Ø±Ø¨ÙŠ', 'Ø§Ù„Ø§Ø³Ù…'],
+  brand: ['brand', 'brand_name', 'manufacturer', 'company', 'mark', 'Ø§Ù„Ù…Ø§Ø±ÙƒØ©', 'Ø§Ù„Ø´Ø±ÙƒØ©', 'Ø§Ù„Ø¹Ù„Ø§Ù…Ø©'],
+  category: ['category', 'group', 'type', 'Ù‚Ø³Ù…', 'Ø§Ù„ÙØ¦Ø©', 'ØªØµÙ†ÙŠÙ'],
+  sellPrice: ['sellprice', 'sell_price', 'price', 'sale', 'Ø³Ø¹Ø± Ø§Ù„Ø¨ÙŠØ¹', 'Ø¨ÙŠØ¹', 'Ø§Ù„Ø³Ø¹Ø±', 'Ø³Ø¹Ø±'],
+  buyPrice: ['buyprice', 'buy_price', 'cost', 'purchase', 'Ø³Ø¹Ø± Ø§Ù„Ø´Ø±Ø§Ø¡', 'Ø´Ø±Ø§Ø¡', 'ØªÙƒÙ„ÙØ©'],
+  stockQty: ['stock', 'stockqty', 'stock_qty', 'quantity', 'qty', 'Ø§Ù„ÙƒÙ…ÙŠØ©', 'Ø§Ù„Ù…Ø®Ø²ÙˆÙ†'],
+  sku: ['sku', 'sku_code', 'code', 'partnumber', 'Ø±Ù‚Ù… Ø§Ù„ØµÙ†Ù'],
+  barcode: ['barcode', 'bar_code', 'ean', 'upc', 'Ø¨Ø§Ø±ÙƒÙˆØ¯'],
   qrCode: ['qr_code', 'qrcode', 'qr code'],
   imageUrl: ['image_url', 'imageurl', 'image url', 'image', 'photo', 'picture', 'url'],
-  minStockLevel: ['minstock', 'min_stock', 'minimum', 'حد ادنى', 'حد أدنى'],
+  minStockLevel: ['minstock', 'min_stock', 'minimum', 'Ø­Ø¯ Ø§Ø¯Ù†Ù‰', 'Ø­Ø¯ Ø£Ø¯Ù†Ù‰'],
 };
 
 function normalizeHeaderForImport(value: string): string {
@@ -1246,12 +1261,12 @@ async function parseExcelOrCsv(buffer: Buffer, filename: string, opts?: { sheetI
 }
 
 const AR_ERRORS: Record<string, string> = {
-  name_required: 'الاسم مطلوب',
-  sell_price_invalid: 'سعر البيع غير صالح',
-  buy_price_invalid: 'سعر الشراء غير صالح',
-  stock_invalid: 'الكمية غير صالحة',
-  sku_duplicate: 'SKU مكرر',
-  barcode_duplicate: 'الباركود مكرر',
+  name_required: 'Ø§Ù„Ø§Ø³Ù… Ù…Ø·Ù„ÙˆØ¨',
+  sell_price_invalid: 'Ø³Ø¹Ø± Ø§Ù„Ø¨ÙŠØ¹ ØºÙŠØ± ØµØ§Ù„Ø­',
+  buy_price_invalid: 'Ø³Ø¹Ø± Ø§Ù„Ø´Ø±Ø§Ø¡ ØºÙŠØ± ØµØ§Ù„Ø­',
+  stock_invalid: 'Ø§Ù„ÙƒÙ…ÙŠØ© ØºÙŠØ± ØµØ§Ù„Ø­Ø©',
+  sku_duplicate: 'SKU Ù…ÙƒØ±Ø±',
+  barcode_duplicate: 'Ø§Ù„Ø¨Ø§Ø±ÙƒÙˆØ¯ Ù…ÙƒØ±Ø±',
 };
 
 function validateCanonicalRow(
@@ -1263,26 +1278,26 @@ function validateCanonicalRow(
   const errs: string[] = [];
   const partName = (canonical.partName ?? '').trim();
   const nameAr = (canonical.nameAr ?? '').trim();
-  if (!partName && !nameAr) errs.push(`الصنف رقم ${rowIndex + 1}: ${AR_ERRORS.name_required}`);
+  if (!partName && !nameAr) errs.push(`Ø§Ù„ØµÙ†Ù Ø±Ù‚Ù… ${rowIndex + 1}: ${AR_ERRORS.name_required}`);
   const sellRaw = (canonical.sellPrice ?? '').trim();
   const buyRaw = (canonical.buyPrice ?? '').trim();
   if (sellRaw) {
     const n = normalizeNumber(sellRaw);
-    if (n === null || n < 0) errs.push(`الصنف رقم ${rowIndex + 1}: ${AR_ERRORS.sell_price_invalid}`);
+    if (n === null || n < 0) errs.push(`Ø§Ù„ØµÙ†Ù Ø±Ù‚Ù… ${rowIndex + 1}: ${AR_ERRORS.sell_price_invalid}`);
   }
   if (buyRaw) {
     const n = normalizeNumber(buyRaw);
-    if (n === null || n < 0) errs.push(`الصنف رقم ${rowIndex + 1}: ${AR_ERRORS.buy_price_invalid}`);
+    if (n === null || n < 0) errs.push(`Ø§Ù„ØµÙ†Ù Ø±Ù‚Ù… ${rowIndex + 1}: ${AR_ERRORS.buy_price_invalid}`);
   }
   const sq = (canonical.stockQty ?? '').trim();
   if (sq) {
     const n = normalizeNumber(sq);
-    if (n === null || Math.floor(Number(n)) < 0) errs.push(`الصنف رقم ${rowIndex + 1}: ${AR_ERRORS.stock_invalid}`);
+    if (n === null || Math.floor(Number(n)) < 0) errs.push(`Ø§Ù„ØµÙ†Ù Ø±Ù‚Ù… ${rowIndex + 1}: ${AR_ERRORS.stock_invalid}`);
   }
   const sku = (canonical.sku ?? '').trim();
-  if (sku && skuSet.has(normalizeText(sku))) errs.push(`الصنف رقم ${rowIndex + 1}: ${AR_ERRORS.sku_duplicate}`);
+  if (sku && skuSet.has(normalizeText(sku))) errs.push(`Ø§Ù„ØµÙ†Ù Ø±Ù‚Ù… ${rowIndex + 1}: ${AR_ERRORS.sku_duplicate}`);
   const barcode = (canonical.barcode ?? '').trim() || (canonical.qrCode ?? '').trim();
-  if (barcode && barcodeSet.has(normalizeText(barcode))) errs.push(`الصنف رقم ${rowIndex + 1}: ${AR_ERRORS.barcode_duplicate}`);
+  if (barcode && barcodeSet.has(normalizeText(barcode))) errs.push(`Ø§Ù„ØµÙ†Ù Ø±Ù‚Ù… ${rowIndex + 1}: ${AR_ERRORS.barcode_duplicate}`);
   return errs;
 }
 
@@ -1460,7 +1475,7 @@ const enforcePlanLimits = async (shopId: number, requestedRole: string) => {
   const additionalUsersCount = Number((counts as any[])[0]?.total || 0);
   if (additionalUsersCount >= additionalLimit) {
     const err = new Error('PLAN_USER_LIMIT_REACHED') as any;
-    err.message_ar = 'لقد وصلت للحد الأقصى لعدد المستخدمين في باقتك. قم بالترقية أو احذف مستخدمًا.';
+    err.message_ar = 'Ù„Ù‚Ø¯ ÙˆØµÙ„Øª Ù„Ù„Ø­Ø¯ Ø§Ù„Ø£Ù‚ØµÙ‰ Ù„Ø¹Ø¯Ø¯ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ† ÙÙŠ Ø¨Ø§Ù‚ØªÙƒ. Ù‚Ù… Ø¨Ø§Ù„ØªØ±Ù‚ÙŠØ© Ø£Ùˆ Ø§Ø­Ø°Ù Ù…Ø³ØªØ®Ø¯Ù…Ù‹Ø§.';
     err.message_en = "You have reached your plan's user limit. Upgrade your plan or remove a user.";
     throw err;
   }
@@ -1611,10 +1626,10 @@ const createSaleAndItems = async (req: any, paymentMethodOverride?: string) => {
     );
 
     const itemsCount = items.length;
-    const titleAr = 'عملية بيع جديدة (POS)';
+    const titleAr = 'Ø¹Ù…Ù„ÙŠØ© Ø¨ÙŠØ¹ Ø¬Ø¯ÙŠØ¯Ø© (POS)';
     const titleEn = 'New POS sale';
-    const bodyAr = `فاتورة جديدة بقيمة ${totalAmount.toFixed(2)} — ${itemsCount} منتج`;
-    const bodyEn = `New sale. Total: ${totalAmount.toFixed(2)} EGP — ${itemsCount} items`;
+    const bodyAr = `ÙØ§ØªÙˆØ±Ø© Ø¬Ø¯ÙŠØ¯Ø© Ø¨Ù‚ÙŠÙ…Ø© ${totalAmount.toFixed(2)} â€” ${itemsCount} Ù…Ù†ØªØ¬`;
+    const bodyEn = `New sale. Total: ${totalAmount.toFixed(2)} EGP â€” ${itemsCount} items`;
     await connection.execute(
       `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
        VALUES (?, 'pos', 'pos_sale_created', ?, ?, ?, ?, 0, ?)`,
@@ -1738,7 +1753,7 @@ async function findUserByIdentifier(identifier: string, resolvedShopId: number |
   return rows.length > 0 ? rows[0] : null;
 }
 
-const SUPER_ADMIN_EMAIL_ONLY_AR = 'حساب مدير النظام يجب تسجيل الدخول بالبريد الإلكتروني.';
+const SUPER_ADMIN_EMAIL_ONLY_AR = 'Ø­Ø³Ø§Ø¨ Ù…Ø¯ÙŠØ± Ø§Ù„Ù†Ø¸Ø§Ù… ÙŠØ¬Ø¨ ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„ Ø¨Ø§Ù„Ø¨Ø±ÙŠØ¯ Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ.';
 const SUPER_ADMIN_EMAIL_ONLY_EN = 'Super admin must sign in using email.';
 
 let userColumnSet: Set<string> | null = null;
@@ -1783,7 +1798,7 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
   if (!identifier.includes('@') && !hasValidShopId) {
     return res.status(400).json({
       error: 'SHOP_ID_REQUIRED',
-      message_ar: 'معرف المتجر مطلوب عند تسجيل الدخول برقم الموظف أو اسم المستخدم.',
+      message_ar: 'Ù…Ø¹Ø±Ù Ø§Ù„Ù…ØªØ¬Ø± Ù…Ø·Ù„ÙˆØ¨ Ø¹Ù†Ø¯ ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„ Ø¨Ø±Ù‚Ù… Ø§Ù„Ù…ÙˆØ¸Ù Ø£Ùˆ Ø§Ø³Ù… Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù….',
       message_en: 'Shop ID is required when logging in with employee ID or username.',
     });
   }
@@ -1799,7 +1814,7 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
   if (!user) {
     return res.status(404).json({
       error: 'USER_NOT_FOUND',
-      message_ar: 'الحساب غير موجود. اطلب من مديرك إنشاء حساب لك.',
+      message_ar: 'Ø§Ù„Ø­Ø³Ø§Ø¨ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯. Ø§Ø·Ù„Ø¨ Ù…Ù† Ù…Ø¯ÙŠØ±Ùƒ Ø¥Ù†Ø´Ø§Ø¡ Ø­Ø³Ø§Ø¨ Ù„Ùƒ.',
       message_en: 'User not found. Ask your manager to create an account for you.',
     });
   }
@@ -1994,9 +2009,9 @@ app.post('/api/auth/accept-invite', async (req: Request, res: Response) => {
       [sid, code]
     );
     const inv = (invRows as any[])[0];
-    if (!inv) return res.status(404).json({ error: 'INVITE_NOT_FOUND', message_ar: 'الدعوة غير موجودة أو غير صالحة.', message_en: 'Invite not found or invalid.' });
-    if (inv.used_at != null) return res.status(400).json({ error: 'INVITE_ALREADY_USED', message_ar: 'تم استخدام هذه الدعوة مسبقاً.', message_en: 'This invite has already been used.' });
-    if (new Date(inv.expires_at) < new Date()) return res.status(400).json({ error: 'INVITE_EXPIRED', message_ar: 'انتهت صلاحية الدعوة.', message_en: 'Invite has expired.' });
+    if (!inv) return res.status(404).json({ error: 'INVITE_NOT_FOUND', message_ar: 'Ø§Ù„Ø¯Ø¹ÙˆØ© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø© Ø£Ùˆ ØºÙŠØ± ØµØ§Ù„Ø­Ø©.', message_en: 'Invite not found or invalid.' });
+    if (inv.used_at != null) return res.status(400).json({ error: 'INVITE_ALREADY_USED', message_ar: 'ØªÙ… Ø§Ø³ØªØ®Ø¯Ø§Ù… Ù‡Ø°Ù‡ Ø§Ù„Ø¯Ø¹ÙˆØ© Ù…Ø³Ø¨Ù‚Ø§Ù‹.', message_en: 'This invite has already been used.' });
+    if (new Date(inv.expires_at) < new Date()) return res.status(400).json({ error: 'INVITE_EXPIRED', message_ar: 'Ø§Ù†ØªÙ‡Øª ØµÙ„Ø§Ø­ÙŠØ© Ø§Ù„Ø¯Ø¹ÙˆØ©.', message_en: 'Invite has expired.' });
 
     const [shopRows] = await pool.execute('SELECT package FROM shops WHERE id = ?', [sid]);
     const shopPkg = (shopRows as any[])[0]?.package || 'bronze';
@@ -2030,16 +2045,16 @@ app.post('/api/auth/accept-invite', async (req: Request, res: Response) => {
 
     const [existingByEmail] = email ? await pool.execute('SELECT id FROM users WHERE LOWER(email) = LOWER(?)', [email]) : [[]];
     if (email && (existingByEmail as any[]).length > 0) {
-      return res.status(400).json({ error: 'USER_EXISTS', message_ar: 'يوجد حساب بهذا البريد مسبقاً.', message_en: 'An account with this email already exists.' });
+      return res.status(400).json({ error: 'USER_EXISTS', message_ar: 'ÙŠÙˆØ¬Ø¯ Ø­Ø³Ø§Ø¨ Ø¨Ù‡Ø°Ø§ Ø§Ù„Ø¨Ø±ÙŠØ¯ Ù…Ø³Ø¨Ù‚Ø§Ù‹.', message_en: 'An account with this email already exists.' });
     }
     const [existingByUsername] = await pool.execute('SELECT id FROM users WHERE username = ? AND shop_id = ?', [username, sid]);
     if ((existingByUsername as any[]).length > 0) {
-      return res.status(400).json({ error: 'USER_EXISTS', message_ar: 'يوجد حساب بهذا الاسم في المتجر.', message_en: 'An account with this username already exists in this shop.' });
+      return res.status(400).json({ error: 'USER_EXISTS', message_ar: 'ÙŠÙˆØ¬Ø¯ Ø­Ø³Ø§Ø¨ Ø¨Ù‡Ø°Ø§ Ø§Ù„Ø§Ø³Ù… ÙÙŠ Ø§Ù„Ù…ØªØ¬Ø±.', message_en: 'An account with this username already exists in this shop.' });
     }
     if (employee_id) {
       const [existingByEmp] = await pool.execute('SELECT id FROM users WHERE employee_id = ? AND shop_id = ?', [employee_id, sid]);
       if ((existingByEmp as any[]).length > 0) {
-        return res.status(400).json({ error: 'USER_EXISTS', message_ar: 'يوجد حساب برقم هذا الموظف في المتجر.', message_en: 'An account with this employee ID already exists in this shop.' });
+        return res.status(400).json({ error: 'USER_EXISTS', message_ar: 'ÙŠÙˆØ¬Ø¯ Ø­Ø³Ø§Ø¨ Ø¨Ø±Ù‚Ù… Ù‡Ø°Ø§ Ø§Ù„Ù…ÙˆØ¸Ù ÙÙŠ Ø§Ù„Ù…ØªØ¬Ø±.', message_en: 'An account with this employee ID already exists in this shop.' });
       }
     }
 
@@ -2134,7 +2149,7 @@ app.post('/api/auth/register-shop', async (req: Request, res: Response) => {
 
       const [branchResult] = await connection.execute(
         'INSERT INTO branches (shop_id, name, name_ar, name_en, code) VALUES (?, ?, ?, ?, ?)',
-        [shopId, 'الفرع الرئيسي', 'الفرع الرئيسي', 'Main Branch', 'main']
+        [shopId, 'Ø§Ù„ÙØ±Ø¹ Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠ', 'Ø§Ù„ÙØ±Ø¹ Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠ', 'Main Branch', 'main']
       );
       const branchId = (branchResult as any).insertId;
       await connection.execute('UPDATE shops SET default_branch_id = ? WHERE id = ?', [branchId, shopId]);
@@ -2284,7 +2299,7 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
         error: 'AI_UNAVAILABLE',
         reason: 'AI_DISABLED',
         message_en: 'AI cloud unavailable, using local help.',
-        message_ar: 'المساعد السحابي غير متاح حالياً، سيتم استخدام المساعدة المحلية.',
+        message_ar: 'Ø§Ù„Ù…Ø³Ø§Ø¹Ø¯ Ø§Ù„Ø³Ø­Ø§Ø¨ÙŠ ØºÙŠØ± Ù…ØªØ§Ø­ Ø­Ø§Ù„ÙŠØ§Ù‹ØŒ Ø³ÙŠØªÙ… Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø§Ù„Ù…Ø³Ø§Ø¹Ø¯Ø© Ø§Ù„Ù…Ø­Ù„ÙŠØ©.',
         answer,
         lang: detectedLang,
         ttsLang,
@@ -2296,7 +2311,7 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
     }
     lang = bodyLang === 'ar' || bodyLang === 'en' ? bodyLang : detectUserLanguage(message);
     const ttsLang = getTtsLocaleForLang(lang);
-    console.log('📩 Chat message:', { lang, preview: String(message).slice(0, 120) });
+    console.log('ðŸ“© Chat message:', { lang, preview: String(message).slice(0, 120) });
 
     const resolvedShopId =
       resolveShopId(req) || (req as any).user?.shop_id || (req as any).user?.shopId || 1;
@@ -2396,8 +2411,8 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
     const inventoryContextAr = (inventoryRows as any[])
       .map((item) => {
         const name = item.name_ar || item.name_en;
-        const brand = item.brand ? `, ماركة ${item.brand}` : '';
-        return `- ${name}: ${item.stock_quantity} في المخزن، السعر ${item.sell_price} جنيه${brand}`;
+        const brand = item.brand ? `, Ù…Ø§Ø±ÙƒØ© ${item.brand}` : '';
+        return `- ${name}: ${item.stock_quantity} ÙÙŠ Ø§Ù„Ù…Ø®Ø²Ù†ØŒ Ø§Ù„Ø³Ø¹Ø± ${item.sell_price} Ø¬Ù†ÙŠÙ‡${brand}`;
       })
       .join('\n');
 
@@ -2424,7 +2439,7 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
 
     const msg = String(message).trim().toLowerCase();
     const numericIntentAr =
-      /مبيعات النهارده|مبيعات اليوم|كام النهارده|عدد العمليات|طلبات مؤكدة|أوردرات|مبيعات امبارح|إيه وضع النهارده|كام بعتنا النهارده|فواتير النهارده/i.test(
+      /Ù…Ø¨ÙŠØ¹Ø§Øª Ø§Ù„Ù†Ù‡Ø§Ø±Ø¯Ù‡|Ù…Ø¨ÙŠØ¹Ø§Øª Ø§Ù„ÙŠÙˆÙ…|ÙƒØ§Ù… Ø§Ù„Ù†Ù‡Ø§Ø±Ø¯Ù‡|Ø¹Ø¯Ø¯ Ø§Ù„Ø¹Ù…Ù„ÙŠØ§Øª|Ø·Ù„Ø¨Ø§Øª Ù…Ø¤ÙƒØ¯Ø©|Ø£ÙˆØ±Ø¯Ø±Ø§Øª|Ù…Ø¨ÙŠØ¹Ø§Øª Ø§Ù…Ø¨Ø§Ø±Ø­|Ø¥ÙŠÙ‡ ÙˆØ¶Ø¹ Ø§Ù„Ù†Ù‡Ø§Ø±Ø¯Ù‡|ÙƒØ§Ù… Ø¨Ø¹ØªÙ†Ø§ Ø§Ù„Ù†Ù‡Ø§Ø±Ø¯Ù‡|ÙÙˆØ§ØªÙŠØ± Ø§Ù„Ù†Ù‡Ø§Ø±Ø¯Ù‡/i.test(
         message
       );
     const numericIntentEn = /today'?s? sales|sales today|how much today|operations count|confirmed orders|invoices today/i.test(msg);
@@ -2433,7 +2448,7 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
     if (isNumericIntent) {
       const quickAr =
         lang === 'ar'
-          ? `مبيعات النهارده: ${totalTodayAmount} ج.م (${todaySales} فاتورة POS + ${todayOnlineCount} طلبات أونلاين مؤكدة).\n${totalTodayAmount === 0 ? 'مفيش عمليات لحد دلوقتي.' : 'عايز تفصيل POS ولا أونلاين؟'}`
+          ? `Ù…Ø¨ÙŠØ¹Ø§Øª Ø§Ù„Ù†Ù‡Ø§Ø±Ø¯Ù‡: ${totalTodayAmount} Ø¬.Ù… (${todaySales} ÙØ§ØªÙˆØ±Ø© POS + ${todayOnlineCount} Ø·Ù„Ø¨Ø§Øª Ø£ÙˆÙ†Ù„Ø§ÙŠÙ† Ù…Ø¤ÙƒØ¯Ø©).\n${totalTodayAmount === 0 ? 'Ù…ÙÙŠØ´ Ø¹Ù…Ù„ÙŠØ§Øª Ù„Ø­Ø¯ Ø¯Ù„ÙˆÙ‚ØªÙŠ.' : 'Ø¹Ø§ÙŠØ² ØªÙØµÙŠÙ„ POS ÙˆÙ„Ø§ Ø£ÙˆÙ†Ù„Ø§ÙŠÙ†ØŸ'}`
           : null;
       const quickEn =
         lang === 'en'
@@ -2454,14 +2469,14 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
     const last7DaysContextAr =
       last7.length > 0
         ? last7
-            .map((d) => `- ${d.date}: ${d.revenue} جنيه — ${d.invoices} فاتورة`)
+            .map((d) => `- ${d.date}: ${d.revenue} Ø¬Ù†ÙŠÙ‡ â€” ${d.invoices} ÙØ§ØªÙˆØ±Ø©`)
             .join('\n')
-        : 'لا توجد مبيعات خلال آخر 7 أيام.';
+        : 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ù…Ø¨ÙŠØ¹Ø§Øª Ø®Ù„Ø§Ù„ Ø¢Ø®Ø± 7 Ø£ÙŠØ§Ù….';
 
     const last7DaysContextEn =
       last7.length > 0
         ? last7
-            .map((d) => `- ${d.date}: ${d.revenue} EGP — ${d.invoices} invoices`)
+            .map((d) => `- ${d.date}: ${d.revenue} EGP â€” ${d.invoices} invoices`)
             .join('\n')
         : 'No sales in the last 7 days.';
 
@@ -2477,7 +2492,7 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
     const rawUserName = (req as any).user?.username || '';
     const firstToken = String(rawUserName || '').split(' ')[0];
     const userName = firstToken && !firstToken.includes('@') ? firstToken : 'Ahmed';
-    const businessName = shopProfile.business_name || (lang === 'en' ? 'the shop' : 'المحل');
+    const businessName = shopProfile.business_name || (lang === 'en' ? 'the shop' : 'Ø§Ù„Ù…Ø­Ù„');
     const activityType = String(shopProfile.activity_type || '').toLowerCase();
     const businessType =
       activityType === 'pharmacy'
@@ -2490,23 +2505,23 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
 
     const businessTypeAr =
       businessType === 'pharmacy'
-        ? 'صيدلية'
+        ? 'ØµÙŠØ¯Ù„ÙŠØ©'
         : businessType === 'supermarket'
-        ? 'سوبر ماركت'
+        ? 'Ø³ÙˆØ¨Ø± Ù…Ø§Ø±ÙƒØª'
         : businessType === 'decor'
-        ? 'ديكور ومفروشات'
-        : 'قطع غيار سيارات';
+        ? 'Ø¯ÙŠÙƒÙˆØ± ÙˆÙ…ÙØ±ÙˆØ´Ø§Øª'
+        : 'Ù‚Ø·Ø¹ ØºÙŠØ§Ø± Ø³ÙŠØ§Ø±Ø§Øª';
 
     const liveCtx = typeof liveContext === 'object' && liveContext !== null ? liveContext : {};
     const ctxLine =
       Object.keys(liveCtx).length > 0
-        ? (lang === 'ar' ? 'سياق الجلسة الحية: ' : 'Live context: ') + JSON.stringify(liveCtx)
+        ? (lang === 'ar' ? 'Ø³ÙŠØ§Ù‚ Ø§Ù„Ø¬Ù„Ø³Ø© Ø§Ù„Ø­ÙŠØ©: ' : 'Live context: ') + JSON.stringify(liveCtx)
         : '';
     const effectiveRole = (liveCtx as any).effectiveRole || (req as any).user?.role || '';
     const pathname = (liveCtx as any).pathname || '';
     const roleInstructionAr =
       effectiveRole
-        ? `دور المستخدم الحالي: ${effectiveRole}. الصفحة: ${pathname || '/'}. لا تنصح بإجراءات غير مسموحة لهذا الدور.`
+        ? `Ø¯ÙˆØ± Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… Ø§Ù„Ø­Ø§Ù„ÙŠ: ${effectiveRole}. Ø§Ù„ØµÙØ­Ø©: ${pathname || '/'}. Ù„Ø§ ØªÙ†ØµØ­ Ø¨Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª ØºÙŠØ± Ù…Ø³Ù…ÙˆØ­Ø© Ù„Ù‡Ø°Ø§ Ø§Ù„Ø¯ÙˆØ±.`
         : '';
     const roleInstructionEn =
       effectiveRole
@@ -2515,44 +2530,44 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
 
     const systemKnowledge = loadSystemKnowledge();
 
-    const systemPromptAr = `أنت المساعد داخل نظام "Crown Services ERP".
-لازم:
-- ترد عربي مصري طبيعي (مش فصحى تقيلة).
-- ردود سريعة ومختصرة: 1–3 سطور افتراضيًا. جاوب بالنتيجة الأول.
-- ما تسألش أكتر من سؤال توضيحي واحد لو لازم.
-- ممنوع تستخدم رموز ماركداون زي ** أو * أو \` نهائيًا. اكتب نص عادي فقط.
-- لو المستخدم سأل: "فيه متجر أونلاين؟/صفحة أونلاين؟" الإجابة لازم تكون: أيوه. المتجر: /storefront. الطلبات الأونلاين بتتأكد من صفحة طلبات الأونلاين في الأدمن، وبتأثر على المخزون بنظام الحجز (reservations)، وبتظهر في الإشعارات ولوحة التحكم والتقارير.
-أنت عارف أقسام النظام:
-لوحة التحكم: المبيعات + مبيعات الأونلاين المؤكدة + العمليات + الراكد/البطيء.
-نقطة البيع POS: بيع وفواتير + available_stock.
-المخزن: منتجات وتنبيهات + صفحة الراكد/البطيء.
-الأونلاين: المتجر + إنشاء طلب + تأكيد/إلغاء/إكمال + حجز مخزون.
-الإشعارات: الجرس + القائمة + العدد + روابط مباشرة.
-التقارير: فترة + المصدر (الكل/POS/أونلاين) + تجميعة (يومي/أسبوعي/شهري) + تصدير CSV/Excel/PDF + طباعة.
+    const systemPromptAr = `Ø£Ù†Øª Ø§Ù„Ù…Ø³Ø§Ø¹Ø¯ Ø¯Ø§Ø®Ù„ Ù†Ø¸Ø§Ù… "Crown Services ERP".
+Ù„Ø§Ø²Ù…:
+- ØªØ±Ø¯ Ø¹Ø±Ø¨ÙŠ Ù…ØµØ±ÙŠ Ø·Ø¨ÙŠØ¹ÙŠ (Ù…Ø´ ÙØµØ­Ù‰ ØªÙ‚ÙŠÙ„Ø©).
+- Ø±Ø¯ÙˆØ¯ Ø³Ø±ÙŠØ¹Ø© ÙˆÙ…Ø®ØªØµØ±Ø©: 1â€“3 Ø³Ø·ÙˆØ± Ø§ÙØªØ±Ø§Ø¶ÙŠÙ‹Ø§. Ø¬Ø§ÙˆØ¨ Ø¨Ø§Ù„Ù†ØªÙŠØ¬Ø© Ø§Ù„Ø£ÙˆÙ„.
+- Ù…Ø§ ØªØ³Ø£Ù„Ø´ Ø£ÙƒØªØ± Ù…Ù† Ø³Ø¤Ø§Ù„ ØªÙˆØ¶ÙŠØ­ÙŠ ÙˆØ§Ø­Ø¯ Ù„Ùˆ Ù„Ø§Ø²Ù….
+- Ù…Ù…Ù†ÙˆØ¹ ØªØ³ØªØ®Ø¯Ù… Ø±Ù…ÙˆØ² Ù…Ø§Ø±ÙƒØ¯Ø§ÙˆÙ† Ø²ÙŠ ** Ø£Ùˆ * Ø£Ùˆ \` Ù†Ù‡Ø§Ø¦ÙŠÙ‹Ø§. Ø§ÙƒØªØ¨ Ù†Øµ Ø¹Ø§Ø¯ÙŠ ÙÙ‚Ø·.
+- Ù„Ùˆ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… Ø³Ø£Ù„: "ÙÙŠÙ‡ Ù…ØªØ¬Ø± Ø£ÙˆÙ†Ù„Ø§ÙŠÙ†ØŸ/ØµÙØ­Ø© Ø£ÙˆÙ†Ù„Ø§ÙŠÙ†ØŸ" Ø§Ù„Ø¥Ø¬Ø§Ø¨Ø© Ù„Ø§Ø²Ù… ØªÙƒÙˆÙ†: Ø£ÙŠÙˆÙ‡. Ø§Ù„Ù…ØªØ¬Ø±: /storefront. Ø§Ù„Ø·Ù„Ø¨Ø§Øª Ø§Ù„Ø£ÙˆÙ†Ù„Ø§ÙŠÙ† Ø¨ØªØªØ£ÙƒØ¯ Ù…Ù† ØµÙØ­Ø© Ø·Ù„Ø¨Ø§Øª Ø§Ù„Ø£ÙˆÙ†Ù„Ø§ÙŠÙ† ÙÙŠ Ø§Ù„Ø£Ø¯Ù…Ù†ØŒ ÙˆØ¨ØªØ£Ø«Ø± Ø¹Ù„Ù‰ Ø§Ù„Ù…Ø®Ø²ÙˆÙ† Ø¨Ù†Ø¸Ø§Ù… Ø§Ù„Ø­Ø¬Ø² (reservations)ØŒ ÙˆØ¨ØªØ¸Ù‡Ø± ÙÙŠ Ø§Ù„Ø¥Ø´Ø¹Ø§Ø±Ø§Øª ÙˆÙ„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ… ÙˆØ§Ù„ØªÙ‚Ø§Ø±ÙŠØ±.
+Ø£Ù†Øª Ø¹Ø§Ø±Ù Ø£Ù‚Ø³Ø§Ù… Ø§Ù„Ù†Ø¸Ø§Ù…:
+Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ…: Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª + Ù…Ø¨ÙŠØ¹Ø§Øª Ø§Ù„Ø£ÙˆÙ†Ù„Ø§ÙŠÙ† Ø§Ù„Ù…Ø¤ÙƒØ¯Ø© + Ø§Ù„Ø¹Ù…Ù„ÙŠØ§Øª + Ø§Ù„Ø±Ø§ÙƒØ¯/Ø§Ù„Ø¨Ø·ÙŠØ¡.
+Ù†Ù‚Ø·Ø© Ø§Ù„Ø¨ÙŠØ¹ POS: Ø¨ÙŠØ¹ ÙˆÙÙˆØ§ØªÙŠØ± + available_stock.
+Ø§Ù„Ù…Ø®Ø²Ù†: Ù…Ù†ØªØ¬Ø§Øª ÙˆØªÙ†Ø¨ÙŠÙ‡Ø§Øª + ØµÙØ­Ø© Ø§Ù„Ø±Ø§ÙƒØ¯/Ø§Ù„Ø¨Ø·ÙŠØ¡.
+Ø§Ù„Ø£ÙˆÙ†Ù„Ø§ÙŠÙ†: Ø§Ù„Ù…ØªØ¬Ø± + Ø¥Ù†Ø´Ø§Ø¡ Ø·Ù„Ø¨ + ØªØ£ÙƒÙŠØ¯/Ø¥Ù„ØºØ§Ø¡/Ø¥ÙƒÙ…Ø§Ù„ + Ø­Ø¬Ø² Ù…Ø®Ø²ÙˆÙ†.
+Ø§Ù„Ø¥Ø´Ø¹Ø§Ø±Ø§Øª: Ø§Ù„Ø¬Ø±Ø³ + Ø§Ù„Ù‚Ø§Ø¦Ù…Ø© + Ø§Ù„Ø¹Ø¯Ø¯ + Ø±ÙˆØ§Ø¨Ø· Ù…Ø¨Ø§Ø´Ø±Ø©.
+Ø§Ù„ØªÙ‚Ø§Ø±ÙŠØ±: ÙØªØ±Ø© + Ø§Ù„Ù…ØµØ¯Ø± (Ø§Ù„ÙƒÙ„/POS/Ø£ÙˆÙ†Ù„Ø§ÙŠÙ†) + ØªØ¬Ù…ÙŠØ¹Ø© (ÙŠÙˆÙ…ÙŠ/Ø£Ø³Ø¨ÙˆØ¹ÙŠ/Ø´Ù‡Ø±ÙŠ) + ØªØµØ¯ÙŠØ± CSV/Excel/PDF + Ø·Ø¨Ø§Ø¹Ø©.
 
 ${systemKnowledge}
 
-المستخدم: "${userName}" — المحل: "${businessName}" (Shop ${shopId}).
+Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…: "${userName}" â€” Ø§Ù„Ù…Ø­Ù„: "${businessName}" (Shop ${shopId}).
 ${ctxLine}
 ${roleInstructionAr}
 
-ملخص المبيعات لآخر 7 أيام:
+Ù…Ù„Ø®Øµ Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª Ù„Ø¢Ø®Ø± 7 Ø£ÙŠØ§Ù…:
 ${last7DaysContextAr}
-امبارح: ${Number(yesterday.revenue || 0)} جنيه — ${Number(yesterday.invoices || 0)} فاتورة.
+Ø§Ù…Ø¨Ø§Ø±Ø­: ${Number(yesterday.revenue || 0)} Ø¬Ù†ÙŠÙ‡ â€” ${Number(yesterday.invoices || 0)} ÙØ§ØªÙˆØ±Ø©.
 
-آخر 25 فاتورة:
-${recentInvoices.length ? JSON.stringify(recentInvoices, null, 2) : 'لا توجد.'}
+Ø¢Ø®Ø± 25 ÙØ§ØªÙˆØ±Ø©:
+${recentInvoices.length ? JSON.stringify(recentInvoices, null, 2) : 'Ù„Ø§ ØªÙˆØ¬Ø¯.'}
 
-المخزون الحالي:
-${inventoryContextAr || 'لا توجد منتجات.'}
+Ø§Ù„Ù…Ø®Ø²ÙˆÙ† Ø§Ù„Ø­Ø§Ù„ÙŠ:
+${inventoryContextAr || 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ù…Ù†ØªØ¬Ø§Øª.'}
 
-إحصائيات اليوم: مبيعات ${stats.today_revenue} جنيه، فواتير ${stats.today_sales}، منتجات ${totalProducts}، قليلة المخزون ${lowStockCount}.
-نوع النشاط: ${businessTypeAr}.`;
+Ø¥Ø­ØµØ§Ø¦ÙŠØ§Øª Ø§Ù„ÙŠÙˆÙ…: Ù…Ø¨ÙŠØ¹Ø§Øª ${stats.today_revenue} Ø¬Ù†ÙŠÙ‡ØŒ ÙÙˆØ§ØªÙŠØ± ${stats.today_sales}ØŒ Ù…Ù†ØªØ¬Ø§Øª ${totalProducts}ØŒ Ù‚Ù„ÙŠÙ„Ø© Ø§Ù„Ù…Ø®Ø²ÙˆÙ† ${lowStockCount}.
+Ù†ÙˆØ¹ Ø§Ù„Ù†Ø´Ø§Ø·: ${businessTypeAr}.`;
 
     const systemPromptEn = `You are the in-app assistant for "Crown Services ERP".
 You MUST:
 - Answer in English.
-- Be concise and fast: default to 1–3 short lines. Give the final answer first.
+- Be concise and fast: default to 1â€“3 short lines. Give the final answer first.
 - Ask at most ONE clarification question only if required.
 - Never output Markdown formatting markers (**, *, backticks). Use plain text only.
 - When user asks "do we have an online shop/storefront?" you MUST answer YES and explain: Storefront: /storefront. Online orders are confirmed from Admin Orders, affect stock via reservations, and appear in notifications, dashboard, and reports.
@@ -2566,13 +2581,13 @@ Reports: date range + source filter (All/POS/Online) + bucket (daily/weekly/mont
 
 ${systemKnowledge}
 
-User: "${userName}" — Shop: "${businessName}" (Shop ${shopId}).
+User: "${userName}" â€” Shop: "${businessName}" (Shop ${shopId}).
 ${ctxLine}
 ${roleInstructionEn}
 
 Sales summary (past 7 days):
 ${last7DaysContextEn}
-Yesterday: ${Number(yesterday.revenue || 0)} EGP — ${Number(yesterday.invoices || 0)} invoices.
+Yesterday: ${Number(yesterday.revenue || 0)} EGP â€” ${Number(yesterday.invoices || 0)} invoices.
 
 Recent invoices (up to 25):
 ${recentInvoices.length ? JSON.stringify(recentInvoices, null, 2) : 'None.'}
@@ -2584,13 +2599,13 @@ Today: revenue ${stats.today_revenue} EGP, invoices ${stats.today_sales}, total 
 Business type: ${businessType}.`;
 
     const systemPrompt = lang === 'ar' ? systemPromptAr : systemPromptEn;
-    const userLine = lang === 'ar' ? `رسالة العميل: ${message}` : `User: ${message}`;
+    const userLine = lang === 'ar' ? `Ø±Ø³Ø§Ù„Ø© Ø§Ù„Ø¹Ù…ÙŠÙ„: ${message}` : `User: ${message}`;
 
     const parts: string[] = [systemPrompt];
     if (Array.isArray(chatHistory) && chatHistory.length > 0) {
       for (const h of chatHistory.slice(-10)) {
-        if (h.role === 'user') parts.push(lang === 'ar' ? `رسالة العميل: ${h.content}` : `User: ${h.content}`);
-        else if (h.role === 'assistant') parts.push(lang === 'ar' ? `رد المساعد: ${h.content}` : `Assistant: ${h.content}`);
+        if (h.role === 'user') parts.push(lang === 'ar' ? `Ø±Ø³Ø§Ù„Ø© Ø§Ù„Ø¹Ù…ÙŠÙ„: ${h.content}` : `User: ${h.content}`);
+        else if (h.role === 'assistant') parts.push(lang === 'ar' ? `Ø±Ø¯ Ø§Ù„Ù…Ø³Ø§Ø¹Ø¯: ${h.content}` : `Assistant: ${h.content}`);
       }
     }
     parts.push(userLine);
@@ -2607,18 +2622,18 @@ Business type: ${businessType}.`;
       return res.json({ ok: true, reply: text, message: text, lang, ttsLang });
     }
 
-    console.error('❌ Gemini empty response');
+    console.error('âŒ Gemini empty response');
     return res.status(200).json({
       ok: false,
       error: 'AI_UNAVAILABLE',
       reason: 'EMPTY_RESPONSE',
       message_en: 'AI is temporarily unavailable. Please try again later.',
-      message_ar: 'المساعد غير متاح حالياً، يرجى المحاولة مرة أخرى لاحقاً.',
+      message_ar: 'Ø§Ù„Ù…Ø³Ø§Ø¹Ø¯ ØºÙŠØ± Ù…ØªØ§Ø­ Ø­Ø§Ù„ÙŠØ§Ù‹ØŒ ÙŠØ±Ø¬Ù‰ Ø§Ù„Ù…Ø­Ø§ÙˆÙ„Ø© Ù…Ø±Ø© Ø£Ø®Ø±Ù‰ Ù„Ø§Ø­Ù‚Ø§Ù‹.',
       lang,
       ttsLang,
     });
   } catch (error: any) {
-    console.error('❌ Chat error:', { name: error?.name, message: error?.message, status: error?.status });
+    console.error('âŒ Chat error:', { name: error?.name, message: error?.message, status: error?.status });
     const detectedLang: 'ar' | 'en' = lang === 'ar' ? 'ar' : 'en';
     const ttsLang = getTtsLocaleForLang(detectedLang);
 
@@ -2639,7 +2654,7 @@ Business type: ${businessType}.`;
         error: 'AI_UNAVAILABLE',
         reason: 'API_KEY_INVALID',
         message_en: 'AI cloud unavailable (invalid or expired API key), using local help.',
-        message_ar: 'المساعد السحابي غير متاح حالياً (مفتاح API غير صالح أو منتهي)، سيتم استخدام المساعدة المحلية.',
+        message_ar: 'Ø§Ù„Ù…Ø³Ø§Ø¹Ø¯ Ø§Ù„Ø³Ø­Ø§Ø¨ÙŠ ØºÙŠØ± Ù…ØªØ§Ø­ Ø­Ø§Ù„ÙŠØ§Ù‹ (Ù…ÙØªØ§Ø­ API ØºÙŠØ± ØµØ§Ù„Ø­ Ø£Ùˆ Ù…Ù†ØªÙ‡ÙŠ)ØŒ Ø³ÙŠØªÙ… Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø§Ù„Ù…Ø³Ø§Ø¹Ø¯Ø© Ø§Ù„Ù…Ø­Ù„ÙŠØ©.',
         answer,
         lang: detectedLang,
         ttsLang,
@@ -2652,7 +2667,7 @@ Business type: ${businessType}.`;
       error: 'AI_UNAVAILABLE',
       reason: 'PROVIDER_ERROR',
       message_en: 'AI cloud unavailable due to an internal error, using local help.',
-      message_ar: 'المساعد السحابي غير متاح حالياً بسبب خطأ داخلي، سيتم استخدام المساعدة المحلية.',
+      message_ar: 'Ø§Ù„Ù…Ø³Ø§Ø¹Ø¯ Ø§Ù„Ø³Ø­Ø§Ø¨ÙŠ ØºÙŠØ± Ù…ØªØ§Ø­ Ø­Ø§Ù„ÙŠØ§Ù‹ Ø¨Ø³Ø¨Ø¨ Ø®Ø·Ø£ Ø¯Ø§Ø®Ù„ÙŠØŒ Ø³ÙŠØªÙ… Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø§Ù„Ù…Ø³Ø§Ø¹Ø¯Ø© Ø§Ù„Ù…Ø­Ù„ÙŠØ©.',
       answer,
       lang: detectedLang,
       ttsLang,
@@ -2785,22 +2800,22 @@ app.post('/api/ai/data-chat', authenticateToken, requirePackageFeature('ai'), as
 
     const result = await genAI.models.generateContent({
       model: GEMINI_MODEL,
-      contents: `أنت كراون - المساعد الذكي. استخدم البيانات التالية فقط للإجابة، ولو السؤال خارج البيانات قول إن المعلومة مش متاحة. رد باللهجة المصرية وباختصار.\n\nالبيانات:\n${JSON.stringify(
+      contents: `Ø£Ù†Øª ÙƒØ±Ø§ÙˆÙ† - Ø§Ù„Ù…Ø³Ø§Ø¹Ø¯ Ø§Ù„Ø°ÙƒÙŠ. Ø§Ø³ØªØ®Ø¯Ù… Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„ØªØ§Ù„ÙŠØ© ÙÙ‚Ø· Ù„Ù„Ø¥Ø¬Ø§Ø¨Ø©ØŒ ÙˆÙ„Ùˆ Ø§Ù„Ø³Ø¤Ø§Ù„ Ø®Ø§Ø±Ø¬ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ù‚ÙˆÙ„ Ø¥Ù† Ø§Ù„Ù…Ø¹Ù„ÙˆÙ…Ø© Ù…Ø´ Ù…ØªØ§Ø­Ø©. Ø±Ø¯ Ø¨Ø§Ù„Ù„Ù‡Ø¬Ø© Ø§Ù„Ù…ØµØ±ÙŠØ© ÙˆØ¨Ø§Ø®ØªØµØ§Ø±.\n\nØ§Ù„Ø¨ÙŠØ§Ù†Ø§Øª:\n${JSON.stringify(
         summary,
         null,
         2
-      )}\n\nسؤال المستخدم: ${question}`,
+      )}\n\nØ³Ø¤Ø§Ù„ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…: ${question}`,
     });
     const text = String((result as any)?.text || '').trim();
 
     if (text) {
       res.json({ text, data: summary });
     } else {
-      console.error('❌ Gemini empty response');
+      console.error('âŒ Gemini empty response');
       return res.status(500).json({ error: 'AI provider response empty' });
     }
   } catch (error: any) {
-    console.error('❌ Data chat error:', error);
+    console.error('âŒ Data chat error:', error);
     res.status(500).json({ error: 'AI data chat unavailable' });
   }
 });
@@ -2832,49 +2847,49 @@ app.get('/api/ai/context', authenticateToken, async (req: any, res: Response) =>
       .map(([k]) => k);
 
     const routesSummary = {
-      pos: language === 'ar' ? 'نقطة البيع والفواتير السريعة داخل المتجر' : 'POS and quick in-store invoicing',
+      pos: language === 'ar' ? 'Ù†Ù‚Ø·Ø© Ø§Ù„Ø¨ÙŠØ¹ ÙˆØ§Ù„ÙÙˆØ§ØªÙŠØ± Ø§Ù„Ø³Ø±ÙŠØ¹Ø© Ø¯Ø§Ø®Ù„ Ø§Ù„Ù…ØªØ¬Ø±' : 'POS and quick in-store invoicing',
       inventory:
         language === 'ar'
-          ? 'إدارة المخزون والمنتجات والتنبيهات'
+          ? 'Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ù…Ø®Ø²ÙˆÙ† ÙˆØ§Ù„Ù…Ù†ØªØ¬Ø§Øª ÙˆØ§Ù„ØªÙ†Ø¨ÙŠÙ‡Ø§Øª'
           : 'Inventory, products, and low-stock alerts',
       invoices:
         language === 'ar'
-          ? 'فواتير وتقارير المبيعات PDF/Excel'
+          ? 'ÙÙˆØ§ØªÙŠØ± ÙˆØªÙ‚Ø§Ø±ÙŠØ± Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª PDF/Excel'
           : 'Invoices and sales reports (PDF/Excel)',
       onlineOrders:
         language === 'ar'
-          ? 'طلبات أونلاين، تأكيد الطلب وخصم المخزون'
+          ? 'Ø·Ù„Ø¨Ø§Øª Ø£ÙˆÙ†Ù„Ø§ÙŠÙ†ØŒ ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø·Ù„Ø¨ ÙˆØ®ØµÙ… Ø§Ù„Ù…Ø®Ø²ÙˆÙ†'
           : 'Online orders, confirmation, and stock deduction',
       notifications:
         language === 'ar'
-          ? 'سجل النشاط والتنبيهات للمبيعات والطلبات'
+          ? 'Ø³Ø¬Ù„ Ø§Ù„Ù†Ø´Ø§Ø· ÙˆØ§Ù„ØªÙ†Ø¨ÙŠÙ‡Ø§Øª Ù„Ù„Ù…Ø¨ÙŠØ¹Ø§Øª ÙˆØ§Ù„Ø·Ù„Ø¨Ø§Øª'
           : 'Activity log and notifications for sales/orders',
       importExport:
         language === 'ar'
-          ? 'استيراد/تصدير المنتجات عبر Excel/CSV (حسب الباقة)'
+          ? 'Ø§Ø³ØªÙŠØ±Ø§Ø¯/ØªØµØ¯ÙŠØ± Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª Ø¹Ø¨Ø± Excel/CSV (Ø­Ø³Ø¨ Ø§Ù„Ø¨Ø§Ù‚Ø©)'
           : 'Import/export products via Excel/CSV (depending on plan)',
       branches:
         language === 'ar'
-          ? 'إدارة الفروع وصلاحيات المستخدمين لكل فرع'
+          ? 'Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„ÙØ±ÙˆØ¹ ÙˆØµÙ„Ø§Ø­ÙŠØ§Øª Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ† Ù„ÙƒÙ„ ÙØ±Ø¹'
           : 'Branch management and per-branch user roles',
       users:
         language === 'ar'
-          ? 'إضافة مستخدمين وصلاحيات مثل الكاشير والفرع والمدير'
+          ? 'Ø¥Ø¶Ø§ÙØ© Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ† ÙˆØµÙ„Ø§Ø­ÙŠØ§Øª Ù…Ø«Ù„ Ø§Ù„ÙƒØ§Ø´ÙŠØ± ÙˆØ§Ù„ÙØ±Ø¹ ÙˆØ§Ù„Ù…Ø¯ÙŠØ±'
           : 'User management and roles such as cashier, branch manager, owner',
       licenses:
         language === 'ar'
-          ? 'أكواد التفعيل لتغيير الباقة لمدة شهر/سنة/مدى الحياة'
+          ? 'Ø£ÙƒÙˆØ§Ø¯ Ø§Ù„ØªÙØ¹ÙŠÙ„ Ù„ØªØºÙŠÙŠØ± Ø§Ù„Ø¨Ø§Ù‚Ø© Ù„Ù…Ø¯Ø© Ø´Ù‡Ø±/Ø³Ù†Ø©/Ù…Ø¯Ù‰ Ø§Ù„Ø­ÙŠØ§Ø©'
           : 'Activation codes to change plans for month/year/lifetime',
       subscriptions:
         language === 'ar'
-          ? 'إدارة الاشتراك الحالي وتاريخ التفعيل والانتهاء'
+          ? 'Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ø§Ø´ØªØ±Ø§Ùƒ Ø§Ù„Ø­Ø§Ù„ÙŠ ÙˆØªØ§Ø±ÙŠØ® Ø§Ù„ØªÙØ¹ÙŠÙ„ ÙˆØ§Ù„Ø§Ù†ØªÙ‡Ø§Ø¡'
           : 'Manage current subscription and activation/expiry history',
     };
 
     const systemPrompt =
       language === 'ar'
-        ? 'أنت مساعد ذكي لنظام Crown ERP. رد دائماً باختصار شديد (٣–٦ نقاط مرقمة أو فقرات قصيرة)، ووضح الخطوات العملية داخل لوحة التحكم (المسار في الـ UI أو اسم الصفحة) وأي endpoint مهم في الـ API إن لزم. لا تخترع معلومات غير موجودة في السياق أو منطق النظام؛ إذا كانت المعلومة ناقصة اسأل سؤالاً واحداً فقط لتوضيح المطلوب ثم اقترح أفضل ممارسة. ركّز على: المبيعات، المخزون، الفواتير، الأكواد والاشتراكات، الأدوار والصلاحيات، المتاجر والفروع، والاستيراد/التصدير. احترم خطة العميل (الباقة) واذكر إن كانت الخاصية متاحة في خطته أم تحتاج ترقية.'
-        : 'You are a smart assistant for the Crown ERP system. Always answer concisely (3–6 short bullet points or paragraphs), and highlight practical steps inside the dashboard (UI route or page name) plus any relevant API endpoint when useful. Do not hallucinate or invent features; if key information is missing, ask exactly one clarifying question before proposing best practices. Focus on: sales, inventory, invoices, licenses & subscriptions, roles & permissions, shops & branches, and import/export. Respect the customer plan (subscription) and mention when a feature requires a higher plan.';
+        ? 'Ø£Ù†Øª Ù…Ø³Ø§Ø¹Ø¯ Ø°ÙƒÙŠ Ù„Ù†Ø¸Ø§Ù… Crown ERP. Ø±Ø¯ Ø¯Ø§Ø¦Ù…Ø§Ù‹ Ø¨Ø§Ø®ØªØµØ§Ø± Ø´Ø¯ÙŠØ¯ (Ù£â€“Ù¦ Ù†Ù‚Ø§Ø· Ù…Ø±Ù‚Ù…Ø© Ø£Ùˆ ÙÙ‚Ø±Ø§Øª Ù‚ØµÙŠØ±Ø©)ØŒ ÙˆÙˆØ¶Ø­ Ø§Ù„Ø®Ø·ÙˆØ§Øª Ø§Ù„Ø¹Ù…Ù„ÙŠØ© Ø¯Ø§Ø®Ù„ Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ… (Ø§Ù„Ù…Ø³Ø§Ø± ÙÙŠ Ø§Ù„Ù€ UI Ø£Ùˆ Ø§Ø³Ù… Ø§Ù„ØµÙØ­Ø©) ÙˆØ£ÙŠ endpoint Ù…Ù‡Ù… ÙÙŠ Ø§Ù„Ù€ API Ø¥Ù† Ù„Ø²Ù…. Ù„Ø§ ØªØ®ØªØ±Ø¹ Ù…Ø¹Ù„ÙˆÙ…Ø§Øª ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø© ÙÙŠ Ø§Ù„Ø³ÙŠØ§Ù‚ Ø£Ùˆ Ù…Ù†Ø·Ù‚ Ø§Ù„Ù†Ø¸Ø§Ù…Ø› Ø¥Ø°Ø§ ÙƒØ§Ù†Øª Ø§Ù„Ù…Ø¹Ù„ÙˆÙ…Ø© Ù†Ø§Ù‚ØµØ© Ø§Ø³Ø£Ù„ Ø³Ø¤Ø§Ù„Ø§Ù‹ ÙˆØ§Ø­Ø¯Ø§Ù‹ ÙÙ‚Ø· Ù„ØªÙˆØ¶ÙŠØ­ Ø§Ù„Ù…Ø·Ù„ÙˆØ¨ Ø«Ù… Ø§Ù‚ØªØ±Ø­ Ø£ÙØ¶Ù„ Ù…Ù…Ø§Ø±Ø³Ø©. Ø±ÙƒÙ‘Ø² Ø¹Ù„Ù‰: Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§ØªØŒ Ø§Ù„Ù…Ø®Ø²ÙˆÙ†ØŒ Ø§Ù„ÙÙˆØ§ØªÙŠØ±ØŒ Ø§Ù„Ø£ÙƒÙˆØ§Ø¯ ÙˆØ§Ù„Ø§Ø´ØªØ±Ø§ÙƒØ§ØªØŒ Ø§Ù„Ø£Ø¯ÙˆØ§Ø± ÙˆØ§Ù„ØµÙ„Ø§Ø­ÙŠØ§ØªØŒ Ø§Ù„Ù…ØªØ§Ø¬Ø± ÙˆØ§Ù„ÙØ±ÙˆØ¹ØŒ ÙˆØ§Ù„Ø§Ø³ØªÙŠØ±Ø§Ø¯/Ø§Ù„ØªØµØ¯ÙŠØ±. Ø§Ø­ØªØ±Ù… Ø®Ø·Ø© Ø§Ù„Ø¹Ù…ÙŠÙ„ (Ø§Ù„Ø¨Ø§Ù‚Ø©) ÙˆØ§Ø°ÙƒØ± Ø¥Ù† ÙƒØ§Ù†Øª Ø§Ù„Ø®Ø§ØµÙŠØ© Ù…ØªØ§Ø­Ø© ÙÙŠ Ø®Ø·ØªÙ‡ Ø£Ù… ØªØ­ØªØ§Ø¬ ØªØ±Ù‚ÙŠØ©.'
+        : 'You are a smart assistant for the Crown ERP system. Always answer concisely (3â€“6 short bullet points or paragraphs), and highlight practical steps inside the dashboard (UI route or page name) plus any relevant API endpoint when useful. Do not hallucinate or invent features; if key information is missing, ask exactly one clarifying question before proposing best practices. Focus on: sales, inventory, invoices, licenses & subscriptions, roles & permissions, shops & branches, and import/export. Respect the customer plan (subscription) and mention when a feature requires a higher plan.';
 
     const shopPayload = shop
       ? {
@@ -3283,12 +3298,12 @@ app.get('/api/users', authenticateToken, requireRole('super_admin', 'shop_owner'
     }
     if (!shopId) {
       if (req.user?.role === 'super_admin') {
-        return res.status(400).json({ error: 'SHOP_ID_REQUIRED', message_ar: 'اختر المتجر أولاً', message_en: 'Please select a shop first' });
+        return res.status(400).json({ error: 'SHOP_ID_REQUIRED', message_ar: 'Ø§Ø®ØªØ± Ø§Ù„Ù…ØªØ¬Ø± Ø£ÙˆÙ„Ø§Ù‹', message_en: 'Please select a shop first' });
       }
       return res.status(400).json({ error: 'shopId is required' });
     }
     if (req.user.role !== 'super_admin' && req.user.shop_id !== shopId) {
-      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'غير مصرح', message_en: 'Forbidden' });
+      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'ØºÙŠØ± Ù…ØµØ±Ø­', message_en: 'Forbidden' });
     }
 
     const [users] = await pool.execute(
@@ -3354,7 +3369,7 @@ app.post('/api/users', authenticateToken, requireRole('super_admin', 'shop_owner
       if (req.user?.role === 'super_admin') {
         return res.status(400).json({
           error: 'SHOP_ID_REQUIRED',
-          message_ar: 'اختر المتجر أولاً',
+          message_ar: 'Ø§Ø®ØªØ± Ø§Ù„Ù…ØªØ¬Ø± Ø£ÙˆÙ„Ø§Ù‹',
           message_en: 'Please select a shop first',
         });
       }
@@ -3368,7 +3383,7 @@ app.post('/api/users', authenticateToken, requireRole('super_admin', 'shop_owner
       if (planError.message === 'PLAN_USER_LIMIT_REACHED') {
         return res.status(403).json({
           error: 'PLAN_USER_LIMIT_REACHED',
-          message_ar: planError.message_ar || 'لقد وصلت للحد الأقصى لعدد المستخدمين في باقتك. قم بالترقية أو احذف مستخدمًا.',
+          message_ar: planError.message_ar || 'Ù„Ù‚Ø¯ ÙˆØµÙ„Øª Ù„Ù„Ø­Ø¯ Ø§Ù„Ø£Ù‚ØµÙ‰ Ù„Ø¹Ø¯Ø¯ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ† ÙÙŠ Ø¨Ø§Ù‚ØªÙƒ. Ù‚Ù… Ø¨Ø§Ù„ØªØ±Ù‚ÙŠØ© Ø£Ùˆ Ø§Ø­Ø°Ù Ù…Ø³ØªØ®Ø¯Ù…Ù‹Ø§.',
           message_en: planError.message_en || "You have reached your plan's user limit. Upgrade your plan or remove a user.",
         });
       }
@@ -3438,10 +3453,10 @@ app.post('/api/users/invite', authenticateToken, requireRole('super_admin', 'sho
 
     const shopId = resolveShopId(req) ?? (req.user.role === 'shop_owner' ? req.user.shop_id : null);
     if (!shopId && req.user?.role !== 'super_admin') {
-      return res.status(400).json({ error: 'SHOP_ID_REQUIRED', message_ar: 'اختر المتجر أولاً', message_en: 'Please select a shop first' });
+      return res.status(400).json({ error: 'SHOP_ID_REQUIRED', message_ar: 'Ø§Ø®ØªØ± Ø§Ù„Ù…ØªØ¬Ø± Ø£ÙˆÙ„Ø§Ù‹', message_en: 'Please select a shop first' });
     }
     if (req.user?.role === 'super_admin' && !shopId) {
-      return res.status(400).json({ error: 'SHOP_ID_REQUIRED', message_ar: 'اختر المتجر أولاً', message_en: 'Please select a shop first' });
+      return res.status(400).json({ error: 'SHOP_ID_REQUIRED', message_ar: 'Ø§Ø®ØªØ± Ø§Ù„Ù…ØªØ¬Ø± Ø£ÙˆÙ„Ø§Ù‹', message_en: 'Please select a shop first' });
     }
     const resolvedShopId = Number(shopId);
     if (!Number.isFinite(resolvedShopId) || resolvedShopId <= 0) {
@@ -3484,7 +3499,7 @@ app.delete('/api/users/:id', authenticateToken, requireRole('super_admin', 'shop
     if (targetUser.role === 'super_admin') return res.status(403).json({ error: 'Only super_admin can delete super_admin' });
 
     const shopId = req.user.role === 'super_admin' ? targetUser.shop_id : req.user.shop_id;
-    if (req.user.role !== 'super_admin' && targetUser.shop_id !== shopId) return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'غير مصرح', message_en: 'Not allowed' });
+    if (req.user.role !== 'super_admin' && targetUser.shop_id !== shopId) return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'ØºÙŠØ± Ù…ØµØ±Ø­', message_en: 'Not allowed' });
 
     await pool.execute('DELETE FROM users WHERE id = ?', [userId]);
     res.json({ success: true });
@@ -3507,30 +3522,30 @@ app.post('/api/users/:id/change-password', authenticateToken, requireRole('super
     const targetUser = userArray[0];
 
     if (targetUser.role === 'super_admin' && req.user.role !== 'super_admin') {
-      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'لا يمكن تغيير كلمة مرور المدير العام', message_en: 'Cannot change super_admin password' });
+      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'Ù„Ø§ ÙŠÙ…ÙƒÙ† ØªØºÙŠÙŠØ± ÙƒÙ„Ù…Ø© Ù…Ø±ÙˆØ± Ø§Ù„Ù…Ø¯ÙŠØ± Ø§Ù„Ø¹Ø§Ù…', message_en: 'Cannot change super_admin password' });
     }
 
     if (req.user.role === 'shop_owner' && targetUser.shop_id !== req.user.shop_id) {
-      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'غير مصرح', message_en: 'Forbidden' });
+      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'ØºÙŠØ± Ù…ØµØ±Ø­', message_en: 'Forbidden' });
     }
 
     if (req.user.role === 'branch_manager') {
       if (targetUser.shop_id !== req.user.shop_id) {
-        return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'غير مصرح', message_en: 'Forbidden' });
+        return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'ØºÙŠØ± Ù…ØµØ±Ø­', message_en: 'Forbidden' });
       }
       const [myAssignments] = await pool.execute('SELECT branch_id FROM user_branch_assignments WHERE user_id = ?', [req.user.id]);
       const myBranchIds = (myAssignments as any[]).map((r) => Number(r.branch_id));
-      if (myBranchIds.length === 0) return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'غير مصرح', message_en: 'Forbidden' });
+      if (myBranchIds.length === 0) return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'ØºÙŠØ± Ù…ØµØ±Ø­', message_en: 'Forbidden' });
       const [targetAssignments] = await pool.execute('SELECT branch_id FROM user_branch_assignments WHERE user_id = ?', [userId]);
       const targetBranchIds = (targetAssignments as any[]).map((r) => Number(r.branch_id));
       const overlap = myBranchIds.some((b) => targetBranchIds.includes(b));
       if (!overlap) {
-        return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'يمكنك تغيير كلمة مرور المستخدمين في فرعك فقط', message_en: 'Can only change password for users in your branch' });
+        return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'ÙŠÙ…ÙƒÙ†Ùƒ ØªØºÙŠÙŠØ± ÙƒÙ„Ù…Ø© Ù…Ø±ÙˆØ± Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ† ÙÙŠ ÙØ±Ø¹Ùƒ ÙÙ‚Ø·', message_en: 'Can only change password for users in your branch' });
       }
     }
 
     if (req.user.role === 'multi_branch_manager' && targetUser.shop_id !== req.user.shop_id) {
-      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'غير مصرح', message_en: 'Forbidden' });
+      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'ØºÙŠØ± Ù…ØµØ±Ø­', message_en: 'Forbidden' });
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -4043,7 +4058,7 @@ app.get('/api/subscription', authenticateToken, async (req: any, res: Response) 
     const additionalUsersCount = Number((additionalCountRows as any[])[0]?.total || 0);
     const canAddUser = additionalUsersCount < additionalUsersLimit;
     res.json({
-      // مصدر واضح للباقة المستخدمة في الـ UI
+      // Ù…ØµØ¯Ø± ÙˆØ§Ø¶Ø­ Ù„Ù„Ø¨Ø§Ù‚Ø© Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…Ø© ÙÙŠ Ø§Ù„Ù€ UI
       planId: planName,
       planName,
       planStatus,
@@ -4153,7 +4168,7 @@ app.post('/api/products', authenticateToken, requireRole('super_admin', 'shop_ow
     const limitCheck = await enforceProductLimit(shopId, 1);
     if (!limitCheck.allowed) {
       return res.status(403).json({
-        message: `لقد وصلت للحد الأقصى من المنتجات (${limitCheck.maxProducts}). يرجى الترقية للباقة الفضية أو الذهبية.`,
+        message: `Ù„Ù‚Ø¯ ÙˆØµÙ„Øª Ù„Ù„Ø­Ø¯ Ø§Ù„Ø£Ù‚ØµÙ‰ Ù…Ù† Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª (${limitCheck.maxProducts}). ÙŠØ±Ø¬Ù‰ Ø§Ù„ØªØ±Ù‚ÙŠØ© Ù„Ù„Ø¨Ø§Ù‚Ø© Ø§Ù„ÙØ¶ÙŠØ© Ø£Ùˆ Ø§Ù„Ø°Ù‡Ø¨ÙŠØ©.`,
         code: 'PRODUCT_LIMIT_REACHED',
       });
     }
@@ -4347,7 +4362,7 @@ const handleProductsImportUpload = async (
       const remaining = limitCheck.remaining ?? 0;
       if (mode === 'import') {
         return res.status(403).json({
-          message: `الحد الأقصى للمنتجات في باقتك ${limitCheck.maxProducts}. لديك ${limitCheck.existingCount} منتج حالياً ويمكنك إضافة ${remaining} منتج فقط. يرجى الترقية للباقة الفضية أو الذهبية.`,
+          message: `Ø§Ù„Ø­Ø¯ Ø§Ù„Ø£Ù‚ØµÙ‰ Ù„Ù„Ù…Ù†ØªØ¬Ø§Øª ÙÙŠ Ø¨Ø§Ù‚ØªÙƒ ${limitCheck.maxProducts}. Ù„Ø¯ÙŠÙƒ ${limitCheck.existingCount} Ù…Ù†ØªØ¬ Ø­Ø§Ù„ÙŠØ§Ù‹ ÙˆÙŠÙ…ÙƒÙ†Ùƒ Ø¥Ø¶Ø§ÙØ© ${remaining} Ù…Ù†ØªØ¬ ÙÙ‚Ø·. ÙŠØ±Ø¬Ù‰ Ø§Ù„ØªØ±Ù‚ÙŠØ© Ù„Ù„Ø¨Ø§Ù‚Ø© Ø§Ù„ÙØ¶ÙŠØ© Ø£Ùˆ Ø§Ù„Ø°Ù‡Ø¨ÙŠØ©.`,
           code: 'PRODUCT_LIMIT_REACHED',
         });
       }
@@ -4719,7 +4734,7 @@ const handleProductsImportUpload = async (
               rowIndex: i + 2,
               rawData: dataRows[i],
               mappedData: canonical,
-              errors: ['تم الوصول للحد الأقصى للمنتجات'],
+              errors: ['ØªÙ… Ø§Ù„ÙˆØµÙˆÙ„ Ù„Ù„Ø­Ø¯ Ø§Ù„Ø£Ù‚ØµÙ‰ Ù„Ù„Ù…Ù†ØªØ¬Ø§Øª'],
             });
             continue;
           }
@@ -4759,10 +4774,10 @@ const handleProductsImportUpload = async (
           [importedCount, failedCount, failedCount > 0 ? 'partial' : 'committed', batchId]
         );
         const msgAr = failedCount === 0
-          ? `تم استيراد ${importedCount} صنف بنجاح`
+          ? `ØªÙ… Ø§Ø³ØªÙŠØ±Ø§Ø¯ ${importedCount} ØµÙ†Ù Ø¨Ù†Ø¬Ø§Ø­`
           : failedCount > 0 && importedCount > 0
-            ? `تم استيراد ${importedCount} صنف. تعذر استيراد ${failedCount} صنف – تحتاج تصحيح`
-            : `تعذر استيراد ${failedCount} صنف – تحتاج تصحيح`;
+            ? `ØªÙ… Ø§Ø³ØªÙŠØ±Ø§Ø¯ ${importedCount} ØµÙ†Ù. ØªØ¹Ø°Ø± Ø§Ø³ØªÙŠØ±Ø§Ø¯ ${failedCount} ØµÙ†Ù â€“ ØªØ­ØªØ§Ø¬ ØªØµØ­ÙŠØ­`
+            : `ØªØ¹Ø°Ø± Ø§Ø³ØªÙŠØ±Ø§Ø¯ ${failedCount} ØµÙ†Ù â€“ ØªØ­ØªØ§Ø¬ ØªØµØ­ÙŠØ­`;
         return res.json({
           ok: true,
           inserted: importedCount,
@@ -5093,7 +5108,7 @@ app.post(
       if (!limitCheck.allowed) {
         const remaining = limitCheck.remaining ?? 0;
         return res.status(403).json({
-          message: `الحد الأقصى للمنتجات في باقتك ${limitCheck.maxProducts}. لديك ${limitCheck.existingCount} منتج حالياً ويمكنك إضافة ${remaining} منتج فقط. يرجى الترقية للباقة الفضية أو الذهبية.`,
+          message: `Ø§Ù„Ø­Ø¯ Ø§Ù„Ø£Ù‚ØµÙ‰ Ù„Ù„Ù…Ù†ØªØ¬Ø§Øª ÙÙŠ Ø¨Ø§Ù‚ØªÙƒ ${limitCheck.maxProducts}. Ù„Ø¯ÙŠÙƒ ${limitCheck.existingCount} Ù…Ù†ØªØ¬ Ø­Ø§Ù„ÙŠØ§Ù‹ ÙˆÙŠÙ…ÙƒÙ†Ùƒ Ø¥Ø¶Ø§ÙØ© ${remaining} Ù…Ù†ØªØ¬ ÙÙ‚Ø·. ÙŠØ±Ø¬Ù‰ Ø§Ù„ØªØ±Ù‚ÙŠØ© Ù„Ù„Ø¨Ø§Ù‚Ø© Ø§Ù„ÙØ¶ÙŠØ© Ø£Ùˆ Ø§Ù„Ø°Ù‡Ø¨ÙŠØ©.`,
           code: 'PRODUCT_LIMIT_REACHED',
         });
       }
@@ -5407,7 +5422,7 @@ app.post(
       return res.json({
         ok: true,
         committed,
-        messageAr: committed > 0 ? `تم اعتماد ${committed} صنف بنجاح` : 'لا توجد أصناف صالحة للاعتماد',
+        messageAr: committed > 0 ? `ØªÙ… Ø§Ø¹ØªÙ…Ø§Ø¯ ${committed} ØµÙ†Ù Ø¨Ù†Ø¬Ø§Ø­` : 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ø£ØµÙ†Ø§Ù ØµØ§Ù„Ø­Ø© Ù„Ù„Ø§Ø¹ØªÙ…Ø§Ø¯',
       });
     } catch (err: any) {
       return res.status(500).json({ ok: false, error: err?.message || 'Commit failed' });
@@ -5415,7 +5430,7 @@ app.post(
   }
 );
 
-// GET /api/products/import/last — last import batch summary for shop
+// GET /api/products/import/last â€” last import batch summary for shop
 app.get(
   '/api/products/import/last',
   authenticateToken,
@@ -5474,7 +5489,7 @@ app.get(
   }
 );
 
-// POST /api/products/import/rollback — undo last import (requires confirm:true)
+// POST /api/products/import/rollback â€” undo last import (requires confirm:true)
 app.post(
   '/api/products/import/rollback',
   authenticateToken,
@@ -5484,7 +5499,7 @@ app.post(
       if (req.body?.confirm !== true) {
         return res.status(400).json({
           ok: false,
-          error: 'يرجى التأكيد: أرسل { confirm: true } لتنفيذ التراجع',
+          error: 'ÙŠØ±Ø¬Ù‰ Ø§Ù„ØªØ£ÙƒÙŠØ¯: Ø£Ø±Ø³Ù„ { confirm: true } Ù„ØªÙ†ÙÙŠØ° Ø§Ù„ØªØ±Ø§Ø¬Ø¹',
         });
       }
       const shopId = resolveShopId(req);
@@ -5785,10 +5800,10 @@ const incrementInvoicePrintCount = async (req: any, saleId: number) => {
        VALUES (?, ?, 'pos', ?, ?)`,
       [shopId, saleId, req.user?.id ?? null, printCount]
     );
-    const titleAr = 'طباعة فاتورة POS';
+    const titleAr = 'Ø·Ø¨Ø§Ø¹Ø© ÙØ§ØªÙˆØ±Ø© POS';
     const titleEn = 'POS invoice printed';
-    const bodyAr = `فاتورة #${invoiceRow?.invoice_number || saleId} — نسخة ${printCount}`;
-    const bodyEn = `Invoice #${invoiceRow?.invoice_number || saleId} — copy ${printCount}`;
+    const bodyAr = `ÙØ§ØªÙˆØ±Ø© #${invoiceRow?.invoice_number || saleId} â€” Ù†Ø³Ø®Ø© ${printCount}`;
+    const bodyEn = `Invoice #${invoiceRow?.invoice_number || saleId} â€” copy ${printCount}`;
     await connection.execute(
       `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
        VALUES (?, 'pos', 'pos_invoice_printed', ?, ?, ?, ?, 0, ?)`,
@@ -5976,7 +5991,7 @@ app.get('/api/sales/:id/items', authenticateToken, async (req: any, res: Respons
   }
 });
 
-// ========== VAULT (الخزنة) ==========
+// ========== VAULT (Ø§Ù„Ø®Ø²Ù†Ø©) ==========
 app.get('/api/vault/summary', authenticateToken, requireRole('super_admin', 'shop_owner', 'cashier'), async (req: any, res: Response) => {
   try {
     const shopId = resolveShopId(req);
@@ -6078,7 +6093,7 @@ app.post('/api/vault/transactions', authenticateToken, requireRole('super_admin'
   }
 });
 
-// ========== AUDIT LOGS (المراجع) ==========
+// ========== AUDIT LOGS (Ø§Ù„Ù…Ø±Ø§Ø¬Ø¹) ==========
 app.get('/api/audit-logs', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
   try {
     const shopId = resolveShopId(req);
@@ -6641,10 +6656,10 @@ app.get('/api/admin/inventory/slow-moving', authenticateToken, requireRole('supe
       let recommendationAr = '';
       let recommendationEn = '';
       if (isDead) {
-        if (stock >= 10) { suggestedDiscountPct = 20; recommendationAr = 'اقتراح: خصم 15-25% لتسريع البيع'; recommendationEn = 'Suggested: 15-25% discount to boost sales'; }
-        else { recommendationAr = 'اقتراح: عرض حزمة أو بيع إضافي'; recommendationEn = 'Suggested: Bundle or upsell offer'; }
+        if (stock >= 10) { suggestedDiscountPct = 20; recommendationAr = 'Ø§Ù‚ØªØ±Ø§Ø­: Ø®ØµÙ… 15-25% Ù„ØªØ³Ø±ÙŠØ¹ Ø§Ù„Ø¨ÙŠØ¹'; recommendationEn = 'Suggested: 15-25% discount to boost sales'; }
+        else { recommendationAr = 'Ø§Ù‚ØªØ±Ø§Ø­: Ø¹Ø±Ø¶ Ø­Ø²Ù…Ø© Ø£Ùˆ Ø¨ÙŠØ¹ Ø¥Ø¶Ø§ÙÙŠ'; recommendationEn = 'Suggested: Bundle or upsell offer'; }
       } else {
-        suggestedDiscountPct = 10; recommendationAr = 'اقتراح: خصم 5-15%'; recommendationEn = 'Suggested: 5-15% discount';
+        suggestedDiscountPct = 10; recommendationAr = 'Ø§Ù‚ØªØ±Ø§Ø­: Ø®ØµÙ… 5-15%'; recommendationEn = 'Suggested: 5-15% discount';
       }
 
       items.push({
@@ -6676,9 +6691,9 @@ async function maybeCreateDeadStockAlert(shopId: number, deadCount: number, slow
     );
     if ((recent as any[]).length > 0) return;
     if (deadCount === 0 && slowCount === 0) return;
-    const titleAr = `تنبيه مخزون راكد/بطيء: ${deadCount} راكد | ${slowCount} بطيء`;
+    const titleAr = `ØªÙ†Ø¨ÙŠÙ‡ Ù…Ø®Ø²ÙˆÙ† Ø±Ø§ÙƒØ¯/Ø¨Ø·ÙŠØ¡: ${deadCount} Ø±Ø§ÙƒØ¯ | ${slowCount} Ø¨Ø·ÙŠØ¡`;
     const titleEn = `Dead/Slow stock alert: ${deadCount} dead | ${slowCount} slow`;
-    const bodyAr = `راجع صفحة المخزون الراكد/البطيء`;
+    const bodyAr = `Ø±Ø§Ø¬Ø¹ ØµÙØ­Ø© Ø§Ù„Ù…Ø®Ø²ÙˆÙ† Ø§Ù„Ø±Ø§ÙƒØ¯/Ø§Ù„Ø¨Ø·ÙŠØ¡`;
     const bodyEn = `Review the Dead/Slow stock page`;
     await pool.execute(
       `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
@@ -6709,7 +6724,7 @@ app.get('/api/admin/reports/summary', authenticateToken, requireRole('super_admi
       return res.json({
         ok: true, range: { from: req.query.from || new Date().toISOString().slice(0, 10), to: req.query.to || new Date().toISOString().slice(0, 10) },
         sales: { totalRevenue: 0, ordersCount: 0, avgOrderValue: 0, posRevenue: 0, onlineRevenueConfirmed: 0, onlineOrdersConfirmedCount: 0, statusBreakdown: { pending: 0, confirmed: 0, completed: 0, cancelled: 0 } },
-        profit: { available: false, profitNoteAr: 'لا يوجد متجر محدد', profitNoteEn: 'No shop selected' },
+        profit: { available: false, profitNoteAr: 'Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ù…ØªØ¬Ø± Ù…Ø­Ø¯Ø¯', profitNoteEn: 'No shop selected' },
         charts: { dailyRevenue: [], dailyProfit: undefined },
         topProducts: [],
       });
@@ -6833,8 +6848,8 @@ app.get('/api/admin/reports/summary', authenticateToken, requireRole('super_admi
       profit: {
         available: profitAvailable,
         totalProfit: profitAvailable ? dailyProfit.reduce((s, d) => s + d.profit, 0) : undefined,
-        profitNoteAr: isBranchManager ? 'مدير الفرع لا يمكنه رؤية الأرباح' : profitAvailable ? undefined : 'الأرباح غير متوفرة — تأكد من وجود سعر الشراء للمنتجات',
-        profitNoteEn: isBranchManager ? 'Branch Manager cannot view profits' : profitAvailable ? undefined : 'Gross profit unavailable — ensure buy_price is set for products',
+        profitNoteAr: isBranchManager ? 'Ù…Ø¯ÙŠØ± Ø§Ù„ÙØ±Ø¹ Ù„Ø§ ÙŠÙ…ÙƒÙ†Ù‡ Ø±Ø¤ÙŠØ© Ø§Ù„Ø£Ø±Ø¨Ø§Ø­' : profitAvailable ? undefined : 'Ø§Ù„Ø£Ø±Ø¨Ø§Ø­ ØºÙŠØ± Ù…ØªÙˆÙØ±Ø© â€” ØªØ£ÙƒØ¯ Ù…Ù† ÙˆØ¬ÙˆØ¯ Ø³Ø¹Ø± Ø§Ù„Ø´Ø±Ø§Ø¡ Ù„Ù„Ù…Ù†ØªØ¬Ø§Øª',
+        profitNoteEn: isBranchManager ? 'Branch Manager cannot view profits' : profitAvailable ? undefined : 'Gross profit unavailable â€” ensure buy_price is set for products',
       },
       charts: { dailyRevenue, dailyProfit: profitAvailable ? dailyProfit : undefined },
       topProducts,
@@ -6925,7 +6940,7 @@ app.get('/api/shop/public', async (req: Request, res: Response) => {
       shopId: shop.id,
       shopName: shop.business_name || shop.name,
       businessType: shop.activity_type || 'default',
-      currencySymbol: shop.currency_symbol || 'ج.م',
+      currencySymbol: shop.currency_symbol || 'Ø¬.Ù…',
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -6962,9 +6977,9 @@ app.get('/api/products/public', async (req: Request, res: Response) => {
 // Normalize payment method to stable codes (avoid DB truncation)
 function normalizePaymentMethod(value: unknown): string {
   const s = String(value || '').toLowerCase();
-  if (s.includes('cod') || s.includes('استلام') || s.includes('cash') || s.includes('نقد')) return 'COD';
-  if (s.includes('transfer') || s.includes('تحويل') || s.includes('bank')) return 'TRANSFER';
-  if (s.includes('card') || s.includes('بطاقة') || s.includes('credit')) return 'CARD';
+  if (s.includes('cod') || s.includes('Ø§Ø³ØªÙ„Ø§Ù…') || s.includes('cash') || s.includes('Ù†Ù‚Ø¯')) return 'COD';
+  if (s.includes('transfer') || s.includes('ØªØ­ÙˆÙŠÙ„') || s.includes('bank')) return 'TRANSFER';
+  if (s.includes('card') || s.includes('Ø¨Ø·Ø§Ù‚Ø©') || s.includes('credit')) return 'CARD';
   return 'COD';
 }
 
@@ -7093,26 +7108,26 @@ app.post('/api/storefront/orders', async (req: Request, res: Response) => {
       }
     }
     if (!Number.isFinite(shopId) || shopId <= 0) {
-      return res.status(400).json({ error: 'shopId or domain is required', ar: 'معرف المتجر أو الدومين مطلوب' });
+      return res.status(400).json({ error: 'shopId or domain is required', ar: 'Ù…Ø¹Ø±Ù Ø§Ù„Ù…ØªØ¬Ø± Ø£Ùˆ Ø§Ù„Ø¯ÙˆÙ…ÙŠÙ† Ù…Ø·Ù„ÙˆØ¨' });
     }
     if (!customerName || String(customerName).trim().length === 0) {
-      return res.status(400).json({ error: 'Customer name is required', ar: 'الاسم مطلوب' });
+      return res.status(400).json({ error: 'Customer name is required', ar: 'Ø§Ù„Ø§Ø³Ù… Ù…Ø·Ù„ÙˆØ¨' });
     }
     const phoneStr = String(phone || '').trim();
     if (!phoneStr || !/^[\d\s\-\+\(\)]{8,20}$/.test(phoneStr)) {
-      return res.status(400).json({ error: 'Valid phone is required', ar: 'رقم هاتف صحيح مطلوب' });
+      return res.status(400).json({ error: 'Valid phone is required', ar: 'Ø±Ù‚Ù… Ù‡Ø§ØªÙ ØµØ­ÙŠØ­ Ù…Ø·Ù„ÙˆØ¨' });
     }
     if (!governorate || String(governorate).trim().length === 0) {
-      return res.status(400).json({ error: 'Governorate is required', ar: 'المحافظة مطلوبة' });
+      return res.status(400).json({ error: 'Governorate is required', ar: 'Ø§Ù„Ù…Ø­Ø§ÙØ¸Ø© Ù…Ø·Ù„ÙˆØ¨Ø©' });
     }
     if (!city || String(city).trim().length === 0) {
-      return res.status(400).json({ error: 'City is required', ar: 'المدينة مطلوبة' });
+      return res.status(400).json({ error: 'City is required', ar: 'Ø§Ù„Ù…Ø¯ÙŠÙ†Ø© Ù…Ø·Ù„ÙˆØ¨Ø©' });
     }
     if (!addr || String(addr).trim().length === 0) {
-      return res.status(400).json({ error: 'Address is required', ar: 'العنوان مطلوب' });
+      return res.status(400).json({ error: 'Address is required', ar: 'Ø§Ù„Ø¹Ù†ÙˆØ§Ù† Ù…Ø·Ù„ÙˆØ¨' });
     }
     if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: 'Cart items required', ar: 'السلة فارغة' });
+      return res.status(400).json({ error: 'Cart items required', ar: 'Ø§Ù„Ø³Ù„Ø© ÙØ§Ø±ØºØ©' });
     }
 
     const conn = await pool.getConnection();
@@ -7162,16 +7177,16 @@ app.post('/api/storefront/orders', async (req: Request, res: Response) => {
 
       if (orderItems.length === 0) {
         await conn.rollback();
-        return res.status(400).json({ error: 'No valid items', ar: 'لا توجد منتجات صالحة' });
+        return res.status(400).json({ error: 'No valid items', ar: 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ù…Ù†ØªØ¬Ø§Øª ØµØ§Ù„Ø­Ø©' });
       }
 
       for (const it of orderItems) {
         const available = await getAvailableStock(conn, shopId, it.productId);
         if (available < it.quantity) {
           await conn.rollback();
-          const titleAr = 'محاولة طلب أونلاين فشلت بسبب نفاد المخزون';
+          const titleAr = 'Ù…Ø­Ø§ÙˆÙ„Ø© Ø·Ù„Ø¨ Ø£ÙˆÙ†Ù„Ø§ÙŠÙ† ÙØ´Ù„Øª Ø¨Ø³Ø¨Ø¨ Ù†ÙØ§Ø¯ Ø§Ù„Ù…Ø®Ø²ÙˆÙ†';
           const titleEn = 'Online order failed due to insufficient stock';
-          const bodyAr = `المنتج غير متوفر بالكمية المطلوبة`;
+          const bodyAr = `Ø§Ù„Ù…Ù†ØªØ¬ ØºÙŠØ± Ù…ØªÙˆÙØ± Ø¨Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ù…Ø·Ù„ÙˆØ¨Ø©`;
           const bodyEn = `Product not available in requested quantity`;
           try {
             await pool.execute(
@@ -7182,7 +7197,7 @@ app.post('/api/storefront/orders', async (req: Request, res: Response) => {
           } catch (_) {}
           return res.status(400).json({
             error: 'Insufficient stock. Product not available in requested quantity.',
-            ar: 'المخزون غير كافٍ. المنتج غير متوفر بالكمية المطلوبة.',
+            ar: 'Ø§Ù„Ù…Ø®Ø²ÙˆÙ† ØºÙŠØ± ÙƒØ§ÙÙ. Ø§Ù„Ù…Ù†ØªØ¬ ØºÙŠØ± Ù…ØªÙˆÙØ± Ø¨Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ù…Ø·Ù„ÙˆØ¨Ø©.',
           });
         }
       }
@@ -7226,10 +7241,10 @@ app.post('/api/storefront/orders', async (req: Request, res: Response) => {
       await reserveStockForOrder(conn, shopId, orderId, orderItems.map((it) => ({ productId: it.productId, quantity: it.quantity })));
 
       const itemsCount = orderItems.length;
-      const titleAr = `طلب أونلاين جديد (#${orderId})`;
+      const titleAr = `Ø·Ù„Ø¨ Ø£ÙˆÙ†Ù„Ø§ÙŠÙ† Ø¬Ø¯ÙŠØ¯ (#${orderId})`;
       const titleEn = `New online order (#${orderId})`;
-      const bodyAr = `تم إنشاء طلب جديد بقيمة ${total.toFixed(2)} جنيه — ${itemsCount} منتج`;
-      const bodyEn = `A new order was placed. Total: ${total.toFixed(2)} EGP — ${itemsCount} items`;
+      const bodyAr = `ØªÙ… Ø¥Ù†Ø´Ø§Ø¡ Ø·Ù„Ø¨ Ø¬Ø¯ÙŠØ¯ Ø¨Ù‚ÙŠÙ…Ø© ${total.toFixed(2)} Ø¬Ù†ÙŠÙ‡ â€” ${itemsCount} Ù…Ù†ØªØ¬`;
+      const bodyEn = `A new order was placed. Total: ${total.toFixed(2)} EGP â€” ${itemsCount} items`;
       await conn.execute(
         `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
          VALUES (?, 'online', 'online_order_created', ?, ?, ?, ?, 0, ?)`,
@@ -7262,7 +7277,7 @@ app.post('/api/storefront/orders', async (req: Request, res: Response) => {
         total,
         trackingUrl,
         message: 'Order created',
-        ar: 'تم تسجيل الطلب',
+        ar: 'ØªÙ… ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø·Ù„Ø¨',
       });
     } catch (e) {
       await conn.rollback();
@@ -7281,10 +7296,10 @@ app.get('/api/storefront/orders/track', async (req: Request, res: Response) => {
     const code = String(req.query.code || '').trim().toUpperCase();
     const phone = String(req.query.phone || '').trim().replace(/\D/g, '');
     if (!code || code.length < 4) {
-      return res.status(400).json({ ok: false, error: 'Tracking code required', ar: 'كود التتبع مطلوب' });
+      return res.status(400).json({ ok: false, error: 'Tracking code required', ar: 'ÙƒÙˆØ¯ Ø§Ù„ØªØªØ¨Ø¹ Ù…Ø·Ù„ÙˆØ¨' });
     }
     if (!phone || phone.length < 8) {
-      return res.status(400).json({ ok: false, error: 'Phone required', ar: 'رقم الهاتف مطلوب' });
+      return res.status(400).json({ ok: false, error: 'Phone required', ar: 'Ø±Ù‚Ù… Ø§Ù„Ù‡Ø§ØªÙ Ù…Ø·Ù„ÙˆØ¨' });
     }
     const phoneNorm = phone.replace(/\D/g, '');
     const [orders] = await pool.execute(
@@ -7299,7 +7314,7 @@ app.get('/api/storefront/orders/track', async (req: Request, res: Response) => {
     );
     const order = (orders as any[])[0];
     if (!order) {
-      return res.status(404).json({ ok: false, error: 'Order not found', ar: 'لم يتم العثور على الطلب' });
+      return res.status(404).json({ ok: false, error: 'Order not found', ar: 'Ù„Ù… ÙŠØªÙ… Ø§Ù„Ø¹Ø«ÙˆØ± Ø¹Ù„Ù‰ Ø§Ù„Ø·Ù„Ø¨' });
     }
     const [items] = await pool.execute(
       'SELECT * FROM online_order_items WHERE order_id = ?',
@@ -7426,7 +7441,7 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requireRole('super_
             const p = (prods as any[])[0];
             await conn.rollback();
             const msg = `Insufficient stock for ${p?.name_en || p?.name_ar || 'product'}`;
-            const msgAr = `المخزون غير كافٍ لـ ${p?.name_ar || p?.name_en || 'المنتج'}`;
+            const msgAr = `Ø§Ù„Ù…Ø®Ø²ÙˆÙ† ØºÙŠØ± ÙƒØ§ÙÙ Ù„Ù€ ${p?.name_ar || p?.name_en || 'Ø§Ù„Ù…Ù†ØªØ¬'}`;
             return res.status(400).json({ error: msg, ar: msgAr });
           }
         }
@@ -7462,9 +7477,9 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requireRole('super_
         const publicCode = order.public_code || String(orderId);
         const total = Number(order.total || 0);
         const itemsCount = (items as any[]).length;
-        const titleAr = `تم تأكيد طلب أونلاين (#${orderId})`;
+        const titleAr = `ØªÙ… ØªØ£ÙƒÙŠØ¯ Ø·Ù„Ø¨ Ø£ÙˆÙ†Ù„Ø§ÙŠÙ† (#${orderId})`;
         const titleEn = `Online order confirmed (#${orderId})`;
-        const bodyAr = `تم تأكيد الطلب بقيمة ${total.toFixed(2)} جنيه`;
+        const bodyAr = `ØªÙ… ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø·Ù„Ø¨ Ø¨Ù‚ÙŠÙ…Ø© ${total.toFixed(2)} Ø¬Ù†ÙŠÙ‡`;
         const bodyEn = `Order confirmed. Total: ${total.toFixed(2)} EGP`;
         await conn.execute(
           `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
@@ -7473,7 +7488,7 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requireRole('super_
         );
 
         await conn.commit();
-        return res.json({ status: 'confirmed', invoiceId, invoiceNumber: nextNum, message: 'Order confirmed and invoice created', ar: 'تم تأكيد الطلب وإنشاء الفاتورة' });
+        return res.json({ status: 'confirmed', invoiceId, invoiceNumber: nextNum, message: 'Order confirmed and invoice created', ar: 'ØªÙ… ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø·Ù„Ø¨ ÙˆØ¥Ù†Ø´Ø§Ø¡ Ø§Ù„ÙØ§ØªÙˆØ±Ø©' });
       } catch (e) {
         await conn.rollback();
         throw e;
@@ -7498,7 +7513,7 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requireRole('super_
       } finally {
         conn.release();
       }
-      return res.json({ status: 'cancelled', message: 'Order cancelled', ar: 'تم إلغاء الطلب' });
+      return res.json({ status: 'cancelled', message: 'Order cancelled', ar: 'ØªÙ… Ø¥Ù„ØºØ§Ø¡ Ø§Ù„Ø·Ù„Ø¨' });
     }
 
     if (status === 'completed') {
@@ -7509,13 +7524,13 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requireRole('super_
       if ((existingInv as any[]).length === 0) {
         return res.status(400).json({
           error: 'Cannot complete: invoice not created. Confirm the order first.',
-          ar: 'لا يمكن إكمال الطلب: الفاتورة غير موجودة. قم بتأكيد الطلب أولاً.',
+          ar: 'Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø¥ÙƒÙ…Ø§Ù„ Ø§Ù„Ø·Ù„Ø¨: Ø§Ù„ÙØ§ØªÙˆØ±Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©. Ù‚Ù… Ø¨ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø·Ù„Ø¨ Ø£ÙˆÙ„Ø§Ù‹.',
         });
       }
       const total = Number(ord.total || 0);
-      const titleAr = `تم إكمال طلب أونلاين (#${orderId})`;
+      const titleAr = `ØªÙ… Ø¥ÙƒÙ…Ø§Ù„ Ø·Ù„Ø¨ Ø£ÙˆÙ†Ù„Ø§ÙŠÙ† (#${orderId})`;
       const titleEn = `Online order completed (#${orderId})`;
-      const bodyAr = `تم إكمال الطلب بقيمة ${total.toFixed(2)} جنيه`;
+      const bodyAr = `ØªÙ… Ø¥ÙƒÙ…Ø§Ù„ Ø§Ù„Ø·Ù„Ø¨ Ø¨Ù‚ÙŠÙ…Ø© ${total.toFixed(2)} Ø¬Ù†ÙŠÙ‡`;
       const bodyEn = `Order completed. Total: ${total.toFixed(2)} EGP`;
       await pool.execute(
         `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
@@ -7535,7 +7550,7 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requireRole('super_
     if ((result as any).affectedRows === 0) {
       return res.status(404).json({ error: 'Order not found' });
     }
-    const titleAr = `تحديث الطلب #${orderId}: ${status}`;
+    const titleAr = `ØªØ­Ø¯ÙŠØ« Ø§Ù„Ø·Ù„Ø¨ #${orderId}: ${status}`;
     const titleEn = `Order #${orderId} status: ${status}`;
     // Update payment_status when confirming order
     if (status === 'confirmed') {
@@ -7544,7 +7559,7 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requireRole('super_
         await pool.execute('UPDATE online_orders SET payment_status = ? WHERE id = ? AND shop_id = ?', ['confirmed', orderId, shopId]);
       } catch (_) {}
     }
-    const bodyAr = `تم تغيير حالة الطلب إلى ${status}`;
+    const bodyAr = `ØªÙ… ØªØºÙŠÙŠØ± Ø­Ø§Ù„Ø© Ø§Ù„Ø·Ù„Ø¨ Ø¥Ù„Ù‰ ${status}`;
     const bodyEn = `Order status changed to ${status}`;
     await pool.execute(
       `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
@@ -7563,7 +7578,7 @@ const canAccessPaymentsOrders = (req: any) =>
 
 app.get('/api/admin/payments-orders/orders', authenticateToken, async (req: any, res: Response) => {
   try {
-    if (!canAccessPaymentsOrders(req)) return res.status(403).json({ error: 'Forbidden', ar: 'غير مصرح' });
+    if (!canAccessPaymentsOrders(req)) return res.status(403).json({ error: 'Forbidden', ar: 'ØºÙŠØ± Ù…ØµØ±Ø­' });
     let shopId = resolveShopId(req);
     if (!shopId && req.user?.role === 'super_admin') {
       const [shops] = await pool.execute('SELECT id FROM shops ORDER BY id ASC LIMIT 1');
@@ -7629,7 +7644,7 @@ app.get('/api/admin/payments-orders/orders', authenticateToken, async (req: any,
 
 app.get('/api/admin/payments-orders/payments', authenticateToken, async (req: any, res: Response) => {
   try {
-    if (!canAccessPaymentsOrders(req)) return res.status(403).json({ error: 'Forbidden', ar: 'غير مصرح' });
+    if (!canAccessPaymentsOrders(req)) return res.status(403).json({ error: 'Forbidden', ar: 'ØºÙŠØ± Ù…ØµØ±Ø­' });
     let shopId = resolveShopId(req);
     if (!shopId && req.user?.role === 'super_admin') {
       const [shops] = await pool.execute('SELECT id FROM shops ORDER BY id ASC LIMIT 1');
@@ -7709,7 +7724,7 @@ app.post('/api/admin/payments/:id/confirm', authenticateToken, requireRole('supe
     if (!pay) return res.status(404).json({ error: 'Payment not found' });
     await pool.execute('UPDATE payments SET status = ? WHERE id = ? AND shop_id = ?', ['confirmed', paymentId, shopId]);
     await pool.execute('UPDATE online_orders SET payment_status = ?, status = ?, order_status = ? WHERE id = ? AND shop_id = ?', ['confirmed', 'confirmed', 'PROCESSING', pay.order_id, shopId]);
-    res.json({ success: true, message: 'Payment confirmed', ar: 'تم تأكيد الدفع' });
+    res.json({ success: true, message: 'Payment confirmed', ar: 'ØªÙ… ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø¯ÙØ¹' });
   } catch (error: any) {
     res.status(500).json({ error: String(error?.message || 'Server error') });
   }
@@ -7727,7 +7742,7 @@ app.post('/api/admin/payments/:id/reject', authenticateToken, requireRole('super
     if (!pay) return res.status(404).json({ error: 'Payment not found' });
     await pool.execute('UPDATE payments SET status = ?, reject_reason = ? WHERE id = ? AND shop_id = ?', ['rejected', reason || rejectReason || null, paymentId, shopId]);
     await pool.execute('UPDATE online_orders SET payment_status = ? WHERE id = ? AND shop_id = ?', ['rejected', pay.order_id, shopId]);
-    res.json({ success: true, message: 'Payment rejected', ar: 'تم رفض الدفع' });
+    res.json({ success: true, message: 'Payment rejected', ar: 'ØªÙ… Ø±ÙØ¶ Ø§Ù„Ø¯ÙØ¹' });
   } catch (error: any) {
     res.status(500).json({ error: String(error?.message || 'Server error') });
   }
@@ -7751,7 +7766,7 @@ app.get('/api/admin/inventory/availability', authenticateToken, requireRole('sup
     if (!hasBranches) {
       return res.status(403).json({
         error: 'FORBIDDEN',
-        message_ar: 'ميزة الفروع غير متوفرة في باقتك الحالية',
+        message_ar: 'Ù…ÙŠØ²Ø© Ø§Ù„ÙØ±ÙˆØ¹ ØºÙŠØ± Ù…ØªÙˆÙØ±Ø© ÙÙŠ Ø¨Ø§Ù‚ØªÙƒ Ø§Ù„Ø­Ø§Ù„ÙŠØ©',
         message_en: 'Branches feature is not available in your current plan',
       });
     }
@@ -7799,7 +7814,7 @@ app.get('/api/inventory/availability', authenticateToken, requireRole('super_adm
     if (!hasBranches) {
       return res.status(403).json({
         error: 'FORBIDDEN',
-        message_ar: 'ميزة الفروع غير متوفرة في باقتك الحالية',
+        message_ar: 'Ù…ÙŠØ²Ø© Ø§Ù„ÙØ±ÙˆØ¹ ØºÙŠØ± Ù…ØªÙˆÙØ±Ø© ÙÙŠ Ø¨Ø§Ù‚ØªÙƒ Ø§Ù„Ø­Ø§Ù„ÙŠØ©',
         message_en: 'Branches feature is not available in your current plan',
       });
     }
@@ -8249,7 +8264,7 @@ app.use((_req: Request, res: Response) => {
 const server = app.listen(PORT, '0.0.0.0', () => console.log('listening', PORT));
 
 server.on('error', (error) => {
-  console.error('❌ Server error:', error);
+  console.error('âŒ Server error:', error);
 });
 
 app.use((err: any, _req: Request, res: Response, _next: any) => {
@@ -8257,16 +8272,16 @@ app.use((err: any, _req: Request, res: Response, _next: any) => {
     return res.status(400).json({ error: 'Invalid JSON body' });
   }
 
-  console.error('❌ Unhandled API error:', err?.message || err);
-  console.error('❌ Unhandled API error stack:', err?.stack || '(no stack)');
+  console.error('âŒ Unhandled API error:', err?.message || err);
+  console.error('âŒ Unhandled API error stack:', err?.stack || '(no stack)');
 
   res.status(500).json({ error: 'Internal server error' });
 });
 
 process.on('unhandledRejection', (reason) => {
-  console.error('❌ Unhandled rejection:', reason);
+  console.error('âŒ Unhandled rejection:', reason);
 });
 
 process.on('uncaughtException', (error) => {
-  console.error('❌ Uncaught exception:', error);
+  console.error('âŒ Uncaught exception:', error);
 });

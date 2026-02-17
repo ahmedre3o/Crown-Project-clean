@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { API_BASE_URL } from '../api-config';
@@ -143,7 +143,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(data.user);
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
-    // ---- Persist activeShopId for API requests ----     try {       const u = JSON.parse(localStorage.getItem('user') || 'null');       const sid = Number(u?.shopId ?? u?.shop_id ?? NaN);       if (Number.isFinite(sid) && sid > 0) localStorage.setItem('activeShopId', String(sid));     } catch {}
   };
 
   const logout = () => {
@@ -206,21 +205,20 @@ export const apiRequest = async (url: string, options: RequestInit = {}) => {
     }
   } catch {}
 
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    ...(token && { Authorization: `Bearer ${token}` }),
-    ...(branchId && { 'x-branch-id': String(branchId) }),
-    ...(options.headers || {}),
-  };
-
   if (activeShopId && activeShopId > 0) {
-    (headers as any)['x-shop-id'] = String(activeShopId);
+    if (headers instanceof Headers) headers.set('x-shop-id', String(activeShopId));
+    else (headers as any)['x-shop-id'] = String(activeShopId);
   }
-
   const response = await fetch(`${API_BASE_URL}${url}`, {
     ...options,
     credentials: 'include',
-    headers,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...(shopId && { 'x-shop-id': String(shopId) }),
+      ...(branchId && { 'x-branch-id': String(branchId) }),
+      ...options.headers,
+    },
   });
 
   const raw = await response.text();

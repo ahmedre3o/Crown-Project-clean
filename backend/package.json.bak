@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "crown-backend",
   "version": "1.0.0",
   "private": true,
@@ -6,7 +6,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "build": "node ./node_modules/typescript/bin/tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json",
     "dev": "ts-node-dev --respawn api.ts",
     "start": "node dist/api.js",
     "prestart": "npm run build"
@@ -40,4 +40,3 @@
     "typescript": "^5"
   }
 }
-

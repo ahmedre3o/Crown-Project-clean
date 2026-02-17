@@ -783,6 +783,65 @@ export async function initializeDatabase() {
       if (e?.code !== 'ER_BAD_FIELD_ERROR') {}
     }
 
+    // License codes (plan/feature activation codes)
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS license_codes (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        code VARCHAR(64) NOT NULL UNIQUE,
+        kind VARCHAR(16) NOT NULL DEFAULT 'plan',
+        feature_key VARCHAR(64) NULL,
+        plan_key VARCHAR(16) NULL,
+        max_branches INT NULL,
+        expires_at DATETIME NULL,
+        used_by_shop_id BIGINT UNSIGNED NULL,
+        used_by_user_id BIGINT UNSIGNED NULL,
+        used_at DATETIME NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_license_codes_code (code),
+        INDEX idx_license_codes_used (used_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // Shop features (e.g. multi_branch with max_limit)
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS shop_features (
+        shop_id BIGINT UNSIGNED NOT NULL,
+        feature_key VARCHAR(64) NOT NULL,
+        enabled TINYINT(1) NOT NULL DEFAULT 0,
+        max_limit INT NULL,
+        activated_at DATETIME NULL,
+        expires_at DATETIME NULL,
+        PRIMARY KEY (shop_id, feature_key),
+        FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE,
+        INDEX idx_shop_features_key (feature_key)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // Shop subscriptions (plan + status per shop)
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS shop_subscriptions (
+        shop_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+        plan VARCHAR(16) NOT NULL DEFAULT 'bronze',
+        status VARCHAR(16) NOT NULL DEFAULT 'active',
+        started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        expires_at DATETIME NULL,
+        FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // Ensure every shop has a row in shop_subscriptions (default bronze)
+    try {
+      await pool.execute(`
+        INSERT INTO shop_subscriptions (shop_id, plan, status)
+        SELECT s.id, COALESCE(s.package, 'bronze'), 'active'
+        FROM shops s
+        LEFT JOIN shop_subscriptions ss ON ss.shop_id = s.id
+        WHERE ss.shop_id IS NULL
+      `);
+    } catch (e: any) {
+      if (e?.code !== 'ER_DUP_ENTRY' && e?.code !== 'ER_NO_REFERENCED_ROW_2') {}
+    }
+
     // Import staging: batches and rows
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS import_batches (

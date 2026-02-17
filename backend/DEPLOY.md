@@ -103,4 +103,54 @@ gcloud run services update crown-api \
 | 4 | **Accept-invite** | `curl -s -X POST BASE_URL/api/auth/accept-invite -H "Content-Type: application/json" -d '{"shopId":SHOP_ID,"inviteCode":"CODE","password":"NewPass1!"}'` → يتوقع `token` و `user` |
 | 5 | **Login بالمستخدم المقبول** | استخدام التوكن أو تسجيل الدخول بـ identifier/كلمة المرور الجديدة ثم `GET /api/auth/me` للتأكد من الجلسة |
 
+---
+
+## 6) تفعيل الباقات والـ features (license_codes)
+
+بعد تشغيل الـ backend مرة واحدة (لإنشاء جداول `license_codes`, `shop_features`, `shop_subscriptions`) يمكنك إدراج أكواد تجريبية:
+
+```bash
+mysql -h HOST -u USER -p DATABASE < backend/sql/seed_license_codes.sql
+```
+
+### تفعيل باقة (plan)
+
+```bash
+curl -s -X POST BASE_URL/api/licenses/activate \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"code":"GOLD-DEMO-001"}'
+```
+
+للـ super_admin يمكن تمرير المتجر: `-H "x-shop-id: SHOP_ID"` أو `-d '{"code":"...","shopId":SHOP_ID}'`.
+
+### تفعيل ميزة multi_branch
+
+```bash
+curl -s -X POST BASE_URL/api/licenses/activate \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"code":"BRANCH-5-DEMO01"}'
+```
+
+### التحقق من الـ plan والـ features للمستخدم الحالي
+
+```bash
+curl -s BASE_URL/api/me/features \
+  -H "Authorization: Bearer TOKEN"
+```
+
+يتوقع: `{"plan":"bronze"|"silver"|"gold","features":{"multi_branch":{"enabled":true|false,"max_branches":5}}}`.
+
+### التحقق من الفروع بدون هيدر (عند ربط user بـ shop_id)
+
+لو المستخدم مرتبط بمتجر (مثلاً shop_owner) لا حاجة لـ `x-shop-id`:
+
+```bash
+curl -s BASE_URL/api/admin/branches \
+  -H "Authorization: Bearer TOKEN"
+```
+
+يُرجع قائمة فروع متجر المستخدم. لو لم يكن للمستخدم متجر يُنشأ متجر تلقائياً ثم يُرجع الفروع.
+
 راجع `API_ENDPOINTS.md` لأمثلة curl كاملة ولجميع الـ endpoints.

@@ -436,6 +436,34 @@ const getBranchManagerBranchIds = async (req: any): Promise<number[] | null> => 
   return ids.length > 0 ? ids : null;
 };
 
+/** Plan for shop from shop_subscriptions (fallback shops.package). */
+async function getShopPlan(shopId: number): Promise<string> {
+  const [rows] = await pool.execute('SELECT plan FROM shop_subscriptions WHERE shop_id = ?', [shopId]);
+  if ((rows as any[]).length > 0) return String((rows as any[])[0].plan || 'bronze');
+  const [shopRows] = await pool.execute('SELECT package FROM shops WHERE id = ?', [shopId]);
+  return (shopRows as any[]).length > 0 ? String((shopRows as any[])[0].package || 'bronze') : 'bronze';
+}
+
+/** Whether a feature is enabled for the shop (from shop_features). */
+async function isFeatureEnabled(shopId: number, featureKey: string): Promise<boolean> {
+  const [rows] = await pool.execute(
+    'SELECT enabled FROM shop_features WHERE shop_id = ? AND feature_key = ? AND (expires_at IS NULL OR expires_at > NOW())',
+    [shopId, featureKey]
+  );
+  return (rows as any[]).length > 0 && Number((rows as any[])[0].enabled) === 1;
+}
+
+/** Max branches limit for shop (from shop_features.max_limit for multi_branch). */
+async function getMaxBranches(shopId: number): Promise<number | null> {
+  const [rows] = await pool.execute(
+    'SELECT max_limit FROM shop_features WHERE shop_id = ? AND feature_key = ? AND enabled = 1 AND (expires_at IS NULL OR expires_at > NOW())',
+    [shopId, 'multi_branch']
+  );
+  if ((rows as any[]).length === 0) return null;
+  const v = (rows as any[])[0].max_limit;
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
 // ========== DOMAIN RESOLUTION + VERIFICATION ==========
 const ALLOWED_DOMAIN_TLDS = new Set(['com', 'net', 'org', 'shop', 'store']);
 const DOMAIN_VERIFY_RECORD_PREFIX = '_crown-verify';
@@ -3660,58 +3688,131 @@ async function subscriptionStackActivation(
 
 app.post('/api/licenses/activate', authenticateToken, async (req: any, res: Response) => {
   try {
-    const { code } = req.body;
+    const code = String(req.body?.code || '').trim();
     if (!code) return res.status(400).json({ error: 'Activation code required' });
 
-    let shopId = resolveShopId(req);
-    if (!shopId) {
-      shopId = await resolveOrCreateShopForUser(req.user);
+    let shopId: number | null = null;
+    if (req.user?.role === 'super_admin') {
+      shopId = Number(req.headers['x-shop-id'] || req.query?.shopId || req.body?.shopId || 0) || null;
     }
+    if (!shopId) shopId = Number(req.user?.shop_id || req.user?.shopId || 0) || null;
+    if (!shopId) shopId = await resolveOrCreateShopForUser(req.user);
 
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
 
-      const [licenses] = await conn.execute('SELECT * FROM licenses WHERE license_key = ? AND status = "unused" FOR UPDATE', [code]);
-      const licenseArray = licenses as any[];
-      if (licenseArray.length === 0) {
-        await conn.rollback();
-        return res.status(400).json({ error: 'CODE_ALREADY_USED' });
-      }
-
-      const license = licenseArray[0];
-      const duration = String(license.duration || 'monthly').toLowerCase();
-
-      const { expiresAt, planStatus } = await subscriptionStackActivation(Number(shopId), 'gold', duration, String(code), req.user.id);
-
-      await conn.execute(
-        'UPDATE licenses SET status = "active", used_by_user_id = ?, used_at = NOW(), expires_at = ? WHERE id = ?',
-        [req.user.id, expiresAt, license.id]
+      const [codeRows] = await conn.execute(
+        'SELECT * FROM license_codes WHERE code = ? AND used_at IS NULL AND (expires_at IS NULL OR expires_at > NOW()) FOR UPDATE',
+        [code]
       );
+      const codeList = codeRows as any[];
 
-      await conn.commit();
+      if (codeList.length > 0) {
+        const row = codeList[0];
+        const kind = String(row.kind || 'plan').toLowerCase();
+        const planKey = row.plan_key ? String(row.plan_key).toLowerCase() : null;
+        const featureKey = row.feature_key ? String(row.feature_key) : null;
+        const maxBranches = row.max_branches != null ? Number(row.max_branches) : null;
 
-      const daysLeft = expiresAt ? Math.ceil((expiresAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000)) : null;
-      const expiresIso = expiresAt ? expiresAt.toISOString() : null;
-      res.json({
-        ok: true,
-        plan: 'gold',
-        duration,
-        expires_at: expiresIso,
-        status: planStatus,
-        success: true,
-        expiresAt: expiresIso,
-        planStatus,
-        daysLeft: planStatus === 'LIFETIME' ? null : daysLeft,
-      });
+        if (kind === 'plan' && planKey) {
+          await conn.execute(
+            'INSERT INTO shop_subscriptions (shop_id, plan, status) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE plan = ?, status = ?',
+            [shopId, planKey, 'active', planKey, 'active']
+          );
+        }
+
+        if (kind === 'feature' && featureKey === 'multi_branch') {
+          const limitVal = maxBranches != null && Number.isFinite(maxBranches) ? maxBranches : 5;
+          await conn.execute(
+            `INSERT INTO shop_features (shop_id, feature_key, enabled, max_limit, activated_at)
+             VALUES (?, 'multi_branch', 1, ?, NOW())
+             ON DUPLICATE KEY UPDATE enabled = 1, max_limit = ?, activated_at = NOW()`,
+            [shopId, limitVal, limitVal]
+          );
+        }
+
+        await conn.execute(
+          'UPDATE license_codes SET used_by_shop_id = ?, used_by_user_id = ?, used_at = NOW() WHERE id = ?',
+          [shopId, req.user.id, row.id]
+        );
+
+        await conn.commit();
+
+        const plan = await getShopPlan(Number(shopId));
+        const multiBranchEnabled = await isFeatureEnabled(Number(shopId), 'multi_branch');
+        const maxBranchesResult = await getMaxBranches(Number(shopId));
+
+        return res.json({
+          ok: true,
+          success: true,
+          plan,
+          features: {
+            multi_branch: { enabled: multiBranchEnabled, max_branches: maxBranchesResult ?? undefined },
+          },
+        });
+      }
     } catch (err: any) {
       await conn.rollback().catch(() => {});
       throw err;
     } finally {
       conn.release();
     }
+
+    const conn2 = await pool.getConnection();
+    try {
+      await conn2.beginTransaction();
+      const [licenses] = await conn2.execute('SELECT * FROM licenses WHERE license_key = ? AND status = "unused" FOR UPDATE', [code]);
+      const licenseArray = licenses as any[];
+      if (licenseArray.length === 0) {
+        await conn2.rollback();
+        return res.status(400).json({ error: 'CODE_ALREADY_USED' });
+      }
+      const license = licenseArray[0];
+      const duration = String(license.duration || 'monthly').toLowerCase();
+      const { expiresAt, planStatus } = await subscriptionStackActivation(Number(shopId), 'gold', duration, String(code), req.user.id);
+      await conn2.execute(
+        'UPDATE licenses SET status = "active", used_by_user_id = ?, used_at = NOW(), expires_at = ? WHERE id = ?',
+        [req.user.id, expiresAt, license.id]
+      );
+      await conn2.commit();
+      const expiresIso = expiresAt ? expiresAt.toISOString() : null;
+      return res.json({
+        ok: true,
+        plan: 'gold',
+        duration,
+        expires_at: expiresIso,
+        status: planStatus,
+        success: true,
+        planStatus,
+      });
+    } catch (err: any) {
+      await conn2.rollback().catch(() => {});
+      throw err;
+    } finally {
+      conn2.release();
+    }
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/me/features', authenticateToken, async (req: any, res: Response) => {
+  try {
+    let shopId = Number(resolveShopId(req) || req.user?.shop_id || req.user?.shopId || 0) || null;
+    if (!shopId && req.user?.role === 'super_admin') shopId = await resolveOrCreateShopForUser(req.user);
+    if (!shopId) return res.status(400).json({ error: 'Shop required' });
+    const plan = await getShopPlan(shopId);
+    const multiBranchEnabled = await isFeatureEnabled(shopId, 'multi_branch');
+    const maxBranches = await getMaxBranches(shopId);
+    return res.json({
+      plan,
+      features: {
+        multi_branch: { enabled: multiBranchEnabled, max_branches: maxBranches ?? undefined },
+      },
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || 'Internal error' });
   }
 });
 
@@ -3776,7 +3877,12 @@ app.post('/api/activate', authenticateToken, async (req: any, res: Response) => 
 // ========== BRANCHES (multi-branch) ==========
 app.get('/api/admin/branches', authenticateToken, requireRole('shop_owner', 'super_admin', 'branch_manager', 'multi_branch_manager'), async (req: any, res: Response) => {
   try {
-    const shopId = Number(resolveShopId(req) || 0);
+    let shopId = Number(resolveShopId(req) || req.user?.shop_id || req.user?.shopId || 0) || null;
+    if (!shopId) {
+      try {
+        shopId = await resolveOrCreateShopForUser(req.user);
+      } catch (_) {}
+    }
     if (!shopId) return res.status(400).json({ error: 'Shop required' });
     if (req.user?.role !== 'super_admin' && req.user?.shop_id !== shopId)
       return res.status(403).json({ error: 'Forbidden' });
@@ -3799,10 +3905,26 @@ app.get('/api/admin/branches', authenticateToken, requireRole('shop_owner', 'sup
 
 app.post('/api/admin/branches', authenticateToken, requireRole('shop_owner', 'super_admin'), async (req: any, res: Response) => {
   try {
-    const shopId = Number(resolveShopId(req) || 0);
+    let shopId = Number(resolveShopId(req) || req.user?.shop_id || req.user?.shopId || 0) || null;
+    if (!shopId) {
+      try {
+        shopId = await resolveOrCreateShopForUser(req.user);
+      } catch (_) {}
+    }
     if (!shopId) return res.status(400).json({ error: 'Shop required' });
     if (req.user?.role !== 'super_admin' && req.user?.shop_id !== shopId)
       return res.status(403).json({ error: 'Forbidden' });
+
+    const multiBranchEnabled = await isFeatureEnabled(shopId, 'multi_branch');
+    if (!multiBranchEnabled) return res.status(403).json({ error: 'multi_branch feature required', code: 'MULTI_BRANCH_REQUIRED' });
+
+    const maxAllowed = await getMaxBranches(shopId);
+    if (maxAllowed != null) {
+      const [countRows] = await pool.execute('SELECT COUNT(*) AS c FROM branches WHERE shop_id = ?', [shopId]);
+      const currentCount = Number((countRows as any[])[0]?.c ?? 0);
+      if (currentCount >= maxAllowed) return res.status(400).json({ error: 'Branch limit reached', max_branches: maxAllowed });
+    }
+
     const { name, code } = req.body || {};
     const c = String((code || '').trim() || 'branch').toLowerCase().replace(/\s+/g, '_');
     const n = String(name || '').trim() || 'Branch';

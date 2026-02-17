@@ -47,8 +47,8 @@ DEALLOCATE PREPARE stmt;
 
 -- 7) user_invites table (shop_id BIGINT UNSIGNED = shops.id); idempotent
 CREATE TABLE IF NOT EXISTS user_invites (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  shop_id BIGINT UNSIGNED NOT NULL,
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  shop_id INT NOT NULL,
   role VARCHAR(32) NOT NULL,
   employee_id VARCHAR(64) NULL,
   email VARCHAR(255) NULL,
@@ -61,26 +61,28 @@ CREATE TABLE IF NOT EXISTS user_invites (
   CONSTRAINT fk_user_invites_shop FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+
 -- 8) license_codes (plan/feature activation)
 CREATE TABLE IF NOT EXISTS license_codes (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  id INT AUTO_INCREMENT PRIMARY KEY,
   code VARCHAR(64) NOT NULL UNIQUE,
   kind VARCHAR(16) NOT NULL DEFAULT 'plan',
   feature_key VARCHAR(64) NULL,
   plan_key VARCHAR(16) NULL,
   max_branches INT NULL,
   expires_at DATETIME NULL,
-  used_by_shop_id BIGINT UNSIGNED NULL,
-  used_by_user_id BIGINT UNSIGNED NULL,
+  used_by_shop_id INT NULL,
+  used_by_user_id INT NULL,
   used_at DATETIME NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_license_codes_code (code),
   INDEX idx_license_codes_used (used_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+
 -- 9) shop_features (e.g. multi_branch)
 CREATE TABLE IF NOT EXISTS shop_features (
-  shop_id BIGINT UNSIGNED NOT NULL,
+  shop_id INT NOT NULL,
   feature_key VARCHAR(64) NOT NULL,
   enabled TINYINT(1) NOT NULL DEFAULT 0,
   max_limit INT NULL,
@@ -91,12 +93,14 @@ CREATE TABLE IF NOT EXISTS shop_features (
   INDEX idx_shop_features_key (feature_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+
 -- 10) shop_subscriptions (plan per shop)
 CREATE TABLE IF NOT EXISTS shop_subscriptions (
-  shop_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+  shop_id INT NOT NULL PRIMARY KEY,
   plan VARCHAR(16) NOT NULL DEFAULT 'bronze',
   status VARCHAR(16) NOT NULL DEFAULT 'active',
   started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   expires_at DATETIME NULL,
   FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+

@@ -178,12 +178,12 @@ export async function initializeDatabase() {
     // Users table with RBAC roles
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS users (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        id INT AUTO_INCREMENT PRIMARY KEY,
         username VARCHAR(255) UNIQUE NOT NULL,
         password VARCHAR(255) NOT NULL,
         role VARCHAR(32) NOT NULL DEFAULT 'cashier',
         package VARCHAR(32) NULL DEFAULT 'bronze',
-        shop_id BIGINT UNSIGNED NULL,
+        shop_id INT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_shop_id (shop_id)
@@ -200,7 +200,7 @@ export async function initializeDatabase() {
     // Shops table
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS shops (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         business_name VARCHAR(255) NULL,
         owner_name VARCHAR(255) NULL,
@@ -215,7 +215,7 @@ export async function initializeDatabase() {
         is_active TINYINT(1) DEFAULT 0,
         trial_ends_at TIMESTAMP NULL,
         logo_url TEXT NULL,
-        owner_id BIGINT UNSIGNED NOT NULL,
+        owner_id INT NOT NULL,
         package VARCHAR(32) NULL DEFAULT 'bronze',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -229,8 +229,8 @@ export async function initializeDatabase() {
     // - Allowed TLDs: .com, .net, .org, .shop, .store (enforced by CHECK + app validation)
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS domains (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        shop_id BIGINT UNSIGNED NOT NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        shop_id INT NOT NULL,
         domain VARCHAR(253) NOT NULL,
         status ENUM('pending', 'verified', 'active', 'inactive') DEFAULT 'pending',
         is_active TINYINT(1) DEFAULT 0,
@@ -318,8 +318,8 @@ export async function initializeDatabase() {
     // Branches table (multi-branch per shop)
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS branches (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        shop_id BIGINT UNSIGNED NOT NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        shop_id INT NOT NULL,
         name VARCHAR(255) NOT NULL,
         name_ar VARCHAR(255) NULL,
         name_en VARCHAR(255) NULL,
@@ -344,7 +344,7 @@ export async function initializeDatabase() {
       await pool.execute("UPDATE branches SET name_ar = name, name_en = CASE WHEN name = 'الفرع الرئيسي' THEN 'Main Branch' ELSE name END WHERE name_ar IS NULL OR name_en IS NULL");
     } catch (_) {}
     try {
-      await pool.execute('ALTER TABLE shops ADD COLUMN default_branch_id BIGINT UNSIGNED NULL');
+      await pool.execute('ALTER TABLE shops ADD COLUMN default_branch_id INT NULL');
     } catch (e: any) {
       if (e?.code !== 'ER_DUP_FIELDNAME') throw e;
     }
@@ -357,10 +357,10 @@ export async function initializeDatabase() {
     // User-branch assignments (Branch Manager restricted to assigned branch)
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS user_branch_assignments (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        user_id BIGINT UNSIGNED NOT NULL,
-        branch_id BIGINT UNSIGNED NOT NULL,
-        shop_id BIGINT UNSIGNED NOT NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        branch_id INT NOT NULL,
+        shop_id INT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
@@ -374,8 +374,8 @@ export async function initializeDatabase() {
     // Subscriptions (per-shop plan and expiry; stacking via subscription_activations)
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS subscriptions (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        shop_id BIGINT UNSIGNED NOT NULL UNIQUE,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        shop_id INT NOT NULL UNIQUE,
         plan_name VARCHAR(32) NOT NULL DEFAULT 'gold',
         started_at TIMESTAMP NULL,
         expires_at TIMESTAMP NULL,
@@ -388,8 +388,8 @@ export async function initializeDatabase() {
     `);
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS subscription_activations (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        shop_id BIGINT UNSIGNED NOT NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        shop_id INT NOT NULL,
         code VARCHAR(128) NOT NULL,
         days INT NOT NULL,
         activated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -403,10 +403,10 @@ export async function initializeDatabase() {
     // Categories table
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS categories (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        id INT AUTO_INCREMENT PRIMARY KEY,
         name_en VARCHAR(255) NOT NULL,
         name_ar VARCHAR(255) NOT NULL,
-        shop_id BIGINT UNSIGNED NULL,
+        shop_id INT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_shop_id (shop_id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -415,20 +415,20 @@ export async function initializeDatabase() {
     // Products/Inventory table
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS products (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        id INT AUTO_INCREMENT PRIMARY KEY,
         name_en VARCHAR(255) NOT NULL,
         name_ar VARCHAR(255) NOT NULL,
         sku VARCHAR(128) NULL,
         barcode VARCHAR(128) NULL,
         qr_code VARCHAR(255) NULL,
         brand VARCHAR(255),
-        category_id BIGINT UNSIGNED,
+        category_id INT,
         buy_price DECIMAL(10, 2) NOT NULL,
         sell_price DECIMAL(10, 2) NOT NULL,
         stock_quantity INT DEFAULT 0,
         min_stock_level INT DEFAULT 5,
         image_url TEXT NULL,
-        shop_id BIGINT UNSIGNED NOT NULL,
+        shop_id INT NOT NULL,
         is_deleted TINYINT(1) NOT NULL DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -465,9 +465,9 @@ export async function initializeDatabase() {
     // Sales/Transactions table
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS sales (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        shop_id BIGINT UNSIGNED NOT NULL,
-        user_id BIGINT UNSIGNED NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        shop_id INT NOT NULL,
+        user_id INT NULL,
         invoice_number VARCHAR(32) UNIQUE NULL,
         customer_name VARCHAR(255) NULL,
         customer_phone VARCHAR(64) NULL,
@@ -483,7 +483,7 @@ export async function initializeDatabase() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
     try {
-      await pool.execute('ALTER TABLE sales ADD COLUMN branch_id BIGINT UNSIGNED NULL');
+      await pool.execute('ALTER TABLE sales ADD COLUMN branch_id INT NULL');
     } catch (e: any) {
       if (e?.code !== 'ER_DUP_FIELDNAME') throw e;
     }
@@ -495,7 +495,7 @@ export async function initializeDatabase() {
 
     await pool.execute(`
       ALTER TABLE sales
-      MODIFY COLUMN user_id BIGINT UNSIGNED NULL;
+      MODIFY COLUMN user_id INT NULL;
     `);
 
     try {
@@ -590,7 +590,7 @@ export async function initializeDatabase() {
     }
 
     try {
-      await pool.execute('ALTER TABLE products ADD COLUMN import_batch_id BIGINT UNSIGNED NULL');
+      await pool.execute('ALTER TABLE products ADD COLUMN import_batch_id INT NULL');
     } catch (error: any) {
       if (error?.code !== 'ER_DUP_FIELDNAME') {
         throw error;
@@ -664,8 +664,8 @@ export async function initializeDatabase() {
     // Password resets table
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS password_resets (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        user_id BIGINT UNSIGNED NOT NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
         token VARCHAR(128) UNIQUE NOT NULL,
         expires_at TIMESTAMP NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -691,9 +691,9 @@ export async function initializeDatabase() {
     // Sale items table
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS sale_items (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        sale_id BIGINT UNSIGNED NOT NULL,
-        product_id BIGINT UNSIGNED NOT NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        sale_id INT NOT NULL,
+        product_id INT NOT NULL,
         quantity INT NOT NULL,
         unit_price DECIMAL(10, 2) NOT NULL,
         total_price DECIMAL(10, 2) NOT NULL,
@@ -704,7 +704,7 @@ export async function initializeDatabase() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
     try {
-      await pool.execute('ALTER TABLE sale_items ADD COLUMN branch_id BIGINT UNSIGNED NULL');
+      await pool.execute('ALTER TABLE sale_items ADD COLUMN branch_id INT NULL');
     } catch (e: any) {
       if (e?.code !== 'ER_DUP_FIELDNAME') throw e;
     }
@@ -715,14 +715,14 @@ export async function initializeDatabase() {
     // Vault transactions (الخزنة)
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS vault_transactions (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        shop_id BIGINT UNSIGNED NOT NULL,
-        user_id BIGINT UNSIGNED NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        shop_id INT NOT NULL,
+        user_id INT NULL,
         type ENUM('in', 'out') NOT NULL,
         amount DECIMAL(10, 2) NOT NULL,
         reason VARCHAR(255) NULL,
         notes TEXT NULL,
-        related_sale_id BIGINT UNSIGNED NULL,
+        related_sale_id INT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
@@ -735,9 +735,9 @@ export async function initializeDatabase() {
     // Audit logs (المراجع)
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS audit_logs (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        shop_id BIGINT UNSIGNED NOT NULL,
-        user_id BIGINT UNSIGNED NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        shop_id INT NOT NULL,
+        user_id INT NULL,
         action VARCHAR(128) NOT NULL,
         entity_type VARCHAR(128) NOT NULL,
         entity_id INT NULL,
@@ -754,9 +754,9 @@ export async function initializeDatabase() {
     // Invoice print log (every print logs: invoice_id, printed_by_user_id, printed_at, print_count_after)
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS invoice_print_log (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        shop_id BIGINT UNSIGNED NOT NULL,
-        invoice_id BIGINT UNSIGNED NOT NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        shop_id INT NOT NULL,
+        invoice_id INT NOT NULL,
         invoice_type ENUM('pos', 'online') DEFAULT 'pos',
         printed_by_user_id INT NULL,
         printed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -769,12 +769,12 @@ export async function initializeDatabase() {
     // Licenses table
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS licenses (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        id INT AUTO_INCREMENT PRIMARY KEY,
         license_key VARCHAR(128) UNIQUE NOT NULL,
         plan ENUM('bronze', 'silver', 'gold') NOT NULL,
         duration ENUM('monthly', 'quarterly', 'yearly', 'lifetime') NOT NULL,
         status ENUM('unused', 'active', 'expired') DEFAULT 'unused',
-        used_by_user_id BIGINT UNSIGNED NULL,
+        used_by_user_id INT NULL,
         used_at TIMESTAMP NULL,
         expires_at TIMESTAMP NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -793,15 +793,15 @@ export async function initializeDatabase() {
     // License codes (plan/feature activation codes)
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS license_codes (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        id INT AUTO_INCREMENT PRIMARY KEY,
         code VARCHAR(64) NOT NULL UNIQUE,
         kind VARCHAR(16) NOT NULL DEFAULT 'plan',
         feature_key VARCHAR(64) NULL,
         plan_key VARCHAR(16) NULL,
         max_branches INT NULL,
         expires_at DATETIME NULL,
-        used_by_shop_id BIGINT UNSIGNED NULL,
-        used_by_user_id BIGINT UNSIGNED NULL,
+        used_by_shop_id INT NULL,
+        used_by_user_id INT NULL,
         used_at DATETIME NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_license_codes_code (code),
@@ -812,7 +812,7 @@ export async function initializeDatabase() {
     // Shop features (e.g. multi_branch with max_limit)
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS shop_features (
-        shop_id BIGINT UNSIGNED NOT NULL,
+        shop_id INT NOT NULL,
         feature_key VARCHAR(64) NOT NULL,
         enabled TINYINT(1) NOT NULL DEFAULT 0,
         max_limit INT NULL,
@@ -827,7 +827,7 @@ export async function initializeDatabase() {
     // Shop subscriptions (plan + status per shop)
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS shop_subscriptions (
-        shop_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+        shop_id INT NOT NULL PRIMARY KEY,
         plan VARCHAR(16) NOT NULL DEFAULT 'bronze',
         status VARCHAR(16) NOT NULL DEFAULT 'active',
         started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -852,9 +852,9 @@ export async function initializeDatabase() {
     // Import staging: batches and rows
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS import_batches (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        user_id BIGINT UNSIGNED NOT NULL,
-        shop_id BIGINT UNSIGNED NOT NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        shop_id INT NOT NULL,
         file_name VARCHAR(255) NOT NULL,
         status ENUM('pending', 'partial', 'committed') DEFAULT 'pending',
         imported_count INT DEFAULT 0,
@@ -874,8 +874,8 @@ export async function initializeDatabase() {
     }
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS import_batch_rows (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        batch_id BIGINT UNSIGNED NOT NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        batch_id INT NOT NULL,
         row_index INT NOT NULL,
         raw_data JSON,
         mapped_data JSON,
@@ -899,8 +899,8 @@ export async function initializeDatabase() {
     // Online orders (storefront) - spec schema
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS online_orders (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        shop_id BIGINT UNSIGNED NOT NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        shop_id INT NOT NULL,
         status ENUM('pending', 'confirmed', 'cancelled', 'completed') DEFAULT 'pending',
         customer_name VARCHAR(255) NOT NULL,
         phone VARCHAR(64) NOT NULL,
@@ -924,7 +924,7 @@ export async function initializeDatabase() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
     try {
-      await pool.execute('ALTER TABLE online_orders ADD COLUMN branch_id BIGINT UNSIGNED NULL');
+      await pool.execute('ALTER TABLE online_orders ADD COLUMN branch_id INT NULL');
     } catch (e: any) {
       if (e?.code !== 'ER_DUP_FIELDNAME') throw e;
     }
@@ -945,10 +945,10 @@ export async function initializeDatabase() {
     // Dedicated payments table (VodafoneCash, InstaPay, Bank transfers, etc.)
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS payments (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        shop_id BIGINT UNSIGNED NOT NULL,
-        order_id BIGINT UNSIGNED NOT NULL,
-        branch_id BIGINT UNSIGNED NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        shop_id INT NOT NULL,
+        order_id INT NOT NULL,
+        branch_id INT NULL,
         method VARCHAR(64) NOT NULL,
         amount DECIMAL(12, 2) NOT NULL,
         reference VARCHAR(255) NULL,
@@ -968,9 +968,9 @@ export async function initializeDatabase() {
     `);
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS online_order_items (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        order_id BIGINT UNSIGNED NOT NULL,
-        product_id BIGINT UNSIGNED NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        order_id INT NOT NULL,
+        product_id INT NULL,
         name_snapshot VARCHAR(255) NULL,
         sku_snapshot VARCHAR(128) NULL,
         barcode_snapshot VARCHAR(128) NULL,
@@ -1007,9 +1007,9 @@ export async function initializeDatabase() {
     // Dedicated online invoices (separate from POS sales)
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS online_invoices (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        shop_id BIGINT UNSIGNED NOT NULL,
-        order_id BIGINT UNSIGNED NOT NULL UNIQUE,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        shop_id INT NOT NULL,
+        order_id INT NOT NULL UNIQUE,
         invoice_number INT NOT NULL,
         total DECIMAL(12, 2) NOT NULL DEFAULT 0,
         printed_count INT DEFAULT 0,
@@ -1023,9 +1023,9 @@ export async function initializeDatabase() {
     `);
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS online_invoice_items (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        invoice_id BIGINT UNSIGNED NOT NULL,
-        product_id BIGINT UNSIGNED NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        invoice_id INT NOT NULL,
+        product_id INT NULL,
         name_snapshot VARCHAR(255) NULL,
         sku_snapshot VARCHAR(128) NULL,
         price_snapshot DECIMAL(10, 2) NOT NULL,
@@ -1056,8 +1056,8 @@ export async function initializeDatabase() {
     // Notifications (activity log: online + pos + system) - persistent forever
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS notifications (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        shop_id BIGINT UNSIGNED NOT NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        shop_id INT NOT NULL,
         source VARCHAR(32) NOT NULL DEFAULT 'online',
         type VARCHAR(64) NOT NULL DEFAULT 'online_order_created',
         title_ar VARCHAR(255) NOT NULL DEFAULT '',
@@ -1085,23 +1085,23 @@ export async function initializeDatabase() {
       if (!String(m?.message || m).includes('Duplicate')) console.error('notifications.idx_shop_source_created:', m?.message || m);
     }
     try {
-      await pool.execute('ALTER TABLE notifications ADD COLUMN branch_id BIGINT UNSIGNED NULL');
+      await pool.execute('ALTER TABLE notifications ADD COLUMN branch_id INT NULL');
     } catch (m: any) {
       if (m?.code !== 'ER_DUP_FIELDNAME') {}
     }
 
     // Stock reservations for online orders (prevent overselling)
-    // Ensure PK/FK types match BIGINT UNSIGNED IDs in shops / online_orders / products
+    // Ensure PK/FK types match INT IDs in shops / online_orders / products
     if (process.env.NODE_ENV !== 'production' && (process.env.DB_NAME || '').includes('_dev')) {
       // In dev-only databases, drop any legacy table with wrong types so we can recreate cleanly
       await pool.execute('DROP TABLE IF EXISTS stock_reservations');
     }
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS stock_reservations (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        shop_id BIGINT UNSIGNED NOT NULL,
-        order_id BIGINT UNSIGNED NOT NULL,
-        product_id BIGINT UNSIGNED NOT NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        shop_id INT NOT NULL,
+        order_id INT NOT NULL,
+        product_id INT NOT NULL,
         qty INT NOT NULL,
         status VARCHAR(32) NOT NULL DEFAULT 'reserved',
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1113,7 +1113,7 @@ export async function initializeDatabase() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
     try {
-      await pool.execute('ALTER TABLE stock_reservations ADD COLUMN branch_id BIGINT UNSIGNED NULL');
+      await pool.execute('ALTER TABLE stock_reservations ADD COLUMN branch_id INT NULL');
     } catch (e: any) {
       if (e?.code !== 'ER_DUP_FIELDNAME') throw e;
     }
@@ -1221,12 +1221,12 @@ export async function initializeDatabase() {
       }
     }
 
-    // user_invites: shop_id same type as shops.id (BIGINT UNSIGNED) for FK compatibility; idempotent
+    // user_invites: shop_id same type as shops.id (INT) for FK compatibility; idempotent
     try {
       await pool.execute(`
         CREATE TABLE IF NOT EXISTS user_invites (
-          id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-          shop_id BIGINT UNSIGNED NOT NULL,
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          shop_id INT NOT NULL,
           role VARCHAR(32) NOT NULL,
           employee_id VARCHAR(64) NULL,
           email VARCHAR(255) NULL,

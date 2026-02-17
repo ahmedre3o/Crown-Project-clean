@@ -31,10 +31,10 @@ declare global {
   }
 }
 
-const localEnvPath = path.resolve(__dirname, '.env');
-const rootEnvPath = path.resolve(__dirname, '../.env');
-dotenv.config({ path: localEnvPath });
-dotenv.config({ path: rootEnvPath });
+// Load .env from backend/ or repo root (never depend on dist/.env when running dist/api.js)
+const backendDir = path.resolve(__dirname, '..');
+dotenv.config({ path: path.join(backendDir, '.env') });
+dotenv.config({ path: path.resolve(backendDir, '..', '.env') });
 
 const app = express();
 app.use(express.json());

@@ -1,7 +1,10 @@
 import dotenv from 'dotenv';
 import path from 'path';
 
-dotenv.config({ path: path.join(__dirname, '.env') });
+// Load .env from backend/ or repo root (same as api.ts; never depend on dist/.env)
+const backendDir = path.resolve(__dirname, '..');
+dotenv.config({ path: path.join(backendDir, '.env') });
+dotenv.config({ path: path.resolve(backendDir, '..', '.env') });
 
 import mysql from 'mysql2/promise';
 import type { RowDataPacket } from 'mysql2/promise';
@@ -16,44 +19,48 @@ function generatePublicCode(): string {
   return s;
 }
 
-// Connection mode: socket (Cloud SQL Unix socket) or ip (TCP host/port)
-const DB_MODE = (process.env.DB_MODE || 'ip').toLowerCase();
-const isSocketMode = DB_MODE === 'socket';
+// Connection mode: socket if DB_MODE=socket OR DB_HOST starts with /cloudsql/; else IP (no throw so Cloud Shell etc can start)
+const DB_MODE = (process.env.DB_MODE || '').toLowerCase();
+const DB_HOST_RAW = process.env.DB_HOST || '';
+const useSocket =
+  DB_MODE === 'socket' || (DB_HOST_RAW && String(DB_HOST_RAW).trim().startsWith('/cloudsql/'));
 
-if (isSocketMode) {
-  // socket mode: INSTANCE_CONNECTION_NAME required
-  if (!process.env.INSTANCE_CONNECTION_NAME) {
-    throw new Error('[db] DB_MODE=socket requires INSTANCE_CONNECTION_NAME to be set');
+const socketPath = useSocket
+  ? (DB_HOST_RAW.trim().startsWith('/cloudsql/')
+      ? DB_HOST_RAW.trim()
+      : process.env.INSTANCE_CONNECTION_NAME
+        ? `/cloudsql/${process.env.INSTANCE_CONNECTION_NAME}`
+        : undefined)
+  : undefined;
+
+const isSocketMode = useSocket && !!socketPath;
+
+if (process.env.NODE_ENV !== 'production') {
+  if (useSocket && !socketPath) {
+    console.warn('[db] Socket mode requested but INSTANCE_CONNECTION_NAME and DB_HOST/cloudsql not set; connection may fail on first use.');
   }
-} else {
-  // ip mode: require DB_HOST, DB_NAME, DB_USER, DB_PASSWORD
-  const required: string[] = [];
-  if (!process.env.DB_HOST) required.push('DB_HOST');
-  if (!process.env.DB_NAME) required.push('DB_NAME');
-  if (!process.env.DB_USER) required.push('DB_USER');
-  if (!process.env.DB_PASSWORD) required.push('DB_PASSWORD');
-  if (required.length > 0) {
-    throw new Error(`[db] DB_MODE=ip missing required env: ${required.join(', ')}`);
+  if (!useSocket && (!process.env.DB_HOST || !process.env.DB_NAME)) {
+    console.warn('[db] IP mode: DB_HOST/DB_NAME not set; connection may fail on first use.');
   }
 }
 
 const poolConfig: mysql.PoolOptions = isSocketMode
   ? {
-      socketPath: `/cloudsql/${process.env.INSTANCE_CONNECTION_NAME}`,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
+      socketPath,
+      user: process.env.DB_USER || undefined,
+      password: process.env.DB_PASSWORD || undefined,
+      database: process.env.DB_NAME || undefined,
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
       ssl: undefined,
     }
   : {
-      host: process.env.DB_HOST,
+      host: process.env.DB_HOST || 'localhost',
       port: Number(process.env.DB_PORT || 3306),
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
+      user: process.env.DB_USER || undefined,
+      password: process.env.DB_PASSWORD || undefined,
+      database: process.env.DB_NAME || undefined,
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,

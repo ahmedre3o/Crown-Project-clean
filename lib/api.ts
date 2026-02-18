@@ -1,16 +1,25 @@
 /**
  * Single source for API base URL. Inlined at build time (NEXT_PUBLIC_*).
- * Production: NEXT_PUBLIC_API_URL must be set in Cloud Build / Docker build args — no localhost fallback.
- * Dev only: fallback to localhost when env unset.
+ * Production: Cloud Run should set NEXT_PUBLIC_API_URL.
+ * Build/Prerender: do NOT crash if env is missing; use a safe fallback.
  */
 const isProduction = process.env.NODE_ENV === "production";
+
+export const FALLBACK_API_URL =
+  "https://crown-api-756273570281.us-central1.run.app/api";
+
 if (isProduction && !process.env.NEXT_PUBLIC_API_URL) {
-  throw new Error(
-    "NEXT_PUBLIC_API_URL is required for production build (e.g. https://api.crowncs.org/api)"
+  // Don't crash the build/prerender. We'll use fallback.
+  // eslint-disable-next-line no-console
+  console.warn(
+    "NEXT_PUBLIC_API_URL not set; using fallback API for build:",
+    FALLBACK_API_URL
   );
 }
-export const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5001/api";
+
+export const API_BASE = (
+  process.env.NEXT_PUBLIC_API_URL || FALLBACK_API_URL
+).replace(/\/+$/, "");
 
 /** Same as API_BASE; all frontend requests use this. */
 export const API_BASE_URL = API_BASE;

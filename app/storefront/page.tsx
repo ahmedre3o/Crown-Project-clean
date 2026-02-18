@@ -30,6 +30,8 @@ type Shop = {
   id: number;
   name: string;
   business_name?: string | null;
+  business_name_ar?: string | null;
+  business_name_en?: string | null;
   activity_type?: string | null;
   package?: string | null;
   currency_symbol?: string | null;

@@ -40,6 +40,21 @@ interface Invoice {
   logo_url?: string;
 }
 
+type ShopProfile = {
+  id?: number;
+  name?: string | null;
+  business_name?: string | null;
+  business_name_ar?: string | null;
+  business_name_en?: string | null;
+  logo_url?: string | null;
+  activity_type?: string | null;
+  owner_name?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  address?: string | null;
+};
+
+
 function InvoicesPageContent() {
   const searchParams = useSearchParams();
   const focusId = searchParams.get('focus');
@@ -49,7 +64,7 @@ function InvoicesPageContent() {
   const { allowed } = useRouteGuard(user, authLoading, { feature: 'invoices', effectiveRole, showDenied: true });
   const { symbol, currency } = useCurrency();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [business, setBusiness] = useState<Partial<Invoice> | null>(null);
+  const [business, setBusiness] = useState<ShopProfile>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<number | null>(null);

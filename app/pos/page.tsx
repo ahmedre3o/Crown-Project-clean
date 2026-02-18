@@ -392,9 +392,9 @@ export default function PosPage() {
       const payload = {
         items,
         paymentMethod: 'invoice',
-        customerName: customer.name || null,
-        customerPhone: customer.phone || null,
-        customerAddress: customer.address || null,
+        customerName: customer.name || undefined,
+        customerPhone: customer.phone || undefined,
+        customerAddress: customer.address || undefined,
       };
 
       const sale = await createPosSaleOrInvoice(payload, isOnline);
@@ -474,9 +474,9 @@ export default function PosPage() {
       const payload = {
         items,
         paymentMethod: 'cash',
-        customerName: customer.name || null,
-        customerPhone: customer.phone || null,
-        customerAddress: customer.address || null,
+        customerName: customer.name || undefined,
+        customerPhone: customer.phone || undefined,
+        customerAddress: customer.address || undefined,
       };
 
       const sale = await createPosSaleOrInvoice(payload, isOnline);

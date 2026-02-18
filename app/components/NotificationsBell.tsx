@@ -26,9 +26,20 @@ export function NotificationsBell() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [toast, setToast] = useState<{ msg: string; orderId?: number } | null>(null);
   const [loadError, setLoadError] = useState(false);
   const prevCountRef = useRef(0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -125,67 +136,147 @@ export function NotificationsBell() {
         {open && (
           <>
             <div
-              className="fixed inset-0 z-40"
+              className="fixed inset-0 z-40 bg-black/40"
               onClick={() => setOpen(false)}
               aria-hidden="true"
             />
-            <div
-              className="absolute top-full mt-2 right-0 z-50 w-80 max-h-80 overflow-y-auto rounded-xl border border-cyan-500/25 bg-[#0a0f18] shadow-[0_0_24px_rgba(34,211,238,0.2)]"
-              dir={language === 'ar' ? 'rtl' : 'ltr'}
-            >
-              <div className="px-4 py-3 border-b border-cyan-500/15 text-sm font-bold text-cyan-100">
-                {language === 'ar' ? 'الإشعارات' : 'Notifications'}
-              </div>
-              <div className="max-h-64 overflow-y-auto">
-                <Link
-                  href="/store-admin/notifications"
-                  onClick={() => setOpen(false)}
-                  className="block px-4 py-2 text-xs text-cyan-400 hover:text-cyan-200 hover:bg-cyan-500/5 border-b border-cyan-500/10"
+            {isMobile ? (
+              <div
+                className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl border border-cyan-500/30 bg-[#050812] shadow-[0_0_32px_rgba(34,211,238,0.35)] w-full max-h-[80vh] overflow-y-auto"
+                dir={language === 'ar' ? 'rtl' : 'ltr'}
+              >
+                <div className="px-4 py-3 border-b border-cyan-500/20 flex items-center justify-between">
+                  <span className="text-sm font-bold text-cyan-100">
+                    {language === 'ar' ? 'الإشعارات' : 'Notifications'}
+                  </span>
+                  <button
+                    onClick={() => setOpen(false)}
+                    className="text-xs text-slate-400 hover:text-cyan-200"
+                  >
+                    {language === 'ar' ? 'إغلاق' : 'Close'}
+                  </button>
+                </div>
+                <div className="max-h-[70vh] overflow-y-auto">
+                  {loadError ? (
+                    <div className="px-4 py-6 text-amber-300 text-sm text-center">
+                      {language === 'ar' ? 'فشل تحميل الإشعارات' : 'Failed to load notifications'}
+                    </div>
+                  ) : notifications.length === 0 ? (
+                    <div className="px-4 py-6 text-slate-400 text-sm text-center">
+                      {language === 'ar' ? 'لا توجد إشعارات' : 'No notifications'}
+                    </div>
+                  ) : (
+                    notifications.map((n) => (
+                      <div
+                        key={n.id}
+                        className={`w-full text-start px-4 py-3 border-b border-cyan-500/10 hover:bg-cyan-500/5 transition ${
+                          n.is_read ? 'text-slate-400' : 'text-slate-100 bg-cyan-500/5'
+                        }`}
+                      >
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="text-sm font-semibold break-words">{title(n)}</div>
+                            <div className="text-[11px] text-slate-500 shrink-0">
+                              {new Date(n.created_at).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')}
+                            </div>
+                          </div>
+                          {body(n) ? (
+                            <div className="text-xs text-slate-400 mt-1 whitespace-pre-wrap break-words line-clamp-2">
+                              {body(n)}
+                            </div>
+                          ) : null}
+                          <div className="mt-2 flex justify-end">
+                            <button
+                              onClick={() => {
+                                void markRead(n.id);
+                                router.push(`/notifications?focus=${n.id}`);
+                                setOpen(false);
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold"
+                            >
+                              {language === 'ar' ? 'عرض' : 'View'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <button
+                  className="w-full px-4 py-3 text-xs font-semibold text-cyan-300 hover:text-cyan-100 hover:bg-cyan-500/10 border-t border-cyan-500/20"
+                  onClick={() => {
+                    router.push('/notifications');
+                    setOpen(false);
+                  }}
                 >
                   {language === 'ar' ? 'عرض كل الإشعارات' : 'View all notifications'}
-                </Link>
-                {loadError ? (
-                  <div className="px-4 py-6 text-amber-300 text-sm text-center">
-                    {language === 'ar' ? 'فشل تحميل الإشعارات' : 'Failed to load notifications'}
-                  </div>
-                ) : notifications.length === 0 ? (
-                  <div className="px-4 py-6 text-slate-400 text-sm text-center">
-                    {language === 'ar' ? 'لا توجد إشعارات' : 'No notifications'}
-                  </div>
-                ) : (
-                  notifications.map((n) => (
-                    <div
-                      key={n.id}
-                      className={`w-full text-start px-4 py-3 border-b border-cyan-500/10 hover:bg-cyan-500/5 transition ${
-                        n.is_read ? 'text-slate-400' : 'text-slate-100 bg-cyan-500/5'
-                      }`}
-                    >
-                      <button
-                        onClick={() => markRead(n.id, getNavLink(n) || undefined)}
-                        className="w-full text-start"
-                      >
-                        <div className="text-sm font-semibold">{title(n)}</div>
-                        {body(n) ? <div className="text-xs text-slate-500 mt-1">{body(n)}</div> : null}
-                        <div className="text-xs text-slate-500 mt-1">
-                          {new Date(n.created_at).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')}
-                        </div>
-                      </button>
-                      {getNavLink(n) && (
-                        <Link
-                          href={getNavLink(n)!}
-                          onClick={() => { setOpen(false); }}
-                          className="mt-2 inline-block text-xs text-cyan-300 hover:text-cyan-200 underline"
-                        >
-                          {meta(n).orderId
-                            ? (language === 'ar' ? 'عرض الطلب' : 'View order')
-                            : (language === 'ar' ? 'عرض الفاتورة' : 'View invoice')}
-                        </Link>
-                      )}
-                    </div>
-                  ))
-                )}
+                </button>
               </div>
-            </div>
+            ) : (
+              <div
+                className="absolute top-full mt-2 right-0 z-50 w-[min(92vw,420px)] max-h-[70vh] overflow-y-auto rounded-xl border border-cyan-500/25 bg-[#0a0f18] shadow-[0_0_24px_rgba(34,211,238,0.2)]"
+                dir={language === 'ar' ? 'rtl' : 'ltr'}
+              >
+                <div className="px-4 py-3 border-b border-cyan-500/15 text-sm font-bold text-cyan-100">
+                  {language === 'ar' ? 'الإشعارات' : 'Notifications'}
+                </div>
+                <div>
+                  {loadError ? (
+                    <div className="px-4 py-6 text-amber-300 text-sm text-center">
+                      {language === 'ar' ? 'فشل تحميل الإشعارات' : 'Failed to load notifications'}
+                    </div>
+                  ) : notifications.length === 0 ? (
+                    <div className="px-4 py-6 text-slate-400 text-sm text-center">
+                      {language === 'ar' ? 'لا توجد إشعارات' : 'No notifications'}
+                    </div>
+                  ) : (
+                    notifications.map((n) => (
+                      <div
+                        key={n.id}
+                        className={`w-full text-start px-4 py-3 border-b border-cyan-500/10 hover:bg-cyan-500/5 transition ${
+                          n.is_read ? 'text-slate-400' : 'text-slate-100 bg-cyan-500/5'
+                        }`}
+                      >
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="text-sm font-semibold break-words">{title(n)}</div>
+                            <div className="text-[11px] text-slate-500 shrink-0">
+                              {new Date(n.created_at).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')}
+                            </div>
+                          </div>
+                          {body(n) ? (
+                            <div className="text-xs text-slate-400 mt-1 whitespace-pre-wrap break-words line-clamp-2">
+                              {body(n)}
+                            </div>
+                          ) : null}
+                          <div className="mt-2 flex justify-end">
+                            <button
+                              onClick={() => {
+                                void markRead(n.id);
+                                router.push(`/notifications?focus=${n.id}`);
+                                setOpen(false);
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold"
+                            >
+                              {language === 'ar' ? 'عرض' : 'View'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  <button
+                    className="w-full px-4 py-3 text-xs font-semibold text-cyan-300 hover:text-cyan-100 hover:bg-cyan-500/10 border-t border-cyan-500/20"
+                    onClick={() => {
+                      router.push('/notifications');
+                      setOpen(false);
+                    }}
+                  >
+                    {language === 'ar' ? 'عرض كل الإشعارات' : 'View all notifications'}
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -194,7 +285,7 @@ export function NotificationsBell() {
           <span>{toast.msg}</span>
           <button
             onClick={() => {
-              router.push('/store-admin/notifications');
+              router.push('/notifications');
               setToast(null);
             }}
             className="px-3 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs"

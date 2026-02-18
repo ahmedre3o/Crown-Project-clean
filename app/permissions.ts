@@ -33,7 +33,9 @@ export type NavItemId =
   | 'settings'
   | 'store_management'
   | 'admin'
-  | 'admin_codes';
+  | 'admin_codes'
+  | 'system_dashboard'
+  | 'system_users';
 
 export type Feature =
   | NavItemId
@@ -73,6 +75,8 @@ export const ROUTE_FEATURE_MAP: Record<string, Feature | NavItemId> = {
   '/store-admin/domains': 'domains',
   '/store-admin/store': 'store_management',
   '/store-admin/inventory/slow-moving': 'inventory_slow',
+  '/system': 'admin',
+  '/system/users': 'admin',
 };
 
 /** Default redirect for role when access denied */
@@ -293,6 +297,22 @@ export function getAllowedNav(
   }
   if (canAccess(role, 'admin_codes', planFeatures)) {
     push({ id: 'admin_codes', href: '/admin/codes', labelKey: 'nav.codes', icon: 'Key', section: 'system' });
+  }
+  if (canAccess(role, 'admin', planFeatures)) {
+    push({
+      id: 'system_dashboard',
+      href: '/system',
+      labelKey: 'nav.systemDashboard',
+      icon: 'LayoutDashboard',
+      section: 'system',
+    });
+    push({
+      id: 'system_users',
+      href: '/system/users',
+      labelKey: 'nav.systemUsers',
+      icon: 'Users',
+      section: 'system',
+    });
   }
 
   return items;

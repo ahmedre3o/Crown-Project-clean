@@ -1,4 +1,4 @@
-﻿import express, { Request, Response, NextFunction } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -271,8 +271,20 @@ const authenticateToken = async (req: any, res: Response, next: any) => {
     return next();
   }
 
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const authHeader =
+    (req.headers.authorization as string | undefined) ||
+    (req.header?.('Authorization') as string | undefined) ||
+    '';
+
+  const tokenFromHeader = authHeader.startsWith('Bearer ')
+    ? authHeader.slice(7).trim()
+    : authHeader.trim();
+
+  const tokenFromCookie =
+    (req.cookies?.token as string | undefined) ||
+    (req.cookies?.access_token as string | undefined);
+
+  const token = tokenFromHeader || tokenFromCookie;
 
   if (!token) {
     return res.status(401).json({ error: 'Access token required' });
@@ -297,6 +309,16 @@ const authenticateToken = async (req: any, res: Response, next: any) => {
       const shopArray = shops as any[];
       if (shopArray.length > 0) {
         user.package = shopArray[0].package;
+      }
+    }
+
+    // Update last_seen_at for authenticated users (excluding public endpoints handled above)
+    try {
+      await pool.execute('UPDATE users SET last_seen_at = NOW() WHERE id = ?', [user.id]);
+      (user as any).last_seen_at = new Date();
+    } catch (err: any) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[auth] failed to update last_seen_at:', err?.message || err);
       }
     }
 
@@ -617,6 +639,9 @@ const requireRole = (...allowedRoles: string[]) => {
     next();
   };
 };
+
+// Helper: require super_admin explicitly (for system-level APIs)
+const requireSuperAdmin = requireRole('super_admin');
 
 // POST /api/products/bulk-delete (must be before POST /api/products)
 app.post('/api/products/bulk-delete', authenticateToken, requireRole('super_admin', 'shop_owner', 'warehouse'), async (req: any, res: Response) => {
@@ -2945,6 +2970,220 @@ app.get('/api/shops', authenticateToken, requireRole('super_admin'), async (req:
     res.json(shops);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== SYSTEM ADMIN: GLOBAL STATS (Super Admin only) ==========
+app.get('/api/system/stats', authenticateToken, requireSuperAdmin, async (_req: any, res: Response) => {
+  try {
+    // Total users
+    let totalUsers = 0;
+    try {
+      const [userRows] = await pool.execute('SELECT COUNT(*) as c FROM users');
+      totalUsers = Number((userRows as any[])[0]?.c ?? 0);
+    } catch (err: any) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[system/stats] users count error:', err?.message || err);
+      }
+    }
+
+    // Total shops (optional if shops table exists)
+    let totalShops: number | null = null;
+    try {
+      const [shopRows] = await pool.execute('SELECT COUNT(*) as c FROM shops');
+      totalShops = Number((shopRows as any[])[0]?.c ?? 0);
+    } catch (err: any) {
+      const msg = String(err?.message || '');
+      if (msg.toLowerCase().includes('doesn\'t exist') || msg.toLowerCase().includes('unknown table')) {
+        totalShops = null;
+      } else {
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('[system/stats] shops count error:', msg);
+        }
+      }
+    }
+
+    // Active/online users based on last_seen_at
+    let active15m = 0;
+    let active60m = 0;
+    try {
+      const [rows] = await pool.execute(
+        `
+        SELECT
+          SUM(CASE WHEN last_seen_at IS NOT NULL AND last_seen_at >= (NOW() - INTERVAL 15 MINUTE) THEN 1 ELSE 0 END) as active15m,
+          SUM(CASE WHEN last_seen_at IS NOT NULL AND last_seen_at >= (NOW() - INTERVAL 60 MINUTE) THEN 1 ELSE 0 END) as active60m
+        FROM users
+        `
+      );
+      const r = (rows as any[])[0] || {};
+      active15m = Number(r.active15m ?? 0);
+      active60m = Number(r.active60m ?? 0);
+    } catch (err: any) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[system/stats] last_seen_at metrics error:', err?.message || err);
+      }
+    }
+
+    const onlineUsers = active15m;
+
+    res.json({
+      ok: true,
+      totalUsers,
+      totalShops,
+      onlineUsers,
+      active15m,
+      active60m,
+    });
+  } catch (error: any) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[system/stats] error:', error?.message || error);
+    }
+    res.status(500).json({ ok: false, error: String(error?.message || 'Server error') });
+  }
+});
+
+// ========== SYSTEM ADMIN: USERS LIST (Super Admin only) ==========
+app.get('/api/system/users', authenticateToken, requireSuperAdmin, async (req: any, res: Response) => {
+  try {
+    const limit = clampInt(req.query.limit, 1, 100, 20);
+    const offset = clampInt(req.query.offset, 0, 1e9, 0);
+    const qRaw = String(req.query.q || '').trim();
+    const q = qRaw.slice(0, 200);
+
+    let baseSql =
+      'SELECT u.id, u.username, u.email, u.role, u.shop_id, u.branch_id, u.created_at, u.last_seen_at, u.is_active, ' +
+      's.name as shop_name, s.business_name, s.slug as shop_slug, b.name as branch_name ' +
+      'FROM users u ' +
+      'LEFT JOIN shops s ON u.shop_id = s.id ' +
+      'LEFT JOIN branches b ON u.branch_id = b.id';
+
+    const params: (string | number)[] = [];
+    if (q.length > 0) {
+      const escaped = q.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+      const qp = `%${escaped}%`;
+      baseSql +=
+        ' WHERE (u.username LIKE ? OR COALESCE(u.email, \'\') LIKE ? OR ' +
+        'COALESCE(s.name, \'\') LIKE ? OR COALESCE(s.business_name, \'\') LIKE ? OR COALESCE(s.slug, \'\') LIKE ?)';
+      params.push(qp, qp, qp, qp, qp);
+    }
+    baseSql += ' ORDER BY u.created_at DESC LIMIT ' + String(limit + 1) + ' OFFSET ' + String(offset);
+
+    let rows: any[] = [];
+    try {
+      const [result] = await pool.execute(baseSql, params);
+      rows = result as any[];
+    } catch (err: any) {
+      // Fallback if shops/branches tables or optional columns are missing
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[system/users] primary query failed, falling back:', err?.message || err);
+      }
+      let fallbackSql =
+        'SELECT u.id, u.username, u.email, u.role, u.shop_id, u.created_at, u.last_seen_at, u.is_active ' +
+        'FROM users u';
+      const fbParams: (string | number)[] = [];
+      if (q.length > 0) {
+        const escaped = q.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+        const qp = `%${escaped}%`;
+        fallbackSql += ' WHERE (u.username LIKE ? OR COALESCE(u.email, \'\') LIKE ?)';
+        fbParams.push(qp, qp);
+      }
+      fallbackSql += ' ORDER BY u.created_at DESC LIMIT ' + String(limit + 1) + ' OFFSET ' + String(offset);
+      const [fallbackRows] = await pool.execute(fallbackSql, fbParams);
+      rows = fallbackRows as any[];
+    }
+
+    const items = rows.slice(0, limit).map((u: any) => ({
+      id: u.id,
+      username: u.username,
+      email: u.email ?? null,
+      role: u.role,
+      shop: u.shop_id
+        ? {
+            id: u.shop_id,
+            name: u.shop_name ?? u.business_name ?? null,
+            slug: u.shop_slug ?? null,
+          }
+        : null,
+      branch: u.branch_id
+        ? {
+            id: u.branch_id,
+            name: u.branch_name ?? null,
+          }
+        : null,
+      last_seen_at: u.last_seen_at ?? null,
+      created_at: u.created_at,
+      is_active: typeof u.is_active === 'number' || typeof u.is_active === 'boolean' ? u.is_active : null,
+    }));
+
+    const hasMore = rows.length > limit;
+    const nextOffset = hasMore ? offset + limit : null;
+
+    res.json({
+      ok: true,
+      items,
+      nextOffset,
+    });
+  } catch (error: any) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[system/users] error:', error?.message || error);
+    }
+    res.status(500).json({ ok: false, error: String(error?.message || 'Server error'), items: [], nextOffset: null });
+  }
+});
+
+// ========== SYSTEM ADMIN: RESET USER PASSWORD (Super Admin only) ==========
+app.post('/api/system/users/:id/reset-password', authenticateToken, requireSuperAdmin, async (req: any, res: Response) => {
+  try {
+    const userId = Number(req.params.id);
+    if (!Number.isFinite(userId) || userId <= 0) {
+      return res.status(400).json({ ok: false, error: 'Invalid user id' });
+    }
+
+    const [rows] = await pool.execute('SELECT id, role, email FROM users WHERE id = ?', [userId]);
+    const userArray = rows as any[];
+    if (userArray.length === 0) {
+      return res.status(404).json({ ok: false, error: 'User not found' });
+    }
+    const targetUser = userArray[0];
+
+    // Optional safety: prevent resetting own super_admin account via this endpoint
+    if (targetUser.role === 'super_admin' && req.user?.id === targetUser.id) {
+      return res.status(403).json({
+        ok: false,
+        error: 'CANNOT_RESET_OWN_SUPER_ADMIN_PASSWORD',
+      });
+    }
+
+    const body = req.body || {};
+    let newPassword: string | null = typeof body.newPassword === 'string' ? String(body.newPassword).trim() : null;
+    if (newPassword && newPassword.length < 8) {
+      return res.status(400).json({ ok: false, error: 'Password must be at least 8 characters' });
+    }
+
+    let generated = false;
+    if (!newPassword) {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%^&*';
+      let tmp = '';
+      for (let i = 0; i < 12; i++) {
+        const idx = Math.floor(Math.random() * chars.length);
+        tmp += chars[idx];
+      }
+      newPassword = tmp;
+      generated = true;
+    }
+
+    const hashed = await bcrypt.hash(newPassword!, 10);
+    await pool.execute('UPDATE users SET password_hash = ?, password = ? WHERE id = ?', [hashed, hashed, userId]);
+
+    res.json({
+      ok: true,
+      tempPassword: generated ? newPassword : undefined,
+    });
+  } catch (error: any) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[system/users/reset-password] error:', error?.message || error);
+    }
+    res.status(500).json({ ok: false, error: String(error?.message || 'Server error') });
   }
 });
 

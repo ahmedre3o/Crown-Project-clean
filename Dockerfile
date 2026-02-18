@@ -6,7 +6,6 @@ WORKDIR /app
 # Next.js inlines NEXT_PUBLIC_* at build time; must be set here, not at runtime.
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-ENV NODE_ENV=production
 
 COPY package*.json ./
 RUN npm ci

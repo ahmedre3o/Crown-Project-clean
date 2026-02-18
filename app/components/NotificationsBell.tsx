@@ -171,15 +171,20 @@ export function NotificationsBell() {
                     notifications.map((n) => (
                       <div
                         key={n.id}
-                        className={`w-full text-start px-4 py-3 border-b border-cyan-500/10 hover:bg-cyan-500/5 transition ${
+                        dir={language === 'ar' ? 'rtl' : 'ltr'}
+                        className={`w-full px-4 py-3 border-b border-cyan-500/10 hover:bg-cyan-500/5 transition ${
                           n.is_read ? 'text-slate-400' : 'text-slate-100 bg-cyan-500/5'
                         }`}
                       >
-                        <div className="flex flex-col gap-1">
-                        <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0 flex-1 text-sm font-semibold break-words">{title(n)}</div>
+                        <div className="flex flex-col gap-1 w-full">
+                          <div className="flex items-start justify-between gap-2 w-full">
+                            <div className="min-w-0 flex-1 text-sm font-semibold break-words whitespace-normal">
+                              {title(n)}
+                            </div>
                             <div className="text-[11px] text-slate-500 shrink-0">
-                              {new Date(n.created_at).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')}
+                              {new Date(n.created_at).toLocaleString(
+                                language === 'ar' ? 'ar-EG' : 'en-US'
+                              )}
                             </div>
                           </div>
                           {body(n) ? (
@@ -216,8 +221,8 @@ export function NotificationsBell() {
               </div>
             ) : (
               <div
-                className={`absolute top-full mt-2 right-0 z-50 w-[min(92vw,420px)] max-h-[70vh] overflow-y-auto rounded-xl border border-cyan-500/25 bg-[#0a0f18] shadow-[0_0_24px_rgba(34,211,238,0.2)] ${
-                  language === 'ar' ? 'text-right' : 'text-left'
+                className={`absolute top-full mt-2 z-50 w-[min(92vw,420px)] max-h-[70vh] overflow-y-auto rounded-xl border border-cyan-500/25 bg-[#0a0f18] shadow-[0_0_24px_rgba(34,211,238,0.2)] ${
+                  language === 'ar' ? 'right-0 origin-top-right text-right' : 'left-0 origin-top-left text-left'
                 }`}
                 dir={language === 'ar' ? 'rtl' : 'ltr'}
               >
@@ -237,15 +242,20 @@ export function NotificationsBell() {
                     notifications.map((n) => (
                       <div
                         key={n.id}
-                        className={`w-full text-start px-4 py-3 border-b border-cyan-500/10 hover:bg-cyan-500/5 transition ${
+                        dir={language === 'ar' ? 'rtl' : 'ltr'}
+                        className={`w-full px-4 py-3 border-b border-cyan-500/10 hover:bg-cyan-500/5 transition ${
                           n.is_read ? 'text-slate-400' : 'text-slate-100 bg-cyan-500/5'
                         }`}
                       >
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0 flex-1 text-sm font-semibold break-words">{title(n)}</div>
+                        <div className="flex flex-col gap-1 w-full">
+                          <div className="flex items-start justify-between gap-2 w-full">
+                            <div className="min-w-0 flex-1 text-sm font-semibold break-words whitespace-normal">
+                              {title(n)}
+                            </div>
                             <div className="text-[11px] text-slate-500 shrink-0">
-                              {new Date(n.created_at).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')}
+                              {new Date(n.created_at).toLocaleString(
+                                language === 'ar' ? 'ar-EG' : 'en-US'
+                              )}
                             </div>
                           </div>
                           {body(n) ? (

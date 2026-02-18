@@ -241,6 +241,7 @@ export default function NotificationsPage() {
               <div
                 key={n.id}
                 id={`notif-${n.id}`}
+                dir={language === 'ar' ? 'rtl' : 'ltr'}
                 className={`rounded-2xl border border-cyan-500/20 bg-white/5 overflow-hidden ${
                   n.is_read ? 'opacity-80' : 'bg-cyan-500/5'
                 }`}

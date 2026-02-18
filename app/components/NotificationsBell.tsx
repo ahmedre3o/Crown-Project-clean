@@ -142,7 +142,9 @@ export function NotificationsBell() {
             />
             {isMobile ? (
               <div
-                className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl border border-cyan-500/30 bg-[#050812] shadow-[0_0_32px_rgba(34,211,238,0.35)] w-full max-h-[80vh] overflow-y-auto"
+                className={`fixed inset-x-0 bottom-0 z-50 rounded-t-2xl border border-cyan-500/30 bg-[#050812] shadow-[0_0_32px_rgba(34,211,238,0.35)] w-full max-h-[80vh] overflow-y-auto ${
+                  language === 'ar' ? 'text-right' : 'text-left'
+                }`}
                 dir={language === 'ar' ? 'rtl' : 'ltr'}
               >
                 <div className="px-4 py-3 border-b border-cyan-500/20 flex items-center justify-between">
@@ -174,14 +176,14 @@ export function NotificationsBell() {
                         }`}
                       >
                         <div className="flex flex-col gap-1">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="text-sm font-semibold break-words">{title(n)}</div>
+                        <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1 text-sm font-semibold break-words">{title(n)}</div>
                             <div className="text-[11px] text-slate-500 shrink-0">
                               {new Date(n.created_at).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')}
                             </div>
                           </div>
                           {body(n) ? (
-                            <div className="text-xs text-slate-400 mt-1 whitespace-pre-wrap break-words line-clamp-2">
+                            <div className="text-xs text-slate-400 mt-1 whitespace-normal break-words line-clamp-2">
                               {body(n)}
                             </div>
                           ) : null}
@@ -214,7 +216,9 @@ export function NotificationsBell() {
               </div>
             ) : (
               <div
-                className="absolute top-full mt-2 right-0 z-50 w-[min(92vw,420px)] max-h-[70vh] overflow-y-auto rounded-xl border border-cyan-500/25 bg-[#0a0f18] shadow-[0_0_24px_rgba(34,211,238,0.2)]"
+                className={`absolute top-full mt-2 right-0 z-50 w-[min(92vw,420px)] max-h-[70vh] overflow-y-auto rounded-xl border border-cyan-500/25 bg-[#0a0f18] shadow-[0_0_24px_rgba(34,211,238,0.2)] ${
+                  language === 'ar' ? 'text-right' : 'text-left'
+                }`}
                 dir={language === 'ar' ? 'rtl' : 'ltr'}
               >
                 <div className="px-4 py-3 border-b border-cyan-500/15 text-sm font-bold text-cyan-100">
@@ -239,13 +243,13 @@ export function NotificationsBell() {
                       >
                         <div className="flex flex-col gap-1">
                           <div className="flex items-start justify-between gap-2">
-                            <div className="text-sm font-semibold break-words">{title(n)}</div>
+                            <div className="min-w-0 flex-1 text-sm font-semibold break-words">{title(n)}</div>
                             <div className="text-[11px] text-slate-500 shrink-0">
                               {new Date(n.created_at).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')}
                             </div>
                           </div>
                           {body(n) ? (
-                            <div className="text-xs text-slate-400 mt-1 whitespace-pre-wrap break-words line-clamp-2">
+                            <div className="text-xs text-slate-400 mt-1 whitespace-normal break-words line-clamp-2">
                               {body(n)}
                             </div>
                           ) : null}

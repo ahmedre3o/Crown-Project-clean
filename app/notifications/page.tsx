@@ -145,7 +145,12 @@ export default function NotificationsPage() {
   if (authLoading || !allowed) return null;
 
   return (
-    <div className={`min-h-screen bg-[#020617] ${direction === 'rtl' ? 'font-[system-ui]' : ''}`}>
+    <div
+      className={`min-h-screen bg-[#020617] ${direction === 'rtl' ? 'font-[system-ui]' : ''} ${
+        language === 'ar' ? 'text-right' : 'text-left'
+      }`}
+      dir={language === 'ar' ? 'rtl' : 'ltr'}
+    >
       <main className="max-w-3xl mx-auto px-4 py-6 md:py-10">
         <header className="mb-6 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">

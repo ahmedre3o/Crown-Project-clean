@@ -53,7 +53,7 @@ app.use((req, res, next) => {
     .map(s => s.trim())
     .filter(Boolean)
     .map(normalize);
-  const allowed = fromEnv.length > 0 ? fromEnv : ['https://crowncs.org', 'http://localhost:3000'].map(normalize);
+  const allowed = fromEnv.length > 0 ? fromEnv : ['https://crowncs.org', 'https://www.crowncs.org', 'http://localhost:3000'].map(normalize);
 
   const o = normalize(origin);
 
@@ -84,7 +84,7 @@ function normalizeOrigin(url: string): string {
   return url.toLowerCase().trim().replace(/\/+$/, '');
 }
 
-const defaultOrigins = ['https://crowncs.org', 'http://localhost:3000'].map(normalizeOrigin);
+const defaultOrigins = ['https://crowncs.org', 'https://www.crowncs.org', 'http://localhost:3000'].map(normalizeOrigin);
 const allowedOrigins = (process.env.CORS_ORIGIN || '')
   .split(',')
   .map((o) => o.trim())
@@ -2859,7 +2859,7 @@ app.get('/api/ai/context', authenticateToken, async (req: any, res: Response) =>
     let shop: any = null;
     if (shopId) {
       const [rows] = await pool.execute(
-        `SELECT id, name, business_name, activity_type, country_name, currency_code, currency_symbol 
+        `SELECT id, name, business_name, business_name_ar, business_name_en, activity_type, country_name, currency_code, currency_symbol 
          FROM shops WHERE id = ?`,
         [shopId]
       );
@@ -2948,7 +2948,7 @@ app.get('/api/ai/context', authenticateToken, async (req: any, res: Response) =>
 app.get('/api/admin/shops', authenticateToken, requireRole('super_admin'), async (req: Request, res: Response) => {
   try {
     const [rows] = await pool.execute(`
-      SELECT s.id, s.name, s.business_name,
+      SELECT s.id, s.name, s.business_name, s.business_name_ar, s.business_name_en,
         (SELECT d.domain FROM domains d WHERE d.shop_id = s.id AND d.is_active = 1 AND d.status = 'active' LIMIT 1) as domain
       FROM shops s
       ORDER BY s.id ASC
@@ -3233,6 +3233,14 @@ app.put('/api/shops/profile', authenticateToken, requireRole('super_admin', 'sho
       body.storeName ??
       body.store_name ??
       null;
+    const businessNameAr =
+      body.businessNameAr ??
+      body.business_name_ar ??
+      null;
+    const businessNameEn =
+      body.businessNameEn ??
+      body.business_name_en ??
+      null;
     const ownerName =
       body.ownerName ??
       body.owner_name ??
@@ -3277,11 +3285,14 @@ app.put('/api/shops/profile', authenticateToken, requireRole('super_admin', 'sho
 
     await pool.execute(
       `UPDATE shops 
-       SET business_name = ?, owner_name = ?, activity_type = ?, address = ?, contact_email = ?, contact_phone = ?, logo_url = ?,
+       SET business_name = ?, business_name_ar = COALESCE(?, business_name_ar), business_name_en = COALESCE(?, business_name_en),
+           owner_name = ?, activity_type = ?, address = ?, contact_email = ?, contact_phone = ?, logo_url = ?,
            country_name = ?, currency_code = ?, currency_symbol = ?
        WHERE id = ?`,
       [
         businessName,
+        businessNameAr,
+        businessNameEn,
         ownerName,
         activityType,
         address,

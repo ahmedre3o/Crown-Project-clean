@@ -479,7 +479,11 @@ function InvoicesPageContent() {
                 </div>
               )}
               <div>
-                <div className="font-semibold text-cyan-200">{business.business_name || business.owner_name}</div>
+                <div className="font-semibold text-cyan-200">
+                  {language === 'ar'
+                    ? business.business_name_ar || business.business_name || business.business_name_en || business.name || 'Crown Services'
+                    : business.business_name_en || business.business_name || business.business_name_ar || business.name || 'Crown Services'}
+                </div>
                 <div>{business.activity_type || ''}</div>
                 <div>{business.address || ''}</div>
                 <div>{business.contact_phone || ''}</div>

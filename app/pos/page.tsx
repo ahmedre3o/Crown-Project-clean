@@ -11,6 +11,7 @@ import { useRouteGuard } from '../guards/useRouteGuard';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { getPlanFeatures } from '../permissions';
 import { Sidebar } from '@/components/Sidebar';
+import { getActiveShopId } from '@/components/ShopSwitcher';
 import { BarcodeScanner } from '../components/BarcodeScanner';
 import { useBranch } from '../contexts/BranchContext';
 
@@ -372,6 +373,15 @@ export default function PosPage() {
 
   const handleInvoicePayment = async () => {
     if (cart.length === 0) return;
+    const activeShopId = getActiveShopId();
+    if (!activeShopId && user?.role === 'super_admin') {
+      toast.error(
+        language === 'ar'
+          ? 'اختر المتجر أولاً من قائمة المتاجر في أعلى الواجهة.'
+          : 'Select a shop first from the shop switcher at the top.'
+      );
+      return;
+    }
     try {
       const items = cart.map((item) => ({
         productId: item.productId,
@@ -382,9 +392,9 @@ export default function PosPage() {
       const payload = {
         items,
         paymentMethod: 'invoice',
-        customerName: customer.name,
-        customerPhone: customer.phone,
-        customerAddress: customer.address,
+        customerName: customer.name || null,
+        customerPhone: customer.phone || null,
+        customerAddress: customer.address || null,
       };
 
       const sale = await createPosSaleOrInvoice(payload, isOnline);
@@ -405,14 +415,54 @@ export default function PosPage() {
       clearCart();
       setCustomer({ name: '', phone: '', address: '' });
       if (isOnline) loadProducts();
-    } catch (error) {
-      console.error('Invoice print failed:', error);
-      alert(language === 'ar' ? 'فشلت العملية' : 'Payment failed');
+    } catch (error: any) {
+      console.error('[POS Invoice Error]', {
+        endpoint: error?.endpoint,
+        status: error?.status,
+        message: error?.message,
+        body: error?.body,
+      });
+      let msg: string;
+      switch (error?.status) {
+        case 400:
+          msg =
+            language === 'ar'
+              ? 'البيانات غير مكتملة أو المتجر غير محدد. راجع الأصناف والمتجر المختار.'
+              : 'Invalid data or missing shop. Please check items and selected shop.';
+          break;
+        case 401:
+          msg =
+            language === 'ar'
+              ? 'انتهت جلسة الدخول. برجاء تسجيل الدخول مرة أخرى.'
+              : 'Session expired. Please log in again.';
+          break;
+        case 409:
+          msg =
+            language === 'ar'
+              ? 'لا يمكن إتمام العملية بسبب المخزون أو قيود الاشتراك.'
+              : 'Sale cannot be completed due to stock or subscription limits.';
+          break;
+        default:
+          msg =
+            language === 'ar'
+              ? 'تعذر إتمام الدفع. حاول مرة أخرى أو تحقق من الاتصال.'
+              : 'Payment failed. Please try again or check your connection.';
+      }
+      toast.error(msg);
     }
   };
 
   const handleCashPayment = async () => {
     if (cart.length === 0) return;
+    const activeShopId = getActiveShopId();
+    if (!activeShopId && user?.role === 'super_admin') {
+      toast.error(
+        language === 'ar'
+          ? 'اختر المتجر أولاً من قائمة المتاجر في أعلى الواجهة.'
+          : 'Select a shop first from the shop switcher at the top.'
+      );
+      return;
+    }
 
     try {
       const items = cart.map((item) => ({
@@ -424,9 +474,9 @@ export default function PosPage() {
       const payload = {
         items,
         paymentMethod: 'cash',
-        customerName: customer.name,
-        customerPhone: customer.phone,
-        customerAddress: customer.address,
+        customerName: customer.name || null,
+        customerPhone: customer.phone || null,
+        customerAddress: customer.address || null,
       };
 
       const sale = await createPosSaleOrInvoice(payload, isOnline);
@@ -448,9 +498,40 @@ export default function PosPage() {
       clearCart();
       setCustomer({ name: '', phone: '', address: '' });
       if (isOnline) loadProducts();
-    } catch (error) {
-      console.error('Payment failed:', error);
-      alert(language === 'ar' ? 'فشلت العملية' : 'Payment failed');
+    } catch (error: any) {
+      console.error('[POS Cash Payment Error]', {
+        endpoint: error?.endpoint,
+        status: error?.status,
+        message: error?.message,
+        body: error?.body,
+      });
+      let msg: string;
+      switch (error?.status) {
+        case 400:
+          msg =
+            language === 'ar'
+              ? 'البيانات غير مكتملة أو المتجر غير محدد. راجع الأصناف والمتجر المختار.'
+              : 'Invalid data or missing shop. Please check items and selected shop.';
+          break;
+        case 401:
+          msg =
+            language === 'ar'
+              ? 'انتهت جلسة الدخول. برجاء تسجيل الدخول مرة أخرى.'
+              : 'Session expired. Please log in again.';
+          break;
+        case 409:
+          msg =
+            language === 'ar'
+              ? 'لا يمكن إتمام العملية بسبب المخزون أو قيود الاشتراك.'
+              : 'Sale cannot be completed due to stock or subscription limits.';
+          break;
+        default:
+          msg =
+            language === 'ar'
+              ? 'تعذر إتمام الدفع. حاول مرة أخرى أو تحقق من الاتصال.'
+              : 'Payment failed. Please try again or check your connection.';
+      }
+      toast.error(msg);
     }
   };
 
@@ -465,6 +546,11 @@ export default function PosPage() {
 
     const duplicateLabel =
       printCount && printCount > 1 ? `Duplicate Copy No. ${Math.max(1, printCount - 1)}` : '';
+
+    const storeName =
+      language === 'ar'
+        ? business?.business_name_ar || business?.business_name || business?.business_name_en
+        : business?.business_name_en || business?.business_name || business?.business_name_ar;
 
     const receiptHTML = `
       <!DOCTYPE html>
@@ -600,7 +686,7 @@ export default function PosPage() {
             <div class="content">
               <div class="header">
                 ${business?.logo_url ? `<img src="${business.logo_url}" alt="Logo" style="height: 48px; margin-bottom: 8px;" />` : ''}
-                <h1>${business?.business_name || 'Crown Services'}</h1>
+                <h1>${storeName || 'Crown Services'}</h1>
                 <p>${business?.activity_type || (language === 'ar' ? 'تاج الخدمات' : 'Services ERP')}</p>
                 ${duplicateLabel ? `<div class="copy-label">${duplicateLabel}</div>` : ''}
               </div>

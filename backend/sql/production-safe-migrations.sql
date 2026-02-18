@@ -118,3 +118,24 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
+-- 13) shops: add business_name_ar / business_name_en if missing
+SET @col = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'shops' AND COLUMN_NAME = 'business_name_ar');
+SET @sql = IF(@col = 0, 'ALTER TABLE shops ADD COLUMN business_name_ar VARCHAR(255) NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'shops' AND COLUMN_NAME = 'business_name_en');
+SET @sql = IF(@col = 0, 'ALTER TABLE shops ADD COLUMN business_name_en VARCHAR(255) NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- 14) shops: migrate existing business_name into both AR/EN name columns (idempotent)
+UPDATE shops
+SET
+  business_name_ar = COALESCE(business_name_ar, business_name),
+  business_name_en = COALESCE(business_name_en, business_name)
+WHERE business_name IS NOT NULL AND business_name <> '';
+
+

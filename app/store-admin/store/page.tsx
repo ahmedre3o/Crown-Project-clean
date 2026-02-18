@@ -57,9 +57,13 @@ export default function StoreManagementPage() {
   const previewUrl = useMemo(() => {
     const id = Number(shopProfile?.id || 0);
     if (!id) return null;
-    const name = shopProfile?.business_name || shopProfile?.name || 'shop';
+    const baseName =
+      language === 'ar'
+        ? shopProfile?.business_name_ar || shopProfile?.business_name || shopProfile?.business_name_en
+        : shopProfile?.business_name_en || shopProfile?.business_name || shopProfile?.business_name_ar;
+    const name = baseName || shopProfile?.name || 'shop';
     return `/store/${id}-${slugify(String(name))}`;
-  }, [shopProfile?.id, shopProfile?.business_name, shopProfile?.name]);
+  }, [shopProfile?.id, shopProfile?.business_name, shopProfile?.business_name_ar, shopProfile?.business_name_en, shopProfile?.name, language]);
 
   const loadDomains = async () => {
     if (!showDomainSection) return;

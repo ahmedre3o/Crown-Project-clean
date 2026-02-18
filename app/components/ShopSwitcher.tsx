@@ -10,7 +10,9 @@ const STORAGE_KEY = 'crown-active-shop-id';
 interface Shop {
   id: number;
   name: string;
-  business_name?: string;
+  business_name?: string | null;
+  business_name_ar?: string | null;
+  business_name_en?: string | null;
   domain?: string | null;
 }
 
@@ -63,8 +65,12 @@ export function ShopSwitcher() {
     window.dispatchEvent(new Event('crown-shop-changed'));
   };
 
-  const displayName = (s: Shop) =>
-    s.business_name || s.name || s.domain || `#${s.id}`;
+  const displayName = (s: Shop) => {
+    if (language === 'ar') {
+      return s.business_name_ar || s.business_name || s.business_name_en || s.name || s.domain || `#${s.id}`;
+    }
+    return s.business_name_en || s.business_name || s.business_name_ar || s.name || s.domain || `#${s.id}`;
+  };
 
   const activeShop = shops.find((s) => String(s.id) === activeShopId);
 

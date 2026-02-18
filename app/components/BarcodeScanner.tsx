@@ -35,6 +35,7 @@ export function BarcodeScanner({
   const streamRef = useRef<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const zxingReaderRef = useRef<any>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const isSecureContext =
     typeof window !== 'undefined' &&
@@ -186,11 +187,24 @@ export function BarcodeScanner({
         <p className="mt-3 text-xs text-slate-400">
           {language === 'ar' ? 'وجّه الكود داخل الإطار. يمكنك أيضاً استخدام إدخال يدوي.' : 'Align the code inside the frame. You can also use manual entry.'}
         </p>
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              try {
+                fileInputRef.current?.click();
+              } catch {
+                // ignore
+              }
+            }}
+            className="w-full py-2 rounded-lg border border-cyan-500/40 text-cyan-200 text-sm hover:bg-cyan-500/10"
+          >
+            {language === 'ar' ? 'مسح من صورة (الكاميرا)' : 'Scan from photo (camera)'}
+          </button>
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2 rounded-lg border border-cyan-500/40 text-cyan-300 text-sm hover:bg-cyan-500/10"
+            className="w-full py-2 rounded-lg border border-cyan-500/40 text-cyan-300 text-sm hover:bg-cyan-500/10"
           >
             {closeText}
           </button>
@@ -199,10 +213,55 @@ export function BarcodeScanner({
             onClick={() => {
               onClose();
             }}
-            className="flex-1 py-2 rounded-lg border border-slate-500/40 text-slate-300 text-sm hover:bg-slate-500/10"
+            className="w-full py-2 rounded-lg border border-slate-500/40 text-slate-300 text-sm hover:bg-slate-500/10"
           >
             {manualText}
           </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              try {
+                const { BrowserMultiFormatReader } = await import('@zxing/browser');
+                const reader = new BrowserMultiFormatReader();
+                const url = URL.createObjectURL(file);
+                const img = new Image();
+                img.src = url;
+                await new Promise<void>((resolve, reject) => {
+                  img.onload = () => resolve();
+                  img.onerror = (err) => reject(err);
+                });
+                const result = await reader.decodeFromImageElement(img as any);
+                URL.revokeObjectURL(url);
+                if (result?.getText()) {
+                  onDetected(result.getText());
+                  onClose();
+                  return;
+                }
+                const msg =
+                  language === 'ar'
+                    ? 'تعذر قراءة الكود من الصورة. حاول مرة أخرى أو استخدم الإدخال اليدوي.'
+                    : 'Could not decode code from image. Try again or use manual entry.';
+                setError(msg);
+                onError?.(msg);
+              } catch (err: any) {
+                const msg =
+                  err?.message ||
+                  (language === 'ar'
+                    ? 'تعذر قراءة الكود من الصورة. حاول مرة أخرى أو استخدم الإدخال اليدوي.'
+                    : 'Could not decode code from image. Try again or use manual entry.');
+                setError(msg);
+                onError?.(msg);
+              } finally {
+                e.target.value = '';
+              }
+            }}
+          />
         </div>
       </div>
     </div>

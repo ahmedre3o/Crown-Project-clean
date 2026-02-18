@@ -17,6 +17,8 @@ export default function SettingsPage() {
   const { currency, setCurrency } = useCurrency();
   const [profile, setProfile] = useState({
     businessName: '',
+    businessNameAr: '',
+    businessNameEn: '',
     ownerName: '',
     activityType: '',
     address: '',
@@ -67,6 +69,8 @@ export default function SettingsPage() {
       const data = await apiRequest('/shops/profile');
       setProfile({
         businessName: data.business_name || data.name || '',
+        businessNameAr: data.business_name_ar || data.business_name || '',
+        businessNameEn: data.business_name_en || data.business_name || '',
         ownerName: data.owner_name || '',
         activityType: data.activity_type || '',
         address: data.address || '',
@@ -105,7 +109,20 @@ export default function SettingsPage() {
       setLoading(true);
       await apiRequest('/shops/profile', {
         method: 'PUT',
-        body: JSON.stringify(profile),
+        body: JSON.stringify({
+          businessName: profile.businessName,
+          businessNameAr: profile.businessNameAr,
+          businessNameEn: profile.businessNameEn,
+          ownerName: profile.ownerName,
+          activityType: profile.activityType,
+          address: profile.address,
+          contactEmail: profile.contactEmail,
+          contactPhone: profile.contactPhone,
+          logoUrl: profile.logoUrl,
+          countryName: profile.countryName,
+          currencyCode: profile.currencyCode,
+          currencySymbol: profile.currencySymbol,
+        }),
       });
       setMessage('Saved successfully');
     } catch (err: any) {
@@ -162,9 +179,15 @@ export default function SettingsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <input
               className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-              placeholder="Store name"
-              value={profile.businessName}
-              onChange={(e) => setProfile((prev) => ({ ...prev, businessName: e.target.value }))}
+              placeholder={language === 'ar' ? 'اسم المتجر (عربي)' : 'Store name (Arabic)'}
+              value={profile.businessNameAr}
+              onChange={(e) => setProfile((prev) => ({ ...prev, businessNameAr: e.target.value }))}
+            />
+            <input
+              className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+              placeholder={language === 'ar' ? 'اسم المتجر (إنجليزي)' : 'Store name (English)'}
+              value={profile.businessNameEn}
+              onChange={(e) => setProfile((prev) => ({ ...prev, businessNameEn: e.target.value }))}
             />
             <input
               className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"

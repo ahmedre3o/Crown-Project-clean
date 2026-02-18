@@ -219,7 +219,10 @@ function StorefrontPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewSlug, domainParam, shopIdParam]);
 
-  const shopName = data?.shop?.business_name || data?.shop?.name || 'Crown Store';
+  const shopName =
+    language === 'ar'
+      ? data?.shop?.business_name_ar || data?.shop?.business_name || data?.shop?.business_name_en || data?.shop?.name || 'Crown Store'
+      : data?.shop?.business_name_en || data?.shop?.business_name || data?.shop?.business_name_ar || data?.shop?.name || 'Crown Store';
   const currency = data?.shop?.currency_symbol || (language === 'ar' ? 'ج.م' : 'EGP');
 
   const filteredProducts = useMemo(() => {

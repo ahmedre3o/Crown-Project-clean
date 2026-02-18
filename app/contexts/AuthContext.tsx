@@ -248,14 +248,21 @@ export const apiRequest = async (url: string, options: RequestInit = {}) => {
     } catch {
       if (raw && raw.trim().startsWith('{')) errorMessage = raw;
       else if (raw && raw.includes('<html')) {
-        errorMessage = response.status === 404
-          ? 'Service not found. Please check that the backend is running.'
-          : response.status === 500
-          ? 'Server error. Please try again later.'
-          : 'Request failed. Please try again.';
+        errorMessage =
+          response.status === 404
+            ? 'Service not found. Please check that the backend is running.'
+            : response.status === 500
+            ? 'Server error. Please try again later.'
+            : 'Request failed. Please try again.';
       } else if (raw) errorMessage = raw.slice(0, 200);
     }
-    throw new Error(errorMessage);
+    const err: any = new Error(errorMessage);
+    err.status = response.status;
+    err.statusText = response.statusText;
+    err.endpoint = `${API_BASE_URL}${url}`;
+    err.url = `${API_BASE_URL}${url}`;
+    err.body = raw;
+    throw err;
   }
 
   return raw ? JSON.parse(raw) : {};

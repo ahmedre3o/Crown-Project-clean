@@ -31,6 +31,8 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.users': 'Users',
     'nav.codes': 'Codes',
     'nav.logout': 'Logout',
+    'nav.systemDashboard': 'System Dashboard',
+    'nav.systemUsers': 'System Users',
 
     // Dashboard
     'dashboard.title': 'Dashboard',
@@ -205,6 +207,8 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.users': 'المستخدمون',
     'nav.codes': 'الأكواد',
     'nav.logout': 'تسجيل الخروج',
+    'nav.systemDashboard': 'لوحة التحكم',
+    'nav.systemUsers': 'مستخدمو النظام',
 
     // Dashboard
     'dashboard.title': 'لوحة التحكم',

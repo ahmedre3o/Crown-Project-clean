@@ -3051,7 +3051,7 @@ app.get('/api/system/users', authenticateToken, requireSuperAdmin, async (req: a
     const q = qRaw.slice(0, 200);
 
     let baseSql =
-      'SELECT u.id, u.username, u.email, u.role, u.shop_id, u.branch_id, u.created_at, u.last_seen_at, u.is_active, ' +
+      'SELECT u.id, u.username, u.email, u.role, u.shop_id, u.branch_id, u.created_at, u.last_seen_at, ' +
       's.name as shop_name, s.business_name, s.slug as shop_slug, b.name as branch_name ' +
       'FROM users u ' +
       'LEFT JOIN shops s ON u.shop_id = s.id ' +
@@ -3078,7 +3078,7 @@ app.get('/api/system/users', authenticateToken, requireSuperAdmin, async (req: a
         console.error('[system/users] primary query failed, falling back:', err?.message || err);
       }
       let fallbackSql =
-        'SELECT u.id, u.username, u.email, u.role, u.shop_id, u.created_at, u.last_seen_at, u.is_active ' +
+        'SELECT u.id, u.username, u.email, u.role, u.shop_id, u.created_at, u.last_seen_at ' +
         'FROM users u';
       const fbParams: (string | number)[] = [];
       if (q.length > 0) {
@@ -3112,7 +3112,6 @@ app.get('/api/system/users', authenticateToken, requireSuperAdmin, async (req: a
         : null,
       last_seen_at: u.last_seen_at ?? null,
       created_at: u.created_at,
-      is_active: typeof u.is_active === 'number' || typeof u.is_active === 'boolean' ? u.is_active : null,
     }));
 
     const hasMore = rows.length > limit;

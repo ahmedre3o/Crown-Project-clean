@@ -49,6 +49,11 @@ logs/
 # ======================
 *.key
 *.pem
+
+# local backups / temp files
+api.ts
+backend/*.bak_*
+backend/*.bak_before_*
 *.bak
 *.bak_*
 *.bak_fix_*

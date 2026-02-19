@@ -37,10 +37,37 @@ dotenv.config({ path: path.join(backendDir, '.env') });
 dotenv.config({ path: path.resolve(backendDir, '..', '.env') });
 
 const app = express();
+
+// ===== GLOBAL_CORS_PREFLIGHT (added) =====
+const ALLOWED_ORIGINS = new Set([
+  'https://crowncs.org',
+  'https://www.crowncs.org',
+  'http://localhost:3000',
+]);
+
+app.use((req: any, res: any, next: any) => {
+  const origin = req.headers.origin as string | undefined;
+
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization, X-Shop-Id, X-Branch-Id, Accept-Language, X-Requested-With'
+  );
+  res.setHeader('Access-Control-Max-Age', '86400');
+
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  next();
+});
+// ===== /GLOBAL_CORS_PREFLIGHT =====
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// âœ… Hard stop for preflight (must be BEFORE any cors() middleware or routes). Never throw.
+// أ¢إ“â€¦ Hard stop for preflight (must be BEFORE any cors() middleware or routes). Never throw.
 app.use((req, res, next) => {
   if (req.method !== 'OPTIONS') return next();
 
@@ -102,7 +129,7 @@ const corsOptions: cors.CorsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Shop-Id'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Shop-Id', 'X-Branch-Id', 'Accept-Language', 'X-Requested-With'],
 };
 
 app.use(cors(corsOptions));
@@ -113,7 +140,7 @@ app.get('/api/plans', (req: Request, res: Response) => {
     ...p,
     pricingForLang: p.pricing[lang],
     currency: lang === 'ar' ? 'EGP' : 'USD',
-    currencySymbol: lang === 'ar' ? 'Ø¬.Ù…' : '$',
+    currencySymbol: lang === 'ar' ? 'أکآ¬.أ™â€¦' : '$',
   }));
   res.json(plans);
 });
@@ -187,7 +214,7 @@ const genAI = (() => {
     // Use stable (v1) endpoints to avoid v1beta model issues.
     return new GoogleGenAI({ apiKey: GEMINI_API_KEY, apiVersion: 'v1' });
   } catch (error) {
-    console.error('âŒ Gemini SDK init error:', error);
+    console.error('أ¢آ‌إ’ Gemini SDK init error:', error);
     return null;
   }
 })();
@@ -207,7 +234,7 @@ const ensureSuperAdmin = async () => {
     connection = await pool.getConnection();
     await connection.beginTransaction();
 
-    // Ø§Ø¹ØªÙ…Ø¯ Ø¹Ù„Ù‰ Ø§Ù„Ø£Ø¹Ù…Ø¯Ø© Ø§Ù„Ø­Ø§Ù„ÙŠØ© ÙÙŠ Ø¬Ø¯ÙˆÙ„ users Ø¨Ø¯ÙˆÙ† ÙØ±Ø¶ ÙˆØ¬ÙˆØ¯ password_hash / is_admin / is_super_admin
+    // أکآ§أکآ¹أکآھأ™â€¦أکآ¯ أکآ¹أ™â€‍أ™â€° أکآ§أ™â€‍أکآ£أکآ¹أ™â€¦أکآ¯أکآ© أکآ§أ™â€‍أکآ­أکآ§أ™â€‍أ™إ أکآ© أ™آپأ™إ  أکآ¬أکآ¯أ™ث†أ™â€‍ users أکآ¨أکآ¯أ™ث†أ™â€  أ™آپأکآ±أکآ¶ أ™ث†أکآ¬أ™ث†أکآ¯ password_hash / is_admin / is_super_admin
     const [userRows] = await connection.execute(
       'SELECT id, password FROM users WHERE email = ? OR username = ?',
       [SUPER_ADMIN_EMAIL, SUPER_ADMIN_EMAIL]
@@ -221,7 +248,7 @@ const ensureSuperAdmin = async () => {
          VALUES (?, ?, ?, 'super_admin', NOW())`,
         [SUPER_ADMIN_EMAIL, SUPER_ADMIN_EMAIL, hashed]
       );
-      console.log('âœ… SUPER ADMIN READY (created)');
+      console.log('أ¢إ“â€¦ SUPER ADMIN READY (created)');
     } else {
       const forceReset = process.env.FORCE_SUPER_ADMIN_RESET === 'true';
       if (forceReset) {
@@ -233,13 +260,13 @@ const ensureSuperAdmin = async () => {
       } else {
         await connection.execute('UPDATE users SET role = ? WHERE id = ?', ['super_admin', existing.id]);
       }
-      console.log('âœ… SUPER ADMIN READY (updated)');
+      console.log('أ¢إ“â€¦ SUPER ADMIN READY (updated)');
     }
 
     await connection.commit();
   } catch (error) {
     if (connection) await connection.rollback().catch(() => {});
-    console.error('âŒ Failed to ensure super admin:', (error as any).message);
+    console.error('أ¢آ‌إ’ Failed to ensure super admin:', (error as any).message);
   } finally {
     if (connection) connection.release();
   }
@@ -252,7 +279,7 @@ testConnection().then(async () => {
     try {
       await pool.execute('ALTER TABLE shops MODIFY COLUMN logo_url LONGTEXT');
     } catch (migrationError) {
-      console.error('âŒ logo_url migration error:', (migrationError as any)?.message || migrationError);
+      console.error('أ¢آ‌إ’ logo_url migration error:', (migrationError as any)?.message || migrationError);
     }
     await ensureSuperAdmin();
   } catch (error) {
@@ -651,7 +678,7 @@ app.post('/api/products/bulk-delete', authenticateToken, requireRole('super_admi
       : [];
 
     if (!ids.length) {
-      return res.status(400).json({ ok: false, error: 'Ù„Ù… ÙŠØªÙ… ØªØ­Ø¯ÙŠØ¯ Ø£ÙŠ ØµÙ†Ù' });
+      return res.status(400).json({ ok: false, error: 'أ™â€‍أ™â€¦ أ™إ أکآھأ™â€¦ أکآھأکآ­أکآ¯أ™إ أکآ¯ أکآ£أ™إ  أکآµأ™â€ أ™آپ' });
     }
 
     const shopId = req.user?.shopId ?? req.user?.shop_id ?? resolveShopId(req);
@@ -667,7 +694,7 @@ app.post('/api/products/bulk-delete', authenticateToken, requireRole('super_admi
     );
     const ownedCount = (ownershipRows as any[])[0]?.c ?? 0;
     if (ownedCount < ids.length) {
-      return res.status(403).json({ ok: false, error: 'Ø¨Ø¹Ø¶ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª Ø§Ù„Ù…Ø­Ø¯Ø¯Ø© Ù„Ø§ ØªÙ†ØªÙ…ÙŠ Ù„Ù„Ù…ØªØ¬Ø± Ø§Ù„Ø­Ø§Ù„ÙŠ' });
+      return res.status(403).json({ ok: false, error: 'أکآ¨أکآ¹أکآ¶ أکآ§أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬أکآ§أکآھ أکآ§أ™â€‍أ™â€¦أکآ­أکآ¯أکآ¯أکآ© أ™â€‍أکآ§ أکآھأ™â€ أکآھأ™â€¦أ™إ  أ™â€‍أ™â€‍أ™â€¦أکآھأکآ¬أکآ± أکآ§أ™â€‍أکآ­أکآ§أ™â€‍أ™إ ' });
     }
 
     const [result] = await pool.execute(
@@ -712,7 +739,7 @@ app.get('/api/models', authenticateToken, requireRole('super_admin'), async (req
 
     res.json({ count: models.length, models });
   } catch (error: any) {
-    console.error('âŒ /api/models error:', { name: error?.name, status: error?.status, message: error?.message });
+    console.error('أ¢آ‌إ’ /api/models error:', { name: error?.name, status: error?.status, message: error?.message });
     res.status(500).json({ error: 'Failed to list models' });
   }
 });
@@ -914,7 +941,7 @@ const getTtsLocaleForLang = (lang: 'ar' | 'en') => {
   return lang === 'ar' ? 'ar-EG' : 'en-US';
 };
 
-/** Strip Markdown from assistant reply so users never see ** or ### etc.; also remove bullets that cause "Ù†Ø¬ÙˆÙ…" in TTS. */
+/** Strip Markdown from assistant reply so users never see ** or ### etc.; also remove bullets that cause "أ™â€ أکآ¬أ™ث†أ™â€¦" in TTS. */
 function sanitizeReply(text: string): string {
   if (!text || typeof text !== 'string') return '';
   let s = text
@@ -926,7 +953,7 @@ function sanitizeReply(text: string): string {
     .replace(/^>\s?/gm, '')
     .replace(/```/g, '')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/[â€¢]/g, '-')
+    .replace(/[أ¢â‚¬آ¢]/g, '-')
     .replace(/\s+/g, ' ')
     .trim();
   return s;
@@ -955,18 +982,18 @@ const fieldMatchers: Record<string, string[]> = {
     'Part_Name',
     'description',
     'item name',
-    'Ø§Ø³Ù… Ø§Ù„Ù…Ù†ØªØ¬',
-    'Ø§Ù„Ù…Ù†ØªØ¬',
-    'Ø§Ø³Ù…',
-    'Ø§Ø³Ù… Ø§Ù„ØµÙ†Ù',
-    'Ø§Ù„ÙˆØµÙ',
+    'أکآ§أکآ³أ™â€¦ أکآ§أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬',
+    'أکآ§أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬',
+    'أکآ§أکآ³أ™â€¦',
+    'أکآ§أکآ³أ™â€¦ أکآ§أ™â€‍أکآµأ™â€ أ™آپ',
+    'أکآ§أ™â€‍أ™ث†أکآµأ™آپ',
   ],
-  nameAr: ['name_ar', 'name ar', 'arabic', 'arabicname', 'Ø§Ø³Ù… Ø¹Ø±Ø¨ÙŠ', 'Ø§Ø³Ù…'],
-  brand: ['brand', 'Brand', 'manufacturer', 'company', 'mark', 'Ø§Ù„Ù…Ø§Ø±ÙƒØ©', 'Ø§Ù„Ø¹Ù„Ø§Ù…Ø©'],
-  sku: ['sku', 'itemcode', 'code', 'partnumber', 'part', 'reference', 'ref', 'Ø±Ù‚Ù… Ø§Ù„ØµÙ†Ù'],
-  barcode: ['barcode', 'bar code', 'ean', 'upc', 'gtin', 'Ø¨Ø§Ø±ÙƒÙˆØ¯', 'qr code', 'qr_code', 'qrcode', 'QR_Code'],
+  nameAr: ['name_ar', 'name ar', 'arabic', 'arabicname', 'أکآ§أکآ³أ™â€¦ أکآ¹أکآ±أکآ¨أ™إ ', 'أکآ§أکآ³أ™â€¦'],
+  brand: ['brand', 'Brand', 'manufacturer', 'company', 'mark', 'أکآ§أ™â€‍أ™â€¦أکآ§أکآ±أ™ئ’أکآ©', 'أکآ§أ™â€‍أکآ¹أ™â€‍أکآ§أ™â€¦أکآ©'],
+  sku: ['sku', 'itemcode', 'code', 'partnumber', 'part', 'reference', 'ref', 'أکآ±أ™â€ڑأ™â€¦ أکآ§أ™â€‍أکآµأ™â€ أ™آپ'],
+  barcode: ['barcode', 'bar code', 'ean', 'upc', 'gtin', 'أکآ¨أکآ§أکآ±أ™ئ’أ™ث†أکآ¯', 'qr code', 'qr_code', 'qrcode', 'QR_Code'],
   qrCode: ['qr', 'qrcode', 'qr code'],
-  category: ['category', 'group', 'type', 'Ù‚Ø³Ù…', 'Ø§Ù„ÙØ¦Ø©', 'ØªØµÙ†ÙŠÙ'],
+  category: ['category', 'group', 'type', 'أ™â€ڑأکآ³أ™â€¦', 'أکآ§أ™â€‍أ™آپأکآ¦أکآ©', 'أکآھأکآµأ™â€ أ™إ أ™آپ'],
   buyPrice: [
     'buy',
     'buy price',
@@ -977,10 +1004,10 @@ const fieldMatchers: Record<string, string[]> = {
     'purchase',
     'purchaseprice',
     'costprice',
-    'Ø³Ø¹Ø± Ø§Ù„Ø´Ø±Ø§Ø¡',
-    'Ø´Ø±Ø§Ø¡',
-    'ØªÙƒÙ„ÙØ©',
-    'Ø³Ø¹Ø± Ø§Ù„ØªÙƒÙ„ÙØ©',
+    'أکآ³أکآ¹أکآ± أکآ§أ™â€‍أکآ´أکآ±أکآ§أکآ،',
+    'أکآ´أکآ±أکآ§أکآ،',
+    'أکآھأ™ئ’أ™â€‍أ™آپأکآ©',
+    'أکآ³أکآ¹أکآ± أکآ§أ™â€‍أکآھأ™ئ’أ™â€‍أ™آپأکآ©',
   ],
   sellPrice: [
     'sell',
@@ -990,13 +1017,13 @@ const fieldMatchers: Record<string, string[]> = {
     'selling price',
     'price',
     'unitprice',
-    'Ø³Ø¹Ø± Ø§Ù„Ø¨ÙŠØ¹',
-    'Ø¨ÙŠØ¹',
-    'Ø§Ù„Ø³Ø¹Ø±',
-    'Ø³Ø¹Ø±',
+    'أکآ³أکآ¹أکآ± أکآ§أ™â€‍أکآ¨أ™إ أکآ¹',
+    'أکآ¨أ™إ أکآ¹',
+    'أکآ§أ™â€‍أکآ³أکآ¹أکآ±',
+    'أکآ³أکآ¹أکآ±',
   ],
-  stockQuantity: ['qty', 'quantity', 'stock', 'Stock', 'available', 'onhand', 'ÙƒÙ…ÙŠØ©', 'Ø§Ù„Ù…Ø®Ø²ÙˆÙ†'],
-  minStockLevel: ['min', 'minimum', 'reorder', 'minstock', 'min stock', 'Ø­Ø¯ Ø§Ø¯Ù†Ù‰', 'Ø­Ø¯ Ø£Ø¯Ù†Ù‰'],
+  stockQuantity: ['qty', 'quantity', 'stock', 'Stock', 'available', 'onhand', 'أ™ئ’أ™â€¦أ™إ أکآ©', 'أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™ث†أ™â€ '],
+  minStockLevel: ['min', 'minimum', 'reorder', 'minstock', 'min stock', 'أکآ­أکآ¯ أکآ§أکآ¯أ™â€ أ™â€°', 'أکآ­أکآ¯ أکآ£أکآ¯أ™â€ أ™â€°'],
   imageUrl: ['image url', 'image_url', 'imageurl', 'img', 'photo', 'picture', 'Image_URL'],
 };
 
@@ -1017,8 +1044,8 @@ const buildProductImportMappingGuide = (headers: string[], columnMap: Record<str
     detectedHeaders: headers,
     currentMapping: columnMap,
     optionalFields: [
-      { field: 'name', note: 'Product name (empty â†’ draft name).', acceptedHeaders: fieldMatchers.name },
-      { field: 'sellPrice', note: 'Sell price (empty â†’ 0, row saved as draft).', acceptedHeaders: [...fieldMatchers.sellPrice, ...fieldMatchers.buyPrice] },
+      { field: 'name', note: 'Product name (empty أ¢â€ â€™ draft name).', acceptedHeaders: fieldMatchers.name },
+      { field: 'sellPrice', note: 'Sell price (empty أ¢â€ â€™ 0, row saved as draft).', acceptedHeaders: [...fieldMatchers.sellPrice, ...fieldMatchers.buyPrice] },
     ],
     suggestedHeaders: {
       name: fieldMatchers.name,
@@ -1038,7 +1065,7 @@ const buildProductImportMappingGuide = (headers: string[], columnMap: Record<str
   };
 };
 
-// --- Power Queryâ€“style import: canonical keys + auto-mapping (no user mapping UI) ---
+// --- Power Queryأ¢â‚¬â€œstyle import: canonical keys + auto-mapping (no user mapping UI) ---
 const PRODUCT_IMPORT_CANONICAL_KEYS = [
   'partName',
   'nameAr',
@@ -1056,18 +1083,18 @@ const PRODUCT_IMPORT_CANONICAL_KEYS = [
 type CanonicalKey = (typeof PRODUCT_IMPORT_CANONICAL_KEYS)[number];
 
 const PRODUCT_IMPORT_ALIASES: Record<CanonicalKey, string[]> = {
-  partName: ['part_name', 'part name', 'product name', 'name', 'productname', 'item', 'title', 'description', 'Ø§Ø³Ù… Ø§Ù„Ù…Ù†ØªØ¬', 'Ø§Ø³Ù…', 'Ø§Ù„ÙˆØµÙ'],
-  nameAr: ['name_ar', 'name ar', 'arabic name', 'namear', 'Ø§Ø³Ù… Ø¹Ø±Ø¨ÙŠ', 'Ø§Ù„Ø§Ø³Ù…'],
-  brand: ['brand', 'brand_name', 'manufacturer', 'company', 'mark', 'Ø§Ù„Ù…Ø§Ø±ÙƒØ©', 'Ø§Ù„Ø´Ø±ÙƒØ©', 'Ø§Ù„Ø¹Ù„Ø§Ù…Ø©'],
-  category: ['category', 'group', 'type', 'Ù‚Ø³Ù…', 'Ø§Ù„ÙØ¦Ø©', 'ØªØµÙ†ÙŠÙ'],
-  sellPrice: ['sellprice', 'sell_price', 'price', 'sale', 'Ø³Ø¹Ø± Ø§Ù„Ø¨ÙŠØ¹', 'Ø¨ÙŠØ¹', 'Ø§Ù„Ø³Ø¹Ø±', 'Ø³Ø¹Ø±'],
-  buyPrice: ['buyprice', 'buy_price', 'cost', 'purchase', 'Ø³Ø¹Ø± Ø§Ù„Ø´Ø±Ø§Ø¡', 'Ø´Ø±Ø§Ø¡', 'ØªÙƒÙ„ÙØ©'],
-  stockQty: ['stock', 'stockqty', 'stock_qty', 'quantity', 'qty', 'Ø§Ù„ÙƒÙ…ÙŠØ©', 'Ø§Ù„Ù…Ø®Ø²ÙˆÙ†'],
-  sku: ['sku', 'sku_code', 'code', 'partnumber', 'Ø±Ù‚Ù… Ø§Ù„ØµÙ†Ù'],
-  barcode: ['barcode', 'bar_code', 'ean', 'upc', 'Ø¨Ø§Ø±ÙƒÙˆØ¯'],
+  partName: ['part_name', 'part name', 'product name', 'name', 'productname', 'item', 'title', 'description', 'أکآ§أکآ³أ™â€¦ أکآ§أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬', 'أکآ§أکآ³أ™â€¦', 'أکآ§أ™â€‍أ™ث†أکآµأ™آپ'],
+  nameAr: ['name_ar', 'name ar', 'arabic name', 'namear', 'أکآ§أکآ³أ™â€¦ أکآ¹أکآ±أکآ¨أ™إ ', 'أکآ§أ™â€‍أکآ§أکآ³أ™â€¦'],
+  brand: ['brand', 'brand_name', 'manufacturer', 'company', 'mark', 'أکآ§أ™â€‍أ™â€¦أکآ§أکآ±أ™ئ’أکآ©', 'أکآ§أ™â€‍أکآ´أکآ±أ™ئ’أکآ©', 'أکآ§أ™â€‍أکآ¹أ™â€‍أکآ§أ™â€¦أکآ©'],
+  category: ['category', 'group', 'type', 'أ™â€ڑأکآ³أ™â€¦', 'أکآ§أ™â€‍أ™آپأکآ¦أکآ©', 'أکآھأکآµأ™â€ أ™إ أ™آپ'],
+  sellPrice: ['sellprice', 'sell_price', 'price', 'sale', 'أکآ³أکآ¹أکآ± أکآ§أ™â€‍أکآ¨أ™إ أکآ¹', 'أکآ¨أ™إ أکآ¹', 'أکآ§أ™â€‍أکآ³أکآ¹أکآ±', 'أکآ³أکآ¹أکآ±'],
+  buyPrice: ['buyprice', 'buy_price', 'cost', 'purchase', 'أکآ³أکآ¹أکآ± أکآ§أ™â€‍أکآ´أکآ±أکآ§أکآ،', 'أکآ´أکآ±أکآ§أکآ،', 'أکآھأ™ئ’أ™â€‍أ™آپأکآ©'],
+  stockQty: ['stock', 'stockqty', 'stock_qty', 'quantity', 'qty', 'أکآ§أ™â€‍أ™ئ’أ™â€¦أ™إ أکآ©', 'أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™ث†أ™â€ '],
+  sku: ['sku', 'sku_code', 'code', 'partnumber', 'أکآ±أ™â€ڑأ™â€¦ أکآ§أ™â€‍أکآµأ™â€ أ™آپ'],
+  barcode: ['barcode', 'bar_code', 'ean', 'upc', 'أکآ¨أکآ§أکآ±أ™ئ’أ™ث†أکآ¯'],
   qrCode: ['qr_code', 'qrcode', 'qr code'],
   imageUrl: ['image_url', 'imageurl', 'image url', 'image', 'photo', 'picture', 'url'],
-  minStockLevel: ['minstock', 'min_stock', 'minimum', 'Ø­Ø¯ Ø§Ø¯Ù†Ù‰', 'Ø­Ø¯ Ø£Ø¯Ù†Ù‰'],
+  minStockLevel: ['minstock', 'min_stock', 'minimum', 'أکآ­أکآ¯ أکآ§أکآ¯أ™â€ أ™â€°', 'أکآ­أکآ¯ أکآ£أکآ¯أ™â€ أ™â€°'],
 };
 
 function normalizeHeaderForImport(value: string): string {
@@ -1286,12 +1313,12 @@ async function parseExcelOrCsv(buffer: Buffer, filename: string, opts?: { sheetI
 }
 
 const AR_ERRORS: Record<string, string> = {
-  name_required: 'Ø§Ù„Ø§Ø³Ù… Ù…Ø·Ù„ÙˆØ¨',
-  sell_price_invalid: 'Ø³Ø¹Ø± Ø§Ù„Ø¨ÙŠØ¹ ØºÙŠØ± ØµØ§Ù„Ø­',
-  buy_price_invalid: 'Ø³Ø¹Ø± Ø§Ù„Ø´Ø±Ø§Ø¡ ØºÙŠØ± ØµØ§Ù„Ø­',
-  stock_invalid: 'Ø§Ù„ÙƒÙ…ÙŠØ© ØºÙŠØ± ØµØ§Ù„Ø­Ø©',
-  sku_duplicate: 'SKU Ù…ÙƒØ±Ø±',
-  barcode_duplicate: 'Ø§Ù„Ø¨Ø§Ø±ÙƒÙˆØ¯ Ù…ÙƒØ±Ø±',
+  name_required: 'أکآ§أ™â€‍أکآ§أکآ³أ™â€¦ أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨',
+  sell_price_invalid: 'أکآ³أکآ¹أکآ± أکآ§أ™â€‍أکآ¨أ™إ أکآ¹ أکآ؛أ™إ أکآ± أکآµأکآ§أ™â€‍أکآ­',
+  buy_price_invalid: 'أکآ³أکآ¹أکآ± أکآ§أ™â€‍أکآ´أکآ±أکآ§أکآ، أکآ؛أ™إ أکآ± أکآµأکآ§أ™â€‍أکآ­',
+  stock_invalid: 'أکآ§أ™â€‍أ™ئ’أ™â€¦أ™إ أکآ© أکآ؛أ™إ أکآ± أکآµأکآ§أ™â€‍أکآ­أکآ©',
+  sku_duplicate: 'SKU أ™â€¦أ™ئ’أکآ±أکآ±',
+  barcode_duplicate: 'أکآ§أ™â€‍أکآ¨أکآ§أکآ±أ™ئ’أ™ث†أکآ¯ أ™â€¦أ™ئ’أکآ±أکآ±',
 };
 
 function validateCanonicalRow(
@@ -1303,26 +1330,26 @@ function validateCanonicalRow(
   const errs: string[] = [];
   const partName = (canonical.partName ?? '').trim();
   const nameAr = (canonical.nameAr ?? '').trim();
-  if (!partName && !nameAr) errs.push(`Ø§Ù„ØµÙ†Ù Ø±Ù‚Ù… ${rowIndex + 1}: ${AR_ERRORS.name_required}`);
+  if (!partName && !nameAr) errs.push(`أکآ§أ™â€‍أکآµأ™â€ أ™آپ أکآ±أ™â€ڑأ™â€¦ ${rowIndex + 1}: ${AR_ERRORS.name_required}`);
   const sellRaw = (canonical.sellPrice ?? '').trim();
   const buyRaw = (canonical.buyPrice ?? '').trim();
   if (sellRaw) {
     const n = normalizeNumber(sellRaw);
-    if (n === null || n < 0) errs.push(`Ø§Ù„ØµÙ†Ù Ø±Ù‚Ù… ${rowIndex + 1}: ${AR_ERRORS.sell_price_invalid}`);
+    if (n === null || n < 0) errs.push(`أکآ§أ™â€‍أکآµأ™â€ أ™آپ أکآ±أ™â€ڑأ™â€¦ ${rowIndex + 1}: ${AR_ERRORS.sell_price_invalid}`);
   }
   if (buyRaw) {
     const n = normalizeNumber(buyRaw);
-    if (n === null || n < 0) errs.push(`Ø§Ù„ØµÙ†Ù Ø±Ù‚Ù… ${rowIndex + 1}: ${AR_ERRORS.buy_price_invalid}`);
+    if (n === null || n < 0) errs.push(`أکآ§أ™â€‍أکآµأ™â€ أ™آپ أکآ±أ™â€ڑأ™â€¦ ${rowIndex + 1}: ${AR_ERRORS.buy_price_invalid}`);
   }
   const sq = (canonical.stockQty ?? '').trim();
   if (sq) {
     const n = normalizeNumber(sq);
-    if (n === null || Math.floor(Number(n)) < 0) errs.push(`Ø§Ù„ØµÙ†Ù Ø±Ù‚Ù… ${rowIndex + 1}: ${AR_ERRORS.stock_invalid}`);
+    if (n === null || Math.floor(Number(n)) < 0) errs.push(`أکآ§أ™â€‍أکآµأ™â€ أ™آپ أکآ±أ™â€ڑأ™â€¦ ${rowIndex + 1}: ${AR_ERRORS.stock_invalid}`);
   }
   const sku = (canonical.sku ?? '').trim();
-  if (sku && skuSet.has(normalizeText(sku))) errs.push(`Ø§Ù„ØµÙ†Ù Ø±Ù‚Ù… ${rowIndex + 1}: ${AR_ERRORS.sku_duplicate}`);
+  if (sku && skuSet.has(normalizeText(sku))) errs.push(`أکآ§أ™â€‍أکآµأ™â€ أ™آپ أکآ±أ™â€ڑأ™â€¦ ${rowIndex + 1}: ${AR_ERRORS.sku_duplicate}`);
   const barcode = (canonical.barcode ?? '').trim() || (canonical.qrCode ?? '').trim();
-  if (barcode && barcodeSet.has(normalizeText(barcode))) errs.push(`Ø§Ù„ØµÙ†Ù Ø±Ù‚Ù… ${rowIndex + 1}: ${AR_ERRORS.barcode_duplicate}`);
+  if (barcode && barcodeSet.has(normalizeText(barcode))) errs.push(`أکآ§أ™â€‍أکآµأ™â€ أ™آپ أکآ±أ™â€ڑأ™â€¦ ${rowIndex + 1}: ${AR_ERRORS.barcode_duplicate}`);
   return errs;
 }
 
@@ -1500,7 +1527,7 @@ const enforcePlanLimits = async (shopId: number, requestedRole: string) => {
   const additionalUsersCount = Number((counts as any[])[0]?.total || 0);
   if (additionalUsersCount >= additionalLimit) {
     const err = new Error('PLAN_USER_LIMIT_REACHED') as any;
-    err.message_ar = 'Ù„Ù‚Ø¯ ÙˆØµÙ„Øª Ù„Ù„Ø­Ø¯ Ø§Ù„Ø£Ù‚ØµÙ‰ Ù„Ø¹Ø¯Ø¯ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ† ÙÙŠ Ø¨Ø§Ù‚ØªÙƒ. Ù‚Ù… Ø¨Ø§Ù„ØªØ±Ù‚ÙŠØ© Ø£Ùˆ Ø§Ø­Ø°Ù Ù…Ø³ØªØ®Ø¯Ù…Ù‹Ø§.';
+    err.message_ar = 'أ™â€‍أ™â€ڑأکآ¯ أ™ث†أکآµأ™â€‍أکآھ أ™â€‍أ™â€‍أکآ­أکآ¯ أکآ§أ™â€‍أکآ£أ™â€ڑأکآµأ™â€° أ™â€‍أکآ¹أکآ¯أکآ¯ أکآ§أ™â€‍أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦أ™إ أ™â€  أ™آپأ™إ  أکآ¨أکآ§أ™â€ڑأکآھأ™ئ’. أ™â€ڑأ™â€¦ أکآ¨أکآ§أ™â€‍أکآھأکآ±أ™â€ڑأ™إ أکآ© أکآ£أ™ث† أکآ§أکآ­أکآ°أ™آپ أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦أ™â€¹أکآ§.';
     err.message_en = "You have reached your plan's user limit. Upgrade your plan or remove a user.";
     throw err;
   }
@@ -1517,7 +1544,7 @@ const generateInvoiceNumber = async (shopId?: number) => {
   const year = new Date().getFullYear();
   const prefix = `INV-${year}-`;
   const params: any[] = [];
-  let where = `WHERE invoice_number LIKE ?`;
+  let where = `WHERE shop_id = ? AND invoice_number LIKE ?`;
   params.push(`${prefix}%`);
   if (shopId) {
     where += ' AND shop_id = ?';
@@ -1651,10 +1678,10 @@ const createSaleAndItems = async (req: any, paymentMethodOverride?: string) => {
     );
 
     const itemsCount = items.length;
-    const titleAr = 'Ø¹Ù…Ù„ÙŠØ© Ø¨ÙŠØ¹ Ø¬Ø¯ÙŠØ¯Ø© (POS)';
+    const titleAr = 'أکآ¹أ™â€¦أ™â€‍أ™إ أکآ© أکآ¨أ™إ أکآ¹ أکآ¬أکآ¯أ™إ أکآ¯أکآ© (POS)';
     const titleEn = 'New POS sale';
-    const bodyAr = `ÙØ§ØªÙˆØ±Ø© Ø¬Ø¯ÙŠØ¯Ø© Ø¨Ù‚ÙŠÙ…Ø© ${totalAmount.toFixed(2)} — ${itemsCount} Ù…Ù†ØªØ¬`;
-    const bodyEn = `New sale. Total: ${totalAmount.toFixed(2)} EGP — ${itemsCount} items`;
+    const bodyAr = `أ™آپأکآ§أکآھأ™ث†أکآ±أکآ© أکآ¬أکآ¯أ™إ أکآ¯أکآ© أکآ¨أ™â€ڑأ™إ أ™â€¦أکآ© ${totalAmount.toFixed(2)} â€” ${itemsCount} أ™â€¦أ™â€ أکآھأکآ¬`;
+    const bodyEn = `New sale. Total: ${totalAmount.toFixed(2)} EGP â€” ${itemsCount} items`;
     await connection.execute(
       `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
        VALUES (?, 'pos', 'pos_sale_created', ?, ?, ?, ?, 0, ?)`,
@@ -1778,7 +1805,7 @@ async function findUserByIdentifier(identifier: string, resolvedShopId: number |
   return rows.length > 0 ? rows[0] : null;
 }
 
-const SUPER_ADMIN_EMAIL_ONLY_AR = 'Ø­Ø³Ø§Ø¨ Ù…Ø¯ÙŠØ± Ø§Ù„Ù†Ø¸Ø§Ù… ÙŠØ¬Ø¨ ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„ Ø¨Ø§Ù„Ø¨Ø±ÙŠØ¯ Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ.';
+const SUPER_ADMIN_EMAIL_ONLY_AR = 'أکآ­أکآ³أکآ§أکآ¨ أ™â€¦أکآ¯أ™إ أکآ± أکآ§أ™â€‍أ™â€ أکآ¸أکآ§أ™â€¦ أ™إ أکآ¬أکآ¨ أکآھأکآ³أکآ¬أ™إ أ™â€‍ أکآ§أ™â€‍أکآ¯أکآ®أ™ث†أ™â€‍ أکآ¨أکآ§أ™â€‍أکآ¨أکآ±أ™إ أکآ¯ أکآ§أ™â€‍أکآ¥أ™â€‍أ™ئ’أکآھأکآ±أ™ث†أ™â€ أ™إ .';
 const SUPER_ADMIN_EMAIL_ONLY_EN = 'Super admin must sign in using email.';
 
 let userColumnSet: Set<string> | null = null;
@@ -1823,7 +1850,7 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
   if (!identifier.includes('@') && !hasValidShopId) {
     return res.status(400).json({
       error: 'SHOP_ID_REQUIRED',
-      message_ar: 'Ù…Ø¹Ø±Ù Ø§Ù„Ù…ØªØ¬Ø± Ù…Ø·Ù„ÙˆØ¨ Ø¹Ù†Ø¯ ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„ Ø¨Ø±Ù‚Ù… Ø§Ù„Ù…ÙˆØ¸Ù Ø£Ùˆ Ø§Ø³Ù… Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù….',
+      message_ar: 'أ™â€¦أکآ¹أکآ±أ™آپ أکآ§أ™â€‍أ™â€¦أکآھأکآ¬أکآ± أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨ أکآ¹أ™â€ أکآ¯ أکآھأکآ³أکآ¬أ™إ أ™â€‍ أکآ§أ™â€‍أکآ¯أکآ®أ™ث†أ™â€‍ أکآ¨أکآ±أ™â€ڑأ™â€¦ أکآ§أ™â€‍أ™â€¦أ™ث†أکآ¸أ™آپ أکآ£أ™ث† أکآ§أکآ³أ™â€¦ أکآ§أ™â€‍أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦.',
       message_en: 'Shop ID is required when logging in with employee ID or username.',
     });
   }
@@ -1839,7 +1866,7 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
   if (!user) {
     return res.status(404).json({
       error: 'USER_NOT_FOUND',
-      message_ar: 'Ø§Ù„Ø­Ø³Ø§Ø¨ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯. Ø§Ø·Ù„Ø¨ Ù…Ù† Ù…Ø¯ÙŠØ±Ùƒ Ø¥Ù†Ø´Ø§Ø¡ Ø­Ø³Ø§Ø¨ Ù„Ùƒ.',
+      message_ar: 'أکآ§أ™â€‍أکآ­أکآ³أکآ§أکآ¨ أکآ؛أ™إ أکآ± أ™â€¦أ™ث†أکآ¬أ™ث†أکآ¯. أکآ§أکآ·أ™â€‍أکآ¨ أ™â€¦أ™â€  أ™â€¦أکآ¯أ™إ أکآ±أ™ئ’ أکآ¥أ™â€ أکآ´أکآ§أکآ، أکآ­أکآ³أکآ§أکآ¨ أ™â€‍أ™ئ’.',
       message_en: 'User not found. Ask your manager to create an account for you.',
     });
   }
@@ -2034,9 +2061,9 @@ app.post('/api/auth/accept-invite', async (req: Request, res: Response) => {
       [sid, code]
     );
     const inv = (invRows as any[])[0];
-    if (!inv) return res.status(404).json({ error: 'INVITE_NOT_FOUND', message_ar: 'Ø§Ù„Ø¯Ø¹ÙˆØ© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø© Ø£Ùˆ ØºÙŠØ± ØµØ§Ù„Ø­Ø©.', message_en: 'Invite not found or invalid.' });
-    if (inv.used_at != null) return res.status(400).json({ error: 'INVITE_ALREADY_USED', message_ar: 'ØªÙ… Ø§Ø³ØªØ®Ø¯Ø§Ù… Ù‡Ø°Ù‡ Ø§Ù„Ø¯Ø¹ÙˆØ© Ù…Ø³Ø¨Ù‚Ø§Ù‹.', message_en: 'This invite has already been used.' });
-    if (new Date(inv.expires_at) < new Date()) return res.status(400).json({ error: 'INVITE_EXPIRED', message_ar: 'Ø§Ù†ØªÙ‡Øª ØµÙ„Ø§Ø­ÙŠØ© Ø§Ù„Ø¯Ø¹ÙˆØ©.', message_en: 'Invite has expired.' });
+    if (!inv) return res.status(404).json({ error: 'INVITE_NOT_FOUND', message_ar: 'أکآ§أ™â€‍أکآ¯أکآ¹أ™ث†أکآ© أکآ؛أ™إ أکآ± أ™â€¦أ™ث†أکآ¬أ™ث†أکآ¯أکآ© أکآ£أ™ث† أکآ؛أ™إ أکآ± أکآµأکآ§أ™â€‍أکآ­أکآ©.', message_en: 'Invite not found or invalid.' });
+    if (inv.used_at != null) return res.status(400).json({ error: 'INVITE_ALREADY_USED', message_ar: 'أکآھأ™â€¦ أکآ§أکآ³أکآھأکآ®أکآ¯أکآ§أ™â€¦ أ™â€،أکآ°أ™â€، أکآ§أ™â€‍أکآ¯أکآ¹أ™ث†أکآ© أ™â€¦أکآ³أکآ¨أ™â€ڑأکآ§أ™â€¹.', message_en: 'This invite has already been used.' });
+    if (new Date(inv.expires_at) < new Date()) return res.status(400).json({ error: 'INVITE_EXPIRED', message_ar: 'أکآ§أ™â€ أکآھأ™â€،أکآھ أکآµأ™â€‍أکآ§أکآ­أ™إ أکآ© أکآ§أ™â€‍أکآ¯أکآ¹أ™ث†أکآ©.', message_en: 'Invite has expired.' });
 
     const [shopRows] = await pool.execute('SELECT package FROM shops WHERE id = ?', [sid]);
     const shopPkg = (shopRows as any[])[0]?.package || 'bronze';
@@ -2070,16 +2097,16 @@ app.post('/api/auth/accept-invite', async (req: Request, res: Response) => {
 
     const [existingByEmail] = email ? await pool.execute('SELECT id FROM users WHERE LOWER(email) = LOWER(?)', [email]) : [[]];
     if (email && (existingByEmail as any[]).length > 0) {
-      return res.status(400).json({ error: 'USER_EXISTS', message_ar: 'ÙŠÙˆØ¬Ø¯ Ø­Ø³Ø§Ø¨ Ø¨Ù‡Ø°Ø§ Ø§Ù„Ø¨Ø±ÙŠØ¯ Ù…Ø³Ø¨Ù‚Ø§Ù‹.', message_en: 'An account with this email already exists.' });
+      return res.status(400).json({ error: 'USER_EXISTS', message_ar: 'أ™إ أ™ث†أکآ¬أکآ¯ أکآ­أکآ³أکآ§أکآ¨ أکآ¨أ™â€،أکآ°أکآ§ أکآ§أ™â€‍أکآ¨أکآ±أ™إ أکآ¯ أ™â€¦أکآ³أکآ¨أ™â€ڑأکآ§أ™â€¹.', message_en: 'An account with this email already exists.' });
     }
     const [existingByUsername] = await pool.execute('SELECT id FROM users WHERE username = ? AND shop_id = ?', [username, sid]);
     if ((existingByUsername as any[]).length > 0) {
-      return res.status(400).json({ error: 'USER_EXISTS', message_ar: 'ÙŠÙˆØ¬Ø¯ Ø­Ø³Ø§Ø¨ Ø¨Ù‡Ø°Ø§ Ø§Ù„Ø§Ø³Ù… ÙÙŠ Ø§Ù„Ù…ØªØ¬Ø±.', message_en: 'An account with this username already exists in this shop.' });
+      return res.status(400).json({ error: 'USER_EXISTS', message_ar: 'أ™إ أ™ث†أکآ¬أکآ¯ أکآ­أکآ³أکآ§أکآ¨ أکآ¨أ™â€،أکآ°أکآ§ أکآ§أ™â€‍أکآ§أکآ³أ™â€¦ أ™آپأ™إ  أکآ§أ™â€‍أ™â€¦أکآھأکآ¬أکآ±.', message_en: 'An account with this username already exists in this shop.' });
     }
     if (employee_id) {
       const [existingByEmp] = await pool.execute('SELECT id FROM users WHERE employee_id = ? AND shop_id = ?', [employee_id, sid]);
       if ((existingByEmp as any[]).length > 0) {
-        return res.status(400).json({ error: 'USER_EXISTS', message_ar: 'ÙŠÙˆØ¬Ø¯ Ø­Ø³Ø§Ø¨ Ø¨Ø±Ù‚Ù… Ù‡Ø°Ø§ Ø§Ù„Ù…ÙˆØ¸Ù ÙÙŠ Ø§Ù„Ù…ØªØ¬Ø±.', message_en: 'An account with this employee ID already exists in this shop.' });
+        return res.status(400).json({ error: 'USER_EXISTS', message_ar: 'أ™إ أ™ث†أکآ¬أکآ¯ أکآ­أکآ³أکآ§أکآ¨ أکآ¨أکآ±أ™â€ڑأ™â€¦ أ™â€،أکآ°أکآ§ أکآ§أ™â€‍أ™â€¦أ™ث†أکآ¸أ™آپ أ™آپأ™إ  أکآ§أ™â€‍أ™â€¦أکآھأکآ¬أکآ±.', message_en: 'An account with this employee ID already exists in this shop.' });
       }
     }
 
@@ -2174,7 +2201,7 @@ app.post('/api/auth/register-shop', async (req: Request, res: Response) => {
 
       const [branchResult] = await connection.execute(
         'INSERT INTO branches (shop_id, name, name_ar, name_en, code) VALUES (?, ?, ?, ?, ?)',
-        [shopId, 'Ø§Ù„ÙØ±Ø¹ Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠ', 'Ø§Ù„ÙØ±Ø¹ Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠ', 'Main Branch', 'main']
+        [shopId, 'أکآ§أ™â€‍أ™آپأکآ±أکآ¹ أکآ§أ™â€‍أکآ±أکآ¦أ™إ أکآ³أ™إ ', 'أکآ§أ™â€‍أ™آپأکآ±أکآ¹ أکآ§أ™â€‍أکآ±أکآ¦أ™إ أکآ³أ™إ ', 'Main Branch', 'main']
       );
       const branchId = (branchResult as any).insertId;
       await connection.execute('UPDATE shops SET default_branch_id = ? WHERE id = ?', [branchId, shopId]);
@@ -2324,7 +2351,7 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
         error: 'AI_UNAVAILABLE',
         reason: 'AI_DISABLED',
         message_en: 'AI cloud unavailable, using local help.',
-        message_ar: 'Ø§Ù„Ù…Ø³Ø§Ø¹Ø¯ Ø§Ù„Ø³Ø­Ø§Ø¨ÙŠ ØºÙŠØ± Ù…ØªØ§Ø­ Ø­Ø§Ù„ÙŠØ§Ù‹ØŒ Ø³ÙŠØªÙ… Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø§Ù„Ù…Ø³Ø§Ø¹Ø¯Ø© Ø§Ù„Ù…Ø­Ù„ÙŠØ©.',
+        message_ar: 'أکآ§أ™â€‍أ™â€¦أکآ³أکآ§أکآ¹أکآ¯ أکآ§أ™â€‍أکآ³أکآ­أکآ§أکآ¨أ™إ  أکآ؛أ™إ أکآ± أ™â€¦أکآھأکآ§أکآ­ أکآ­أکآ§أ™â€‍أ™إ أکآ§أ™â€¹أکإ’ أکآ³أ™إ أکآھأ™â€¦ أکآ§أکآ³أکآھأکآ®أکآ¯أکآ§أ™â€¦ أکآ§أ™â€‍أ™â€¦أکآ³أکآ§أکآ¹أکآ¯أکآ© أکآ§أ™â€‍أ™â€¦أکآ­أ™â€‍أ™إ أکآ©.',
         answer,
         lang: detectedLang,
         ttsLang,
@@ -2336,7 +2363,7 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
     }
     lang = bodyLang === 'ar' || bodyLang === 'en' ? bodyLang : detectUserLanguage(message);
     const ttsLang = getTtsLocaleForLang(lang);
-    console.log('ðŸ“© Chat message:', { lang, preview: String(message).slice(0, 120) });
+    console.log('أ°إ¸â€œآ© Chat message:', { lang, preview: String(message).slice(0, 120) });
 
     const resolvedShopId =
       resolveShopId(req) || (req as any).user?.shop_id || (req as any).user?.shopId || 1;
@@ -2436,8 +2463,8 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
     const inventoryContextAr = (inventoryRows as any[])
       .map((item) => {
         const name = item.name_ar || item.name_en;
-        const brand = item.brand ? `, Ù…Ø§Ø±ÙƒØ© ${item.brand}` : '';
-        return `- ${name}: ${item.stock_quantity} ÙÙŠ Ø§Ù„Ù…Ø®Ø²Ù†ØŒ Ø§Ù„Ø³Ø¹Ø± ${item.sell_price} Ø¬Ù†ÙŠÙ‡${brand}`;
+        const brand = item.brand ? `, أ™â€¦أکآ§أکآ±أ™ئ’أکآ© ${item.brand}` : '';
+        return `- ${name}: ${item.stock_quantity} أ™آپأ™إ  أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™â€ أکإ’ أکآ§أ™â€‍أکآ³أکآ¹أکآ± ${item.sell_price} أکآ¬أ™â€ أ™إ أ™â€،${brand}`;
       })
       .join('\n');
 
@@ -2464,7 +2491,7 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
 
     const msg = String(message).trim().toLowerCase();
     const numericIntentAr =
-      /Ù…Ø¨ÙŠØ¹Ø§Øª Ø§Ù„Ù†Ù‡Ø§Ø±Ø¯Ù‡|Ù…Ø¨ÙŠØ¹Ø§Øª Ø§Ù„ÙŠÙˆÙ…|ÙƒØ§Ù… Ø§Ù„Ù†Ù‡Ø§Ø±Ø¯Ù‡|Ø¹Ø¯Ø¯ Ø§Ù„Ø¹Ù…Ù„ÙŠØ§Øª|Ø·Ù„Ø¨Ø§Øª Ù…Ø¤ÙƒØ¯Ø©|Ø£ÙˆØ±Ø¯Ø±Ø§Øª|Ù…Ø¨ÙŠØ¹Ø§Øª Ø§Ù…Ø¨Ø§Ø±Ø­|Ø¥ÙŠÙ‡ ÙˆØ¶Ø¹ Ø§Ù„Ù†Ù‡Ø§Ø±Ø¯Ù‡|ÙƒØ§Ù… Ø¨Ø¹ØªÙ†Ø§ Ø§Ù„Ù†Ù‡Ø§Ø±Ø¯Ù‡|ÙÙˆØ§ØªÙŠØ± Ø§Ù„Ù†Ù‡Ø§Ø±Ø¯Ù‡/i.test(
+      /أ™â€¦أکآ¨أ™إ أکآ¹أکآ§أکآھ أکآ§أ™â€‍أ™â€ أ™â€،أکآ§أکآ±أکآ¯أ™â€،|أ™â€¦أکآ¨أ™إ أکآ¹أکآ§أکآھ أکآ§أ™â€‍أ™إ أ™ث†أ™â€¦|أ™ئ’أکآ§أ™â€¦ أکآ§أ™â€‍أ™â€ أ™â€،أکآ§أکآ±أکآ¯أ™â€،|أکآ¹أکآ¯أکآ¯ أکآ§أ™â€‍أکآ¹أ™â€¦أ™â€‍أ™إ أکآ§أکآھ|أکآ·أ™â€‍أکآ¨أکآ§أکآھ أ™â€¦أکآ¤أ™ئ’أکآ¯أکآ©|أکآ£أ™ث†أکآ±أکآ¯أکآ±أکآ§أکآھ|أ™â€¦أکآ¨أ™إ أکآ¹أکآ§أکآھ أکآ§أ™â€¦أکآ¨أکآ§أکآ±أکآ­|أکآ¥أ™إ أ™â€، أ™ث†أکآ¶أکآ¹ أکآ§أ™â€‍أ™â€ أ™â€،أکآ§أکآ±أکآ¯أ™â€،|أ™ئ’أکآ§أ™â€¦ أکآ¨أکآ¹أکآھأ™â€ أکآ§ أکآ§أ™â€‍أ™â€ أ™â€،أکآ§أکآ±أکآ¯أ™â€،|أ™آپأ™ث†أکآ§أکآھأ™إ أکآ± أکآ§أ™â€‍أ™â€ أ™â€،أکآ§أکآ±أکآ¯أ™â€،/i.test(
         message
       );
     const numericIntentEn = /today'?s? sales|sales today|how much today|operations count|confirmed orders|invoices today/i.test(msg);
@@ -2473,7 +2500,7 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
     if (isNumericIntent) {
       const quickAr =
         lang === 'ar'
-          ? `Ù…Ø¨ÙŠØ¹Ø§Øª Ø§Ù„Ù†Ù‡Ø§Ø±Ø¯Ù‡: ${totalTodayAmount} Ø¬.Ù… (${todaySales} ÙØ§ØªÙˆØ±Ø© POS + ${todayOnlineCount} Ø·Ù„Ø¨Ø§Øª Ø£ÙˆÙ†Ù„Ø§ÙŠÙ† Ù…Ø¤ÙƒØ¯Ø©).\n${totalTodayAmount === 0 ? 'Ù…ÙÙŠØ´ Ø¹Ù…Ù„ÙŠØ§Øª Ù„Ø­Ø¯ Ø¯Ù„ÙˆÙ‚ØªÙŠ.' : 'Ø¹Ø§ÙŠØ² ØªÙØµÙŠÙ„ POS ÙˆÙ„Ø§ Ø£ÙˆÙ†Ù„Ø§ÙŠÙ†ØŸ'}`
+          ? `أ™â€¦أکآ¨أ™إ أکآ¹أکآ§أکآھ أکآ§أ™â€‍أ™â€ أ™â€،أکآ§أکآ±أکآ¯أ™â€،: ${totalTodayAmount} أکآ¬.أ™â€¦ (${todaySales} أ™آپأکآ§أکآھأ™ث†أکآ±أکآ© POS + ${todayOnlineCount} أکآ·أ™â€‍أکآ¨أکآ§أکآھ أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€  أ™â€¦أکآ¤أ™ئ’أکآ¯أکآ©).\n${totalTodayAmount === 0 ? 'أ™â€¦أ™آپأ™إ أکآ´ أکآ¹أ™â€¦أ™â€‍أ™إ أکآ§أکآھ أ™â€‍أکآ­أکآ¯ أکآ¯أ™â€‍أ™ث†أ™â€ڑأکآھأ™إ .' : 'أکآ¹أکآ§أ™إ أکآ² أکآھأ™آپأکآµأ™إ أ™â€‍ POS أ™ث†أ™â€‍أکآ§ أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€ أکإ¸'}`
           : null;
       const quickEn =
         lang === 'en'
@@ -2494,14 +2521,14 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
     const last7DaysContextAr =
       last7.length > 0
         ? last7
-            .map((d) => `- ${d.date}: ${d.revenue} Ø¬Ù†ÙŠÙ‡ — ${d.invoices} ÙØ§ØªÙˆØ±Ø©`)
+            .map((d) => `- ${d.date}: ${d.revenue} أکآ¬أ™â€ أ™إ أ™â€، â€” ${d.invoices} أ™آپأکآ§أکآھأ™ث†أکآ±أکآ©`)
             .join('\n')
-        : 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ù…Ø¨ÙŠØ¹Ø§Øª Ø®Ù„Ø§Ù„ Ø¢Ø®Ø± 7 Ø£ÙŠØ§Ù….';
+        : 'أ™â€‍أکآ§ أکآھأ™ث†أکآ¬أکآ¯ أ™â€¦أکآ¨أ™إ أکآ¹أکآ§أکآھ أکآ®أ™â€‍أکآ§أ™â€‍ أکآ¢أکآ®أکآ± 7 أکآ£أ™إ أکآ§أ™â€¦.';
 
     const last7DaysContextEn =
       last7.length > 0
         ? last7
-            .map((d) => `- ${d.date}: ${d.revenue} EGP — ${d.invoices} invoices`)
+            .map((d) => `- ${d.date}: ${d.revenue} EGP â€” ${d.invoices} invoices`)
             .join('\n')
         : 'No sales in the last 7 days.';
 
@@ -2517,7 +2544,7 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
     const rawUserName = (req as any).user?.username || '';
     const firstToken = String(rawUserName || '').split(' ')[0];
     const userName = firstToken && !firstToken.includes('@') ? firstToken : 'Ahmed';
-    const businessName = shopProfile.business_name || (lang === 'en' ? 'the shop' : 'Ø§Ù„Ù…Ø­Ù„');
+    const businessName = shopProfile.business_name || (lang === 'en' ? 'the shop' : 'أکآ§أ™â€‍أ™â€¦أکآ­أ™â€‍');
     const activityType = String(shopProfile.activity_type || '').toLowerCase();
     const businessType =
       activityType === 'pharmacy'
@@ -2530,23 +2557,23 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
 
     const businessTypeAr =
       businessType === 'pharmacy'
-        ? 'ØµÙŠØ¯Ù„ÙŠØ©'
+        ? 'أکآµأ™إ أکآ¯أ™â€‍أ™إ أکآ©'
         : businessType === 'supermarket'
-        ? 'Ø³ÙˆØ¨Ø± Ù…Ø§Ø±ÙƒØª'
+        ? 'أکآ³أ™ث†أکآ¨أکآ± أ™â€¦أکآ§أکآ±أ™ئ’أکآھ'
         : businessType === 'decor'
-        ? 'Ø¯ÙŠÙƒÙˆØ± ÙˆÙ…ÙØ±ÙˆØ´Ø§Øª'
-        : 'Ù‚Ø·Ø¹ ØºÙŠØ§Ø± Ø³ÙŠØ§Ø±Ø§Øª';
+        ? 'أکآ¯أ™إ أ™ئ’أ™ث†أکآ± أ™ث†أ™â€¦أ™آپأکآ±أ™ث†أکآ´أکآ§أکآھ'
+        : 'أ™â€ڑأکآ·أکآ¹ أکآ؛أ™إ أکآ§أکآ± أکآ³أ™إ أکآ§أکآ±أکآ§أکآھ';
 
     const liveCtx = typeof liveContext === 'object' && liveContext !== null ? liveContext : {};
     const ctxLine =
       Object.keys(liveCtx).length > 0
-        ? (lang === 'ar' ? 'Ø³ÙŠØ§Ù‚ Ø§Ù„Ø¬Ù„Ø³Ø© Ø§Ù„Ø­ÙŠØ©: ' : 'Live context: ') + JSON.stringify(liveCtx)
+        ? (lang === 'ar' ? 'أکآ³أ™إ أکآ§أ™â€ڑ أکآ§أ™â€‍أکآ¬أ™â€‍أکآ³أکآ© أکآ§أ™â€‍أکآ­أ™إ أکآ©: ' : 'Live context: ') + JSON.stringify(liveCtx)
         : '';
     const effectiveRole = (liveCtx as any).effectiveRole || (req as any).user?.role || '';
     const pathname = (liveCtx as any).pathname || '';
     const roleInstructionAr =
       effectiveRole
-        ? `Ø¯ÙˆØ± Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… Ø§Ù„Ø­Ø§Ù„ÙŠ: ${effectiveRole}. Ø§Ù„ØµÙØ­Ø©: ${pathname || '/'}. Ù„Ø§ ØªÙ†ØµØ­ Ø¨Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª ØºÙŠØ± Ù…Ø³Ù…ÙˆØ­Ø© Ù„Ù‡Ø°Ø§ Ø§Ù„Ø¯ÙˆØ±.`
+        ? `أکآ¯أ™ث†أکآ± أکآ§أ™â€‍أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦ أکآ§أ™â€‍أکآ­أکآ§أ™â€‍أ™إ : ${effectiveRole}. أکآ§أ™â€‍أکآµأ™آپأکآ­أکآ©: ${pathname || '/'}. أ™â€‍أکآ§ أکآھأ™â€ أکآµأکآ­ أکآ¨أکآ¥أکآ¬أکآ±أکآ§أکآ،أکآ§أکآھ أکآ؛أ™إ أکآ± أ™â€¦أکآ³أ™â€¦أ™ث†أکآ­أکآ© أ™â€‍أ™â€،أکآ°أکآ§ أکآ§أ™â€‍أکآ¯أ™ث†أکآ±.`
         : '';
     const roleInstructionEn =
       effectiveRole
@@ -2555,44 +2582,44 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
 
     const systemKnowledge = loadSystemKnowledge();
 
-    const systemPromptAr = `Ø£Ù†Øª Ø§Ù„Ù…Ø³Ø§Ø¹Ø¯ Ø¯Ø§Ø®Ù„ Ù†Ø¸Ø§Ù… "Crown Services ERP".
-Ù„Ø§Ø²Ù…:
-- ØªØ±Ø¯ Ø¹Ø±Ø¨ÙŠ Ù…ØµØ±ÙŠ Ø·Ø¨ÙŠØ¹ÙŠ (Ù…Ø´ ÙØµØ­Ù‰ ØªÙ‚ÙŠÙ„Ø©).
-- Ø±Ø¯ÙˆØ¯ Ø³Ø±ÙŠØ¹Ø© ÙˆÙ…Ø®ØªØµØ±Ø©: 1â€“3 Ø³Ø·ÙˆØ± Ø§ÙØªØ±Ø§Ø¶ÙŠÙ‹Ø§. Ø¬Ø§ÙˆØ¨ Ø¨Ø§Ù„Ù†ØªÙŠØ¬Ø© Ø§Ù„Ø£ÙˆÙ„.
-- Ù…Ø§ ØªØ³Ø£Ù„Ø´ Ø£ÙƒØªØ± Ù…Ù† Ø³Ø¤Ø§Ù„ ØªÙˆØ¶ÙŠØ­ÙŠ ÙˆØ§Ø­Ø¯ Ù„Ùˆ Ù„Ø§Ø²Ù….
-- Ù…Ù…Ù†ÙˆØ¹ ØªØ³ØªØ®Ø¯Ù… Ø±Ù…ÙˆØ² Ù…Ø§Ø±ÙƒØ¯Ø§ÙˆÙ† Ø²ÙŠ ** Ø£Ùˆ * Ø£Ùˆ \` Ù†Ù‡Ø§Ø¦ÙŠÙ‹Ø§. Ø§ÙƒØªØ¨ Ù†Øµ Ø¹Ø§Ø¯ÙŠ ÙÙ‚Ø·.
-- Ù„Ùˆ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… Ø³Ø£Ù„: "ÙÙŠÙ‡ Ù…ØªØ¬Ø± Ø£ÙˆÙ†Ù„Ø§ÙŠÙ†ØŸ/ØµÙØ­Ø© Ø£ÙˆÙ†Ù„Ø§ÙŠÙ†ØŸ" Ø§Ù„Ø¥Ø¬Ø§Ø¨Ø© Ù„Ø§Ø²Ù… ØªÙƒÙˆÙ†: Ø£ÙŠÙˆÙ‡. Ø§Ù„Ù…ØªØ¬Ø±: /storefront. Ø§Ù„Ø·Ù„Ø¨Ø§Øª Ø§Ù„Ø£ÙˆÙ†Ù„Ø§ÙŠÙ† Ø¨ØªØªØ£ÙƒØ¯ Ù…Ù† ØµÙØ­Ø© Ø·Ù„Ø¨Ø§Øª Ø§Ù„Ø£ÙˆÙ†Ù„Ø§ÙŠÙ† ÙÙŠ Ø§Ù„Ø£Ø¯Ù…Ù†ØŒ ÙˆØ¨ØªØ£Ø«Ø± Ø¹Ù„Ù‰ Ø§Ù„Ù…Ø®Ø²ÙˆÙ† Ø¨Ù†Ø¸Ø§Ù… Ø§Ù„Ø­Ø¬Ø² (reservations)ØŒ ÙˆØ¨ØªØ¸Ù‡Ø± ÙÙŠ Ø§Ù„Ø¥Ø´Ø¹Ø§Ø±Ø§Øª ÙˆÙ„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ… ÙˆØ§Ù„ØªÙ‚Ø§Ø±ÙŠØ±.
-Ø£Ù†Øª Ø¹Ø§Ø±Ù Ø£Ù‚Ø³Ø§Ù… Ø§Ù„Ù†Ø¸Ø§Ù…:
-Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ…: Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª + Ù…Ø¨ÙŠØ¹Ø§Øª Ø§Ù„Ø£ÙˆÙ†Ù„Ø§ÙŠÙ† Ø§Ù„Ù…Ø¤ÙƒØ¯Ø© + Ø§Ù„Ø¹Ù…Ù„ÙŠØ§Øª + Ø§Ù„Ø±Ø§ÙƒØ¯/Ø§Ù„Ø¨Ø·ÙŠØ¡.
-Ù†Ù‚Ø·Ø© Ø§Ù„Ø¨ÙŠØ¹ POS: Ø¨ÙŠØ¹ ÙˆÙÙˆØ§ØªÙŠØ± + available_stock.
-Ø§Ù„Ù…Ø®Ø²Ù†: Ù…Ù†ØªØ¬Ø§Øª ÙˆØªÙ†Ø¨ÙŠÙ‡Ø§Øª + ØµÙØ­Ø© Ø§Ù„Ø±Ø§ÙƒØ¯/Ø§Ù„Ø¨Ø·ÙŠØ¡.
-Ø§Ù„Ø£ÙˆÙ†Ù„Ø§ÙŠÙ†: Ø§Ù„Ù…ØªØ¬Ø± + Ø¥Ù†Ø´Ø§Ø¡ Ø·Ù„Ø¨ + ØªØ£ÙƒÙŠØ¯/Ø¥Ù„ØºØ§Ø¡/Ø¥ÙƒÙ…Ø§Ù„ + Ø­Ø¬Ø² Ù…Ø®Ø²ÙˆÙ†.
-Ø§Ù„Ø¥Ø´Ø¹Ø§Ø±Ø§Øª: Ø§Ù„Ø¬Ø±Ø³ + Ø§Ù„Ù‚Ø§Ø¦Ù…Ø© + Ø§Ù„Ø¹Ø¯Ø¯ + Ø±ÙˆØ§Ø¨Ø· Ù…Ø¨Ø§Ø´Ø±Ø©.
-Ø§Ù„ØªÙ‚Ø§Ø±ÙŠØ±: ÙØªØ±Ø© + Ø§Ù„Ù…ØµØ¯Ø± (Ø§Ù„ÙƒÙ„/POS/Ø£ÙˆÙ†Ù„Ø§ÙŠÙ†) + ØªØ¬Ù…ÙŠØ¹Ø© (ÙŠÙˆÙ…ÙŠ/Ø£Ø³Ø¨ÙˆØ¹ÙŠ/Ø´Ù‡Ø±ÙŠ) + ØªØµØ¯ÙŠØ± CSV/Excel/PDF + Ø·Ø¨Ø§Ø¹Ø©.
+    const systemPromptAr = `أکآ£أ™â€ أکآھ أکآ§أ™â€‍أ™â€¦أکآ³أکآ§أکآ¹أکآ¯ أکآ¯أکآ§أکآ®أ™â€‍ أ™â€ أکآ¸أکآ§أ™â€¦ "Crown Services ERP".
+أ™â€‍أکآ§أکآ²أ™â€¦:
+- أکآھأکآ±أکآ¯ أکآ¹أکآ±أکآ¨أ™إ  أ™â€¦أکآµأکآ±أ™إ  أکآ·أکآ¨أ™إ أکآ¹أ™إ  (أ™â€¦أکآ´ أ™آپأکآµأکآ­أ™â€° أکآھأ™â€ڑأ™إ أ™â€‍أکآ©).
+- أکآ±أکآ¯أ™ث†أکآ¯ أکآ³أکآ±أ™إ أکآ¹أکآ© أ™ث†أ™â€¦أکآ®أکآھأکآµأکآ±أکآ©: 1أ¢â‚¬â€œ3 أکآ³أکآ·أ™ث†أکآ± أکآ§أ™آپأکآھأکآ±أکآ§أکآ¶أ™إ أ™â€¹أکآ§. أکآ¬أکآ§أ™ث†أکآ¨ أکآ¨أکآ§أ™â€‍أ™â€ أکآھأ™إ أکآ¬أکآ© أکآ§أ™â€‍أکآ£أ™ث†أ™â€‍.
+- أ™â€¦أکآ§ أکآھأکآ³أکآ£أ™â€‍أکآ´ أکآ£أ™ئ’أکآھأکآ± أ™â€¦أ™â€  أکآ³أکآ¤أکآ§أ™â€‍ أکآھأ™ث†أکآ¶أ™إ أکآ­أ™إ  أ™ث†أکآ§أکآ­أکآ¯ أ™â€‍أ™ث† أ™â€‍أکآ§أکآ²أ™â€¦.
+- أ™â€¦أ™â€¦أ™â€ أ™ث†أکآ¹ أکآھأکآ³أکآھأکآ®أکآ¯أ™â€¦ أکآ±أ™â€¦أ™ث†أکآ² أ™â€¦أکآ§أکآ±أ™ئ’أکآ¯أکآ§أ™ث†أ™â€  أکآ²أ™إ  ** أکآ£أ™ث† * أکآ£أ™ث† \` أ™â€ أ™â€،أکآ§أکآ¦أ™إ أ™â€¹أکآ§. أکآ§أ™ئ’أکآھأکآ¨ أ™â€ أکآµ أکآ¹أکآ§أکآ¯أ™إ  أ™آپأ™â€ڑأکآ·.
+- أ™â€‍أ™ث† أکآ§أ™â€‍أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦ أکآ³أکآ£أ™â€‍: "أ™آپأ™إ أ™â€، أ™â€¦أکآھأکآ¬أکآ± أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€ أکإ¸/أکآµأ™آپأکآ­أکآ© أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€ أکإ¸" أکآ§أ™â€‍أکآ¥أکآ¬أکآ§أکآ¨أکآ© أ™â€‍أکآ§أکآ²أ™â€¦ أکآھأ™ئ’أ™ث†أ™â€ : أکآ£أ™إ أ™ث†أ™â€،. أکآ§أ™â€‍أ™â€¦أکآھأکآ¬أکآ±: /storefront. أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨أکآ§أکآھ أکآ§أ™â€‍أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€  أکآ¨أکآھأکآھأکآ£أ™ئ’أکآ¯ أ™â€¦أ™â€  أکآµأ™آپأکآ­أکآ© أکآ·أ™â€‍أکآ¨أکآ§أکآھ أکآ§أ™â€‍أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€  أ™آپأ™إ  أکآ§أ™â€‍أکآ£أکآ¯أ™â€¦أ™â€ أکإ’ أ™ث†أکآ¨أکآھأکآ£أکآ«أکآ± أکآ¹أ™â€‍أ™â€° أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™ث†أ™â€  أکآ¨أ™â€ أکآ¸أکآ§أ™â€¦ أکآ§أ™â€‍أکآ­أکآ¬أکآ² (reservations)أکإ’ أ™ث†أکآ¨أکآھأکآ¸أ™â€،أکآ± أ™آپأ™إ  أکآ§أ™â€‍أکآ¥أکآ´أکآ¹أکآ§أکآ±أکآ§أکآھ أ™ث†أ™â€‍أ™ث†أکآ­أکآ© أکآ§أ™â€‍أکآھأکآ­أ™ئ’أ™â€¦ أ™ث†أکآ§أ™â€‍أکآھأ™â€ڑأکآ§أکآ±أ™إ أکآ±.
+أکآ£أ™â€ أکآھ أکآ¹أکآ§أکآ±أ™آپ أکآ£أ™â€ڑأکآ³أکآ§أ™â€¦ أکآ§أ™â€‍أ™â€ أکآ¸أکآ§أ™â€¦:
+أ™â€‍أ™ث†أکآ­أکآ© أکآ§أ™â€‍أکآھأکآ­أ™ئ’أ™â€¦: أکآ§أ™â€‍أ™â€¦أکآ¨أ™إ أکآ¹أکآ§أکآھ + أ™â€¦أکآ¨أ™إ أکآ¹أکآ§أکآھ أکآ§أ™â€‍أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€  أکآ§أ™â€‍أ™â€¦أکآ¤أ™ئ’أکآ¯أکآ© + أکآ§أ™â€‍أکآ¹أ™â€¦أ™â€‍أ™إ أکآ§أکآھ + أکآ§أ™â€‍أکآ±أکآ§أ™ئ’أکآ¯/أکآ§أ™â€‍أکآ¨أکآ·أ™إ أکآ،.
+أ™â€ أ™â€ڑأکآ·أکآ© أکآ§أ™â€‍أکآ¨أ™إ أکآ¹ POS: أکآ¨أ™إ أکآ¹ أ™ث†أ™آپأ™ث†أکآ§أکآھأ™إ أکآ± + available_stock.
+أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™â€ : أ™â€¦أ™â€ أکآھأکآ¬أکآ§أکآھ أ™ث†أکآھأ™â€ أکآ¨أ™إ أ™â€،أکآ§أکآھ + أکآµأ™آپأکآ­أکآ© أکآ§أ™â€‍أکآ±أکآ§أ™ئ’أکآ¯/أکآ§أ™â€‍أکآ¨أکآ·أ™إ أکآ،.
+أکآ§أ™â€‍أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€ : أکآ§أ™â€‍أ™â€¦أکآھأکآ¬أکآ± + أکآ¥أ™â€ أکآ´أکآ§أکآ، أکآ·أ™â€‍أکآ¨ + أکآھأکآ£أ™ئ’أ™إ أکآ¯/أکآ¥أ™â€‍أکآ؛أکآ§أکآ،/أکآ¥أ™ئ’أ™â€¦أکآ§أ™â€‍ + أکآ­أکآ¬أکآ² أ™â€¦أکآ®أکآ²أ™ث†أ™â€ .
+أکآ§أ™â€‍أکآ¥أکآ´أکآ¹أکآ§أکآ±أکآ§أکآھ: أکآ§أ™â€‍أکآ¬أکآ±أکآ³ + أکآ§أ™â€‍أ™â€ڑأکآ§أکآ¦أ™â€¦أکآ© + أکآ§أ™â€‍أکآ¹أکآ¯أکآ¯ + أکآ±أ™ث†أکآ§أکآ¨أکآ· أ™â€¦أکآ¨أکآ§أکآ´أکآ±أکآ©.
+أکآ§أ™â€‍أکآھأ™â€ڑأکآ§أکآ±أ™إ أکآ±: أ™آپأکآھأکآ±أکآ© + أکآ§أ™â€‍أ™â€¦أکآµأکآ¯أکآ± (أکآ§أ™â€‍أ™ئ’أ™â€‍/POS/أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€ ) + أکآھأکآ¬أ™â€¦أ™إ أکآ¹أکآ© (أ™إ أ™ث†أ™â€¦أ™إ /أکآ£أکآ³أکآ¨أ™ث†أکآ¹أ™إ /أکآ´أ™â€،أکآ±أ™إ ) + أکآھأکآµأکآ¯أ™إ أکآ± CSV/Excel/PDF + أکآ·أکآ¨أکآ§أکآ¹أکآ©.
 
 ${systemKnowledge}
 
-Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…: "${userName}" — Ø§Ù„Ù…Ø­Ù„: "${businessName}" (Shop ${shopId}).
+أکآ§أ™â€‍أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦: "${userName}" â€” أکآ§أ™â€‍أ™â€¦أکآ­أ™â€‍: "${businessName}" (Shop ${shopId}).
 ${ctxLine}
 ${roleInstructionAr}
 
-Ù…Ù„Ø®Øµ Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª Ù„Ø¢Ø®Ø± 7 Ø£ÙŠØ§Ù…:
+أ™â€¦أ™â€‍أکآ®أکآµ أکآ§أ™â€‍أ™â€¦أکآ¨أ™إ أکآ¹أکآ§أکآھ أ™â€‍أکآ¢أکآ®أکآ± 7 أکآ£أ™إ أکآ§أ™â€¦:
 ${last7DaysContextAr}
-Ø§Ù…Ø¨Ø§Ø±Ø­: ${Number(yesterday.revenue || 0)} Ø¬Ù†ÙŠÙ‡ — ${Number(yesterday.invoices || 0)} ÙØ§ØªÙˆØ±Ø©.
+أکآ§أ™â€¦أکآ¨أکآ§أکآ±أکآ­: ${Number(yesterday.revenue || 0)} أکآ¬أ™â€ أ™إ أ™â€، â€” ${Number(yesterday.invoices || 0)} أ™آپأکآ§أکآھأ™ث†أکآ±أکآ©.
 
-Ø¢Ø®Ø± 25 ÙØ§ØªÙˆØ±Ø©:
-${recentInvoices.length ? JSON.stringify(recentInvoices, null, 2) : 'Ù„Ø§ ØªÙˆØ¬Ø¯.'}
+أکآ¢أکآ®أکآ± 25 أ™آپأکآ§أکآھأ™ث†أکآ±أکآ©:
+${recentInvoices.length ? JSON.stringify(recentInvoices, null, 2) : 'أ™â€‍أکآ§ أکآھأ™ث†أکآ¬أکآ¯.'}
 
-Ø§Ù„Ù…Ø®Ø²ÙˆÙ† Ø§Ù„Ø­Ø§Ù„ÙŠ:
-${inventoryContextAr || 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ù…Ù†ØªØ¬Ø§Øª.'}
+أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™ث†أ™â€  أکآ§أ™â€‍أکآ­أکآ§أ™â€‍أ™إ :
+${inventoryContextAr || 'أ™â€‍أکآ§ أکآھأ™ث†أکآ¬أکآ¯ أ™â€¦أ™â€ أکآھأکآ¬أکآ§أکآھ.'}
 
-Ø¥Ø­ØµØ§Ø¦ÙŠØ§Øª Ø§Ù„ÙŠÙˆÙ…: Ù…Ø¨ÙŠØ¹Ø§Øª ${stats.today_revenue} Ø¬Ù†ÙŠÙ‡ØŒ ÙÙˆØ§ØªÙŠØ± ${stats.today_sales}ØŒ Ù…Ù†ØªØ¬Ø§Øª ${totalProducts}ØŒ Ù‚Ù„ÙŠÙ„Ø© Ø§Ù„Ù…Ø®Ø²ÙˆÙ† ${lowStockCount}.
-Ù†ÙˆØ¹ Ø§Ù„Ù†Ø´Ø§Ø·: ${businessTypeAr}.`;
+أکآ¥أکآ­أکآµأکآ§أکآ¦أ™إ أکآ§أکآھ أکآ§أ™â€‍أ™إ أ™ث†أ™â€¦: أ™â€¦أکآ¨أ™إ أکآ¹أکآ§أکآھ ${stats.today_revenue} أکآ¬أ™â€ أ™إ أ™â€،أکإ’ أ™آپأ™ث†أکآ§أکآھأ™إ أکآ± ${stats.today_sales}أکإ’ أ™â€¦أ™â€ أکآھأکآ¬أکآ§أکآھ ${totalProducts}أکإ’ أ™â€ڑأ™â€‍أ™إ أ™â€‍أکآ© أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™ث†أ™â€  ${lowStockCount}.
+أ™â€ أ™ث†أکآ¹ أکآ§أ™â€‍أ™â€ أکآ´أکآ§أکآ·: ${businessTypeAr}.`;
 
     const systemPromptEn = `You are the in-app assistant for "Crown Services ERP".
 You MUST:
 - Answer in English.
-- Be concise and fast: default to 1â€“3 short lines. Give the final answer first.
+- Be concise and fast: default to 1أ¢â‚¬â€œ3 short lines. Give the final answer first.
 - Ask at most ONE clarification question only if required.
 - Never output Markdown formatting markers (**, *, backticks). Use plain text only.
 - When user asks "do we have an online shop/storefront?" you MUST answer YES and explain: Storefront: /storefront. Online orders are confirmed from Admin Orders, affect stock via reservations, and appear in notifications, dashboard, and reports.
@@ -2606,13 +2633,13 @@ Reports: date range + source filter (All/POS/Online) + bucket (daily/weekly/mont
 
 ${systemKnowledge}
 
-User: "${userName}" — Shop: "${businessName}" (Shop ${shopId}).
+User: "${userName}" â€” Shop: "${businessName}" (Shop ${shopId}).
 ${ctxLine}
 ${roleInstructionEn}
 
 Sales summary (past 7 days):
 ${last7DaysContextEn}
-Yesterday: ${Number(yesterday.revenue || 0)} EGP — ${Number(yesterday.invoices || 0)} invoices.
+Yesterday: ${Number(yesterday.revenue || 0)} EGP â€” ${Number(yesterday.invoices || 0)} invoices.
 
 Recent invoices (up to 25):
 ${recentInvoices.length ? JSON.stringify(recentInvoices, null, 2) : 'None.'}
@@ -2624,13 +2651,13 @@ Today: revenue ${stats.today_revenue} EGP, invoices ${stats.today_sales}, total 
 Business type: ${businessType}.`;
 
     const systemPrompt = lang === 'ar' ? systemPromptAr : systemPromptEn;
-    const userLine = lang === 'ar' ? `Ø±Ø³Ø§Ù„Ø© Ø§Ù„Ø¹Ù…ÙŠÙ„: ${message}` : `User: ${message}`;
+    const userLine = lang === 'ar' ? `أکآ±أکآ³أکآ§أ™â€‍أکآ© أکآ§أ™â€‍أکآ¹أ™â€¦أ™إ أ™â€‍: ${message}` : `User: ${message}`;
 
     const parts: string[] = [systemPrompt];
     if (Array.isArray(chatHistory) && chatHistory.length > 0) {
       for (const h of chatHistory.slice(-10)) {
-        if (h.role === 'user') parts.push(lang === 'ar' ? `Ø±Ø³Ø§Ù„Ø© Ø§Ù„Ø¹Ù…ÙŠÙ„: ${h.content}` : `User: ${h.content}`);
-        else if (h.role === 'assistant') parts.push(lang === 'ar' ? `Ø±Ø¯ Ø§Ù„Ù…Ø³Ø§Ø¹Ø¯: ${h.content}` : `Assistant: ${h.content}`);
+        if (h.role === 'user') parts.push(lang === 'ar' ? `أکآ±أکآ³أکآ§أ™â€‍أکآ© أکآ§أ™â€‍أکآ¹أ™â€¦أ™إ أ™â€‍: ${h.content}` : `User: ${h.content}`);
+        else if (h.role === 'assistant') parts.push(lang === 'ar' ? `أکآ±أکآ¯ أکآ§أ™â€‍أ™â€¦أکآ³أکآ§أکآ¹أکآ¯: ${h.content}` : `Assistant: ${h.content}`);
       }
     }
     parts.push(userLine);
@@ -2647,18 +2674,18 @@ Business type: ${businessType}.`;
       return res.json({ ok: true, reply: text, message: text, lang, ttsLang });
     }
 
-    console.error('âŒ Gemini empty response');
+    console.error('أ¢آ‌إ’ Gemini empty response');
     return res.status(200).json({
       ok: false,
       error: 'AI_UNAVAILABLE',
       reason: 'EMPTY_RESPONSE',
       message_en: 'AI is temporarily unavailable. Please try again later.',
-      message_ar: 'Ø§Ù„Ù…Ø³Ø§Ø¹Ø¯ ØºÙŠØ± Ù…ØªØ§Ø­ Ø­Ø§Ù„ÙŠØ§Ù‹ØŒ ÙŠØ±Ø¬Ù‰ Ø§Ù„Ù…Ø­Ø§ÙˆÙ„Ø© Ù…Ø±Ø© Ø£Ø®Ø±Ù‰ Ù„Ø§Ø­Ù‚Ø§Ù‹.',
+      message_ar: 'أکآ§أ™â€‍أ™â€¦أکآ³أکآ§أکآ¹أکآ¯ أکآ؛أ™إ أکآ± أ™â€¦أکآھأکآ§أکآ­ أکآ­أکآ§أ™â€‍أ™إ أکآ§أ™â€¹أکإ’ أ™إ أکآ±أکآ¬أ™â€° أکآ§أ™â€‍أ™â€¦أکآ­أکآ§أ™ث†أ™â€‍أکآ© أ™â€¦أکآ±أکآ© أکآ£أکآ®أکآ±أ™â€° أ™â€‍أکآ§أکآ­أ™â€ڑأکآ§أ™â€¹.',
       lang,
       ttsLang,
     });
   } catch (error: any) {
-    console.error('âŒ Chat error:', { name: error?.name, message: error?.message, status: error?.status });
+    console.error('أ¢آ‌إ’ Chat error:', { name: error?.name, message: error?.message, status: error?.status });
     const detectedLang: 'ar' | 'en' = lang === 'ar' ? 'ar' : 'en';
     const ttsLang = getTtsLocaleForLang(detectedLang);
 
@@ -2679,7 +2706,7 @@ Business type: ${businessType}.`;
         error: 'AI_UNAVAILABLE',
         reason: 'API_KEY_INVALID',
         message_en: 'AI cloud unavailable (invalid or expired API key), using local help.',
-        message_ar: 'Ø§Ù„Ù…Ø³Ø§Ø¹Ø¯ Ø§Ù„Ø³Ø­Ø§Ø¨ÙŠ ØºÙŠØ± Ù…ØªØ§Ø­ Ø­Ø§Ù„ÙŠØ§Ù‹ (Ù…ÙØªØ§Ø­ API ØºÙŠØ± ØµØ§Ù„Ø­ Ø£Ùˆ Ù…Ù†ØªÙ‡ÙŠ)ØŒ Ø³ÙŠØªÙ… Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø§Ù„Ù…Ø³Ø§Ø¹Ø¯Ø© Ø§Ù„Ù…Ø­Ù„ÙŠØ©.',
+        message_ar: 'أکآ§أ™â€‍أ™â€¦أکآ³أکآ§أکآ¹أکآ¯ أکآ§أ™â€‍أکآ³أکآ­أکآ§أکآ¨أ™إ  أکآ؛أ™إ أکآ± أ™â€¦أکآھأکآ§أکآ­ أکآ­أکآ§أ™â€‍أ™إ أکآ§أ™â€¹ (أ™â€¦أ™آپأکآھأکآ§أکآ­ API أکآ؛أ™إ أکآ± أکآµأکآ§أ™â€‍أکآ­ أکآ£أ™ث† أ™â€¦أ™â€ أکآھأ™â€،أ™إ )أکإ’ أکآ³أ™إ أکآھأ™â€¦ أکآ§أکآ³أکآھأکآ®أکآ¯أکآ§أ™â€¦ أکآ§أ™â€‍أ™â€¦أکآ³أکآ§أکآ¹أکآ¯أکآ© أکآ§أ™â€‍أ™â€¦أکآ­أ™â€‍أ™إ أکآ©.',
         answer,
         lang: detectedLang,
         ttsLang,
@@ -2692,7 +2719,7 @@ Business type: ${businessType}.`;
       error: 'AI_UNAVAILABLE',
       reason: 'PROVIDER_ERROR',
       message_en: 'AI cloud unavailable due to an internal error, using local help.',
-      message_ar: 'Ø§Ù„Ù…Ø³Ø§Ø¹Ø¯ Ø§Ù„Ø³Ø­Ø§Ø¨ÙŠ ØºÙŠØ± Ù…ØªØ§Ø­ Ø­Ø§Ù„ÙŠØ§Ù‹ Ø¨Ø³Ø¨Ø¨ Ø®Ø·Ø£ Ø¯Ø§Ø®Ù„ÙŠØŒ Ø³ÙŠØªÙ… Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø§Ù„Ù…Ø³Ø§Ø¹Ø¯Ø© Ø§Ù„Ù…Ø­Ù„ÙŠØ©.',
+      message_ar: 'أکآ§أ™â€‍أ™â€¦أکآ³أکآ§أکآ¹أکآ¯ أکآ§أ™â€‍أکآ³أکآ­أکآ§أکآ¨أ™إ  أکآ؛أ™إ أکآ± أ™â€¦أکآھأکآ§أکآ­ أکآ­أکآ§أ™â€‍أ™إ أکآ§أ™â€¹ أکآ¨أکآ³أکآ¨أکآ¨ أکآ®أکآ·أکآ£ أکآ¯أکآ§أکآ®أ™â€‍أ™إ أکإ’ أکآ³أ™إ أکآھأ™â€¦ أکآ§أکآ³أکآھأکآ®أکآ¯أکآ§أ™â€¦ أکآ§أ™â€‍أ™â€¦أکآ³أکآ§أکآ¹أکآ¯أکآ© أکآ§أ™â€‍أ™â€¦أکآ­أ™â€‍أ™إ أکآ©.',
       answer,
       lang: detectedLang,
       ttsLang,
@@ -2825,22 +2852,22 @@ app.post('/api/ai/data-chat', authenticateToken, requirePackageFeature('ai'), as
 
     const result = await genAI.models.generateContent({
       model: GEMINI_MODEL,
-      contents: `Ø£Ù†Øª ÙƒØ±Ø§ÙˆÙ† - Ø§Ù„Ù…Ø³Ø§Ø¹Ø¯ Ø§Ù„Ø°ÙƒÙŠ. Ø§Ø³ØªØ®Ø¯Ù… Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„ØªØ§Ù„ÙŠØ© ÙÙ‚Ø· Ù„Ù„Ø¥Ø¬Ø§Ø¨Ø©ØŒ ÙˆÙ„Ùˆ Ø§Ù„Ø³Ø¤Ø§Ù„ Ø®Ø§Ø±Ø¬ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ù‚ÙˆÙ„ Ø¥Ù† Ø§Ù„Ù…Ø¹Ù„ÙˆÙ…Ø© Ù…Ø´ Ù…ØªØ§Ø­Ø©. Ø±Ø¯ Ø¨Ø§Ù„Ù„Ù‡Ø¬Ø© Ø§Ù„Ù…ØµØ±ÙŠØ© ÙˆØ¨Ø§Ø®ØªØµØ§Ø±.\n\nØ§Ù„Ø¨ÙŠØ§Ù†Ø§Øª:\n${JSON.stringify(
+      contents: `أکآ£أ™â€ أکآھ أ™ئ’أکآ±أکآ§أ™ث†أ™â€  - أکآ§أ™â€‍أ™â€¦أکآ³أکآ§أکآ¹أکآ¯ أکآ§أ™â€‍أکآ°أ™ئ’أ™إ . أکآ§أکآ³أکآھأکآ®أکآ¯أ™â€¦ أکآ§أ™â€‍أکآ¨أ™إ أکآ§أ™â€ أکآ§أکآھ أکآ§أ™â€‍أکآھأکآ§أ™â€‍أ™إ أکآ© أ™آپأ™â€ڑأکآ· أ™â€‍أ™â€‍أکآ¥أکآ¬أکآ§أکآ¨أکآ©أکإ’ أ™ث†أ™â€‍أ™ث† أکآ§أ™â€‍أکآ³أکآ¤أکآ§أ™â€‍ أکآ®أکآ§أکآ±أکآ¬ أکآ§أ™â€‍أکآ¨أ™إ أکآ§أ™â€ أکآ§أکآھ أ™â€ڑأ™ث†أ™â€‍ أکآ¥أ™â€  أکآ§أ™â€‍أ™â€¦أکآ¹أ™â€‍أ™ث†أ™â€¦أکآ© أ™â€¦أکآ´ أ™â€¦أکآھأکآ§أکآ­أکآ©. أکآ±أکآ¯ أکآ¨أکآ§أ™â€‍أ™â€‍أ™â€،أکآ¬أکآ© أکآ§أ™â€‍أ™â€¦أکآµأکآ±أ™إ أکآ© أ™ث†أکآ¨أکآ§أکآ®أکآھأکآµأکآ§أکآ±.\n\nأکآ§أ™â€‍أکآ¨أ™إ أکآ§أ™â€ أکآ§أکآھ:\n${JSON.stringify(
         summary,
         null,
         2
-      )}\n\nØ³Ø¤Ø§Ù„ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…: ${question}`,
+      )}\n\nأکآ³أکآ¤أکآ§أ™â€‍ أکآ§أ™â€‍أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦: ${question}`,
     });
     const text = String((result as any)?.text || '').trim();
 
     if (text) {
       res.json({ text, data: summary });
     } else {
-      console.error('âŒ Gemini empty response');
+      console.error('أ¢آ‌إ’ Gemini empty response');
       return res.status(500).json({ error: 'AI provider response empty' });
     }
   } catch (error: any) {
-    console.error('âŒ Data chat error:', error);
+    console.error('أ¢آ‌إ’ Data chat error:', error);
     res.status(500).json({ error: 'AI data chat unavailable' });
   }
 });
@@ -2872,49 +2899,49 @@ app.get('/api/ai/context', authenticateToken, async (req: any, res: Response) =>
       .map(([k]) => k);
 
     const routesSummary = {
-      pos: language === 'ar' ? 'Ù†Ù‚Ø·Ø© Ø§Ù„Ø¨ÙŠØ¹ ÙˆØ§Ù„ÙÙˆØ§ØªÙŠØ± Ø§Ù„Ø³Ø±ÙŠØ¹Ø© Ø¯Ø§Ø®Ù„ Ø§Ù„Ù…ØªØ¬Ø±' : 'POS and quick in-store invoicing',
+      pos: language === 'ar' ? 'أ™â€ أ™â€ڑأکآ·أکآ© أکآ§أ™â€‍أکآ¨أ™إ أکآ¹ أ™ث†أکآ§أ™â€‍أ™آپأ™ث†أکآ§أکآھأ™إ أکآ± أکآ§أ™â€‍أکآ³أکآ±أ™إ أکآ¹أکآ© أکآ¯أکآ§أکآ®أ™â€‍ أکآ§أ™â€‍أ™â€¦أکآھأکآ¬أکآ±' : 'POS and quick in-store invoicing',
       inventory:
         language === 'ar'
-          ? 'Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ù…Ø®Ø²ÙˆÙ† ÙˆØ§Ù„Ù…Ù†ØªØ¬Ø§Øª ÙˆØ§Ù„ØªÙ†Ø¨ÙŠÙ‡Ø§Øª'
+          ? 'أکآ¥أکآ¯أکآ§أکآ±أکآ© أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™ث†أ™â€  أ™ث†أکآ§أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬أکآ§أکآھ أ™ث†أکآ§أ™â€‍أکآھأ™â€ أکآ¨أ™إ أ™â€،أکآ§أکآھ'
           : 'Inventory, products, and low-stock alerts',
       invoices:
         language === 'ar'
-          ? 'ÙÙˆØ§ØªÙŠØ± ÙˆØªÙ‚Ø§Ø±ÙŠØ± Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª PDF/Excel'
+          ? 'أ™آپأ™ث†أکآ§أکآھأ™إ أکآ± أ™ث†أکآھأ™â€ڑأکآ§أکآ±أ™إ أکآ± أکآ§أ™â€‍أ™â€¦أکآ¨أ™إ أکآ¹أکآ§أکآھ PDF/Excel'
           : 'Invoices and sales reports (PDF/Excel)',
       onlineOrders:
         language === 'ar'
-          ? 'Ø·Ù„Ø¨Ø§Øª Ø£ÙˆÙ†Ù„Ø§ÙŠÙ†ØŒ ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø·Ù„Ø¨ ÙˆØ®ØµÙ… Ø§Ù„Ù…Ø®Ø²ÙˆÙ†'
+          ? 'أکآ·أ™â€‍أکآ¨أکآ§أکآھ أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€ أکإ’ أکآھأکآ£أ™ئ’أ™إ أکآ¯ أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨ أ™ث†أکآ®أکآµأ™â€¦ أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™ث†أ™â€ '
           : 'Online orders, confirmation, and stock deduction',
       notifications:
         language === 'ar'
-          ? 'Ø³Ø¬Ù„ Ø§Ù„Ù†Ø´Ø§Ø· ÙˆØ§Ù„ØªÙ†Ø¨ÙŠÙ‡Ø§Øª Ù„Ù„Ù…Ø¨ÙŠØ¹Ø§Øª ÙˆØ§Ù„Ø·Ù„Ø¨Ø§Øª'
+          ? 'أکآ³أکآ¬أ™â€‍ أکآ§أ™â€‍أ™â€ أکآ´أکآ§أکآ· أ™ث†أکآ§أ™â€‍أکآھأ™â€ أکآ¨أ™إ أ™â€،أکآ§أکآھ أ™â€‍أ™â€‍أ™â€¦أکآ¨أ™إ أکآ¹أکآ§أکآھ أ™ث†أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨أکآ§أکآھ'
           : 'Activity log and notifications for sales/orders',
       importExport:
         language === 'ar'
-          ? 'Ø§Ø³ØªÙŠØ±Ø§Ø¯/ØªØµØ¯ÙŠØ± Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª Ø¹Ø¨Ø± Excel/CSV (Ø­Ø³Ø¨ Ø§Ù„Ø¨Ø§Ù‚Ø©)'
+          ? 'أکآ§أکآ³أکآھأ™إ أکآ±أکآ§أکآ¯/أکآھأکآµأکآ¯أ™إ أکآ± أکآ§أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬أکآ§أکآھ أکآ¹أکآ¨أکآ± Excel/CSV (أکآ­أکآ³أکآ¨ أکآ§أ™â€‍أکآ¨أکآ§أ™â€ڑأکآ©)'
           : 'Import/export products via Excel/CSV (depending on plan)',
       branches:
         language === 'ar'
-          ? 'Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„ÙØ±ÙˆØ¹ ÙˆØµÙ„Ø§Ø­ÙŠØ§Øª Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ† Ù„ÙƒÙ„ ÙØ±Ø¹'
+          ? 'أکآ¥أکآ¯أکآ§أکآ±أکآ© أکآ§أ™â€‍أ™آپأکآ±أ™ث†أکآ¹ أ™ث†أکآµأ™â€‍أکآ§أکآ­أ™إ أکآ§أکآھ أکآ§أ™â€‍أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦أ™إ أ™â€  أ™â€‍أ™ئ’أ™â€‍ أ™آپأکآ±أکآ¹'
           : 'Branch management and per-branch user roles',
       users:
         language === 'ar'
-          ? 'Ø¥Ø¶Ø§ÙØ© Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ† ÙˆØµÙ„Ø§Ø­ÙŠØ§Øª Ù…Ø«Ù„ Ø§Ù„ÙƒØ§Ø´ÙŠØ± ÙˆØ§Ù„ÙØ±Ø¹ ÙˆØ§Ù„Ù…Ø¯ÙŠØ±'
+          ? 'أکآ¥أکآ¶أکآ§أ™آپأکآ© أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦أ™إ أ™â€  أ™ث†أکآµأ™â€‍أکآ§أکآ­أ™إ أکآ§أکآھ أ™â€¦أکآ«أ™â€‍ أکآ§أ™â€‍أ™ئ’أکآ§أکآ´أ™إ أکآ± أ™ث†أکآ§أ™â€‍أ™آپأکآ±أکآ¹ أ™ث†أکآ§أ™â€‍أ™â€¦أکآ¯أ™إ أکآ±'
           : 'User management and roles such as cashier, branch manager, owner',
       licenses:
         language === 'ar'
-          ? 'Ø£ÙƒÙˆØ§Ø¯ Ø§Ù„ØªÙØ¹ÙŠÙ„ Ù„ØªØºÙŠÙŠØ± Ø§Ù„Ø¨Ø§Ù‚Ø© Ù„Ù…Ø¯Ø© Ø´Ù‡Ø±/Ø³Ù†Ø©/Ù…Ø¯Ù‰ Ø§Ù„Ø­ÙŠØ§Ø©'
+          ? 'أکآ£أ™ئ’أ™ث†أکآ§أکآ¯ أکآ§أ™â€‍أکآھأ™آپأکآ¹أ™إ أ™â€‍ أ™â€‍أکآھأکآ؛أ™إ أ™إ أکآ± أکآ§أ™â€‍أکآ¨أکآ§أ™â€ڑأکآ© أ™â€‍أ™â€¦أکآ¯أکآ© أکآ´أ™â€،أکآ±/أکآ³أ™â€ أکآ©/أ™â€¦أکآ¯أ™â€° أکآ§أ™â€‍أکآ­أ™إ أکآ§أکآ©'
           : 'Activation codes to change plans for month/year/lifetime',
       subscriptions:
         language === 'ar'
-          ? 'Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ø§Ø´ØªØ±Ø§Ùƒ Ø§Ù„Ø­Ø§Ù„ÙŠ ÙˆØªØ§Ø±ÙŠØ® Ø§Ù„ØªÙØ¹ÙŠÙ„ ÙˆØ§Ù„Ø§Ù†ØªÙ‡Ø§Ø¡'
+          ? 'أکآ¥أکآ¯أکآ§أکآ±أکآ© أکآ§أ™â€‍أکآ§أکآ´أکآھأکآ±أکآ§أ™ئ’ أکآ§أ™â€‍أکآ­أکآ§أ™â€‍أ™إ  أ™ث†أکآھأکآ§أکآ±أ™إ أکآ® أکآ§أ™â€‍أکآھأ™آپأکآ¹أ™إ أ™â€‍ أ™ث†أکآ§أ™â€‍أکآ§أ™â€ أکآھأ™â€،أکآ§أکآ،'
           : 'Manage current subscription and activation/expiry history',
     };
 
     const systemPrompt =
       language === 'ar'
-        ? 'Ø£Ù†Øª Ù…Ø³Ø§Ø¹Ø¯ Ø°ÙƒÙŠ Ù„Ù†Ø¸Ø§Ù… Crown ERP. Ø±Ø¯ Ø¯Ø§Ø¦Ù…Ø§Ù‹ Ø¨Ø§Ø®ØªØµØ§Ø± Ø´Ø¯ÙŠØ¯ (Ù£â€“Ù¦ Ù†Ù‚Ø§Ø· Ù…Ø±Ù‚Ù…Ø© Ø£Ùˆ ÙÙ‚Ø±Ø§Øª Ù‚ØµÙŠØ±Ø©)ØŒ ÙˆÙˆØ¶Ø­ Ø§Ù„Ø®Ø·ÙˆØ§Øª Ø§Ù„Ø¹Ù…Ù„ÙŠØ© Ø¯Ø§Ø®Ù„ Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ… (Ø§Ù„Ù…Ø³Ø§Ø± ÙÙŠ Ø§Ù„Ù€ UI Ø£Ùˆ Ø§Ø³Ù… Ø§Ù„ØµÙØ­Ø©) ÙˆØ£ÙŠ endpoint Ù…Ù‡Ù… ÙÙŠ Ø§Ù„Ù€ API Ø¥Ù† Ù„Ø²Ù…. Ù„Ø§ ØªØ®ØªØ±Ø¹ Ù…Ø¹Ù„ÙˆÙ…Ø§Øª ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø© ÙÙŠ Ø§Ù„Ø³ÙŠØ§Ù‚ Ø£Ùˆ Ù…Ù†Ø·Ù‚ Ø§Ù„Ù†Ø¸Ø§Ù…Ø› Ø¥Ø°Ø§ ÙƒØ§Ù†Øª Ø§Ù„Ù…Ø¹Ù„ÙˆÙ…Ø© Ù†Ø§Ù‚ØµØ© Ø§Ø³Ø£Ù„ Ø³Ø¤Ø§Ù„Ø§Ù‹ ÙˆØ§Ø­Ø¯Ø§Ù‹ ÙÙ‚Ø· Ù„ØªÙˆØ¶ÙŠØ­ Ø§Ù„Ù…Ø·Ù„ÙˆØ¨ Ø«Ù… Ø§Ù‚ØªØ±Ø­ Ø£ÙØ¶Ù„ Ù…Ù…Ø§Ø±Ø³Ø©. Ø±ÙƒÙ‘Ø² Ø¹Ù„Ù‰: Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§ØªØŒ Ø§Ù„Ù…Ø®Ø²ÙˆÙ†ØŒ Ø§Ù„ÙÙˆØ§ØªÙŠØ±ØŒ Ø§Ù„Ø£ÙƒÙˆØ§Ø¯ ÙˆØ§Ù„Ø§Ø´ØªØ±Ø§ÙƒØ§ØªØŒ Ø§Ù„Ø£Ø¯ÙˆØ§Ø± ÙˆØ§Ù„ØµÙ„Ø§Ø­ÙŠØ§ØªØŒ Ø§Ù„Ù…ØªØ§Ø¬Ø± ÙˆØ§Ù„ÙØ±ÙˆØ¹ØŒ ÙˆØ§Ù„Ø§Ø³ØªÙŠØ±Ø§Ø¯/Ø§Ù„ØªØµØ¯ÙŠØ±. Ø§Ø­ØªØ±Ù… Ø®Ø·Ø© Ø§Ù„Ø¹Ù…ÙŠÙ„ (Ø§Ù„Ø¨Ø§Ù‚Ø©) ÙˆØ§Ø°ÙƒØ± Ø¥Ù† ÙƒØ§Ù†Øª Ø§Ù„Ø®Ø§ØµÙŠØ© Ù…ØªØ§Ø­Ø© ÙÙŠ Ø®Ø·ØªÙ‡ Ø£Ù… ØªØ­ØªØ§Ø¬ ØªØ±Ù‚ÙŠØ©.'
-        : 'You are a smart assistant for the Crown ERP system. Always answer concisely (3â€“6 short bullet points or paragraphs), and highlight practical steps inside the dashboard (UI route or page name) plus any relevant API endpoint when useful. Do not hallucinate or invent features; if key information is missing, ask exactly one clarifying question before proposing best practices. Focus on: sales, inventory, invoices, licenses & subscriptions, roles & permissions, shops & branches, and import/export. Respect the customer plan (subscription) and mention when a feature requires a higher plan.';
+        ? 'أکآ£أ™â€ أکآھ أ™â€¦أکآ³أکآ§أکآ¹أکآ¯ أکآ°أ™ئ’أ™إ  أ™â€‍أ™â€ أکآ¸أکآ§أ™â€¦ Crown ERP. أکآ±أکآ¯ أکآ¯أکآ§أکآ¦أ™â€¦أکآ§أ™â€¹ أکآ¨أکآ§أکآ®أکآھأکآµأکآ§أکآ± أکآ´أکآ¯أ™إ أکآ¯ (أ™آ£أ¢â‚¬â€œأ™آ¦ أ™â€ أ™â€ڑأکآ§أکآ· أ™â€¦أکآ±أ™â€ڑأ™â€¦أکآ© أکآ£أ™ث† أ™آپأ™â€ڑأکآ±أکآ§أکآھ أ™â€ڑأکآµأ™إ أکآ±أکآ©)أکإ’ أ™ث†أ™ث†أکآ¶أکآ­ أکآ§أ™â€‍أکآ®أکآ·أ™ث†أکآ§أکآھ أکآ§أ™â€‍أکآ¹أ™â€¦أ™â€‍أ™إ أکآ© أکآ¯أکآ§أکآ®أ™â€‍ أ™â€‍أ™ث†أکآ­أکآ© أکآ§أ™â€‍أکآھأکآ­أ™ئ’أ™â€¦ (أکآ§أ™â€‍أ™â€¦أکآ³أکآ§أکآ± أ™آپأ™إ  أکآ§أ™â€‍أ™â‚¬ UI أکآ£أ™ث† أکآ§أکآ³أ™â€¦ أکآ§أ™â€‍أکآµأ™آپأکآ­أکآ©) أ™ث†أکآ£أ™إ  endpoint أ™â€¦أ™â€،أ™â€¦ أ™آپأ™إ  أکآ§أ™â€‍أ™â‚¬ API أکآ¥أ™â€  أ™â€‍أکآ²أ™â€¦. أ™â€‍أکآ§ أکآھأکآ®أکآھأکآ±أکآ¹ أ™â€¦أکآ¹أ™â€‍أ™ث†أ™â€¦أکآ§أکآھ أکآ؛أ™إ أکآ± أ™â€¦أ™ث†أکآ¬أ™ث†أکآ¯أکآ© أ™آپأ™إ  أکآ§أ™â€‍أکآ³أ™إ أکآ§أ™â€ڑ أکآ£أ™ث† أ™â€¦أ™â€ أکآ·أ™â€ڑ أکآ§أ™â€‍أ™â€ أکآ¸أکآ§أ™â€¦أکâ€؛ أکآ¥أکآ°أکآ§ أ™ئ’أکآ§أ™â€ أکآھ أکآ§أ™â€‍أ™â€¦أکآ¹أ™â€‍أ™ث†أ™â€¦أکآ© أ™â€ أکآ§أ™â€ڑأکآµأکآ© أکآ§أکآ³أکآ£أ™â€‍ أکآ³أکآ¤أکآ§أ™â€‍أکآ§أ™â€¹ أ™ث†أکآ§أکآ­أکآ¯أکآ§أ™â€¹ أ™آپأ™â€ڑأکآ· أ™â€‍أکآھأ™ث†أکآ¶أ™إ أکآ­ أکآ§أ™â€‍أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨ أکآ«أ™â€¦ أکآ§أ™â€ڑأکآھأکآ±أکآ­ أکآ£أ™آپأکآ¶أ™â€‍ أ™â€¦أ™â€¦أکآ§أکآ±أکآ³أکآ©. أکآ±أ™ئ’أ™â€کأکآ² أکآ¹أ™â€‍أ™â€°: أکآ§أ™â€‍أ™â€¦أکآ¨أ™إ أکآ¹أکآ§أکآھأکإ’ أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™ث†أ™â€ أکإ’ أکآ§أ™â€‍أ™آپأ™ث†أکآ§أکآھأ™إ أکآ±أکإ’ أکآ§أ™â€‍أکآ£أ™ئ’أ™ث†أکآ§أکآ¯ أ™ث†أکآ§أ™â€‍أکآ§أکآ´أکآھأکآ±أکآ§أ™ئ’أکآ§أکآھأکإ’ أکآ§أ™â€‍أکآ£أکآ¯أ™ث†أکآ§أکآ± أ™ث†أکآ§أ™â€‍أکآµأ™â€‍أکآ§أکآ­أ™إ أکآ§أکآھأکإ’ أکآ§أ™â€‍أ™â€¦أکآھأکآ§أکآ¬أکآ± أ™ث†أکآ§أ™â€‍أ™آپأکآ±أ™ث†أکآ¹أکإ’ أ™ث†أکآ§أ™â€‍أکآ§أکآ³أکآھأ™إ أکآ±أکآ§أکآ¯/أکآ§أ™â€‍أکآھأکآµأکآ¯أ™إ أکآ±. أکآ§أکآ­أکآھأکآ±أ™â€¦ أکآ®أکآ·أکآ© أکآ§أ™â€‍أکآ¹أ™â€¦أ™إ أ™â€‍ (أکآ§أ™â€‍أکآ¨أکآ§أ™â€ڑأکآ©) أ™ث†أکآ§أکآ°أ™ئ’أکآ± أکآ¥أ™â€  أ™ئ’أکآ§أ™â€ أکآھ أکآ§أ™â€‍أکآ®أکآ§أکآµأ™إ أکآ© أ™â€¦أکآھأکآ§أکآ­أکآ© أ™آپأ™إ  أکآ®أکآ·أکآھأ™â€، أکآ£أ™â€¦ أکآھأکآ­أکآھأکآ§أکآ¬ أکآھأکآ±أ™â€ڑأ™إ أکآ©.'
+        : 'You are a smart assistant for the Crown ERP system. Always answer concisely (3أ¢â‚¬â€œ6 short bullet points or paragraphs), and highlight practical steps inside the dashboard (UI route or page name) plus any relevant API endpoint when useful. Do not hallucinate or invent features; if key information is missing, ask exactly one clarifying question before proposing best practices. Focus on: sales, inventory, invoices, licenses & subscriptions, roles & permissions, shops & branches, and import/export. Respect the customer plan (subscription) and mention when a feature requires a higher plan.';
 
     const shopPayload = shop
       ? {
@@ -3547,12 +3574,12 @@ app.get('/api/users', authenticateToken, requireRole('super_admin', 'shop_owner'
     }
     if (!shopId) {
       if (req.user?.role === 'super_admin') {
-        return res.status(400).json({ error: 'SHOP_ID_REQUIRED', message_ar: 'Ø§Ø®ØªØ± Ø§Ù„Ù…ØªØ¬Ø± Ø£ÙˆÙ„Ø§Ù‹', message_en: 'Please select a shop first' });
+        return res.status(400).json({ error: 'SHOP_ID_REQUIRED', message_ar: 'أکآ§أکآ®أکآھأکآ± أکآ§أ™â€‍أ™â€¦أکآھأکآ¬أکآ± أکآ£أ™ث†أ™â€‍أکآ§أ™â€¹', message_en: 'Please select a shop first' });
       }
       return res.status(400).json({ error: 'shopId is required' });
     }
     if (req.user.role !== 'super_admin' && req.user.shop_id !== shopId) {
-      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'ØºÙŠØ± Ù…ØµØ±Ø­', message_en: 'Forbidden' });
+      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'أکآ؛أ™إ أکآ± أ™â€¦أکآµأکآ±أکآ­', message_en: 'Forbidden' });
     }
 
     const [users] = await pool.execute(
@@ -3618,7 +3645,7 @@ app.post('/api/users', authenticateToken, requireRole('super_admin', 'shop_owner
       if (req.user?.role === 'super_admin') {
         return res.status(400).json({
           error: 'SHOP_ID_REQUIRED',
-          message_ar: 'Ø§Ø®ØªØ± Ø§Ù„Ù…ØªØ¬Ø± Ø£ÙˆÙ„Ø§Ù‹',
+          message_ar: 'أکآ§أکآ®أکآھأکآ± أکآ§أ™â€‍أ™â€¦أکآھأکآ¬أکآ± أکآ£أ™ث†أ™â€‍أکآ§أ™â€¹',
           message_en: 'Please select a shop first',
         });
       }
@@ -3632,7 +3659,7 @@ app.post('/api/users', authenticateToken, requireRole('super_admin', 'shop_owner
       if (planError.message === 'PLAN_USER_LIMIT_REACHED') {
         return res.status(403).json({
           error: 'PLAN_USER_LIMIT_REACHED',
-          message_ar: planError.message_ar || 'Ù„Ù‚Ø¯ ÙˆØµÙ„Øª Ù„Ù„Ø­Ø¯ Ø§Ù„Ø£Ù‚ØµÙ‰ Ù„Ø¹Ø¯Ø¯ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ† ÙÙŠ Ø¨Ø§Ù‚ØªÙƒ. Ù‚Ù… Ø¨Ø§Ù„ØªØ±Ù‚ÙŠØ© Ø£Ùˆ Ø§Ø­Ø°Ù Ù…Ø³ØªØ®Ø¯Ù…Ù‹Ø§.',
+          message_ar: planError.message_ar || 'أ™â€‍أ™â€ڑأکآ¯ أ™ث†أکآµأ™â€‍أکآھ أ™â€‍أ™â€‍أکآ­أکآ¯ أکآ§أ™â€‍أکآ£أ™â€ڑأکآµأ™â€° أ™â€‍أکآ¹أکآ¯أکآ¯ أکآ§أ™â€‍أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦أ™إ أ™â€  أ™آپأ™إ  أکآ¨أکآ§أ™â€ڑأکآھأ™ئ’. أ™â€ڑأ™â€¦ أکآ¨أکآ§أ™â€‍أکآھأکآ±أ™â€ڑأ™إ أکآ© أکآ£أ™ث† أکآ§أکآ­أکآ°أ™آپ أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦أ™â€¹أکآ§.',
           message_en: planError.message_en || "You have reached your plan's user limit. Upgrade your plan or remove a user.",
         });
       }
@@ -3702,10 +3729,10 @@ app.post('/api/users/invite', authenticateToken, requireRole('super_admin', 'sho
 
     const shopId = resolveShopId(req) ?? (req.user.role === 'shop_owner' ? req.user.shop_id : null);
     if (!shopId && req.user?.role !== 'super_admin') {
-      return res.status(400).json({ error: 'SHOP_ID_REQUIRED', message_ar: 'Ø§Ø®ØªØ± Ø§Ù„Ù…ØªØ¬Ø± Ø£ÙˆÙ„Ø§Ù‹', message_en: 'Please select a shop first' });
+      return res.status(400).json({ error: 'SHOP_ID_REQUIRED', message_ar: 'أکآ§أکآ®أکآھأکآ± أکآ§أ™â€‍أ™â€¦أکآھأکآ¬أکآ± أکآ£أ™ث†أ™â€‍أکآ§أ™â€¹', message_en: 'Please select a shop first' });
     }
     if (req.user?.role === 'super_admin' && !shopId) {
-      return res.status(400).json({ error: 'SHOP_ID_REQUIRED', message_ar: 'Ø§Ø®ØªØ± Ø§Ù„Ù…ØªØ¬Ø± Ø£ÙˆÙ„Ø§Ù‹', message_en: 'Please select a shop first' });
+      return res.status(400).json({ error: 'SHOP_ID_REQUIRED', message_ar: 'أکآ§أکآ®أکآھأکآ± أکآ§أ™â€‍أ™â€¦أکآھأکآ¬أکآ± أکآ£أ™ث†أ™â€‍أکآ§أ™â€¹', message_en: 'Please select a shop first' });
     }
     const resolvedShopId = Number(shopId);
     if (!Number.isFinite(resolvedShopId) || resolvedShopId <= 0) {
@@ -3748,7 +3775,7 @@ app.delete('/api/users/:id', authenticateToken, requireRole('super_admin', 'shop
     if (targetUser.role === 'super_admin') return res.status(403).json({ error: 'Only super_admin can delete super_admin' });
 
     const shopId = req.user.role === 'super_admin' ? targetUser.shop_id : req.user.shop_id;
-    if (req.user.role !== 'super_admin' && targetUser.shop_id !== shopId) return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'ØºÙŠØ± Ù…ØµØ±Ø­', message_en: 'Not allowed' });
+    if (req.user.role !== 'super_admin' && targetUser.shop_id !== shopId) return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'أکآ؛أ™إ أکآ± أ™â€¦أکآµأکآ±أکآ­', message_en: 'Not allowed' });
 
     await pool.execute('DELETE FROM users WHERE id = ?', [userId]);
     res.json({ success: true });
@@ -3771,30 +3798,30 @@ app.post('/api/users/:id/change-password', authenticateToken, requireRole('super
     const targetUser = userArray[0];
 
     if (targetUser.role === 'super_admin' && req.user.role !== 'super_admin') {
-      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'Ù„Ø§ ÙŠÙ…ÙƒÙ† ØªØºÙŠÙŠØ± ÙƒÙ„Ù…Ø© Ù…Ø±ÙˆØ± Ø§Ù„Ù…Ø¯ÙŠØ± Ø§Ù„Ø¹Ø§Ù…', message_en: 'Cannot change super_admin password' });
+      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'أ™â€‍أکآ§ أ™إ أ™â€¦أ™ئ’أ™â€  أکآھأکآ؛أ™إ أ™إ أکآ± أ™ئ’أ™â€‍أ™â€¦أکآ© أ™â€¦أکآ±أ™ث†أکآ± أکآ§أ™â€‍أ™â€¦أکآ¯أ™إ أکآ± أکآ§أ™â€‍أکآ¹أکآ§أ™â€¦', message_en: 'Cannot change super_admin password' });
     }
 
     if (req.user.role === 'shop_owner' && targetUser.shop_id !== req.user.shop_id) {
-      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'ØºÙŠØ± Ù…ØµØ±Ø­', message_en: 'Forbidden' });
+      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'أکآ؛أ™إ أکآ± أ™â€¦أکآµأکآ±أکآ­', message_en: 'Forbidden' });
     }
 
     if (req.user.role === 'branch_manager') {
       if (targetUser.shop_id !== req.user.shop_id) {
-        return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'ØºÙŠØ± Ù…ØµØ±Ø­', message_en: 'Forbidden' });
+        return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'أکآ؛أ™إ أکآ± أ™â€¦أکآµأکآ±أکآ­', message_en: 'Forbidden' });
       }
       const [myAssignments] = await pool.execute('SELECT branch_id FROM user_branch_assignments WHERE user_id = ?', [req.user.id]);
       const myBranchIds = (myAssignments as any[]).map((r) => Number(r.branch_id));
-      if (myBranchIds.length === 0) return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'ØºÙŠØ± Ù…ØµØ±Ø­', message_en: 'Forbidden' });
+      if (myBranchIds.length === 0) return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'أکآ؛أ™إ أکآ± أ™â€¦أکآµأکآ±أکآ­', message_en: 'Forbidden' });
       const [targetAssignments] = await pool.execute('SELECT branch_id FROM user_branch_assignments WHERE user_id = ?', [userId]);
       const targetBranchIds = (targetAssignments as any[]).map((r) => Number(r.branch_id));
       const overlap = myBranchIds.some((b) => targetBranchIds.includes(b));
       if (!overlap) {
-        return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'ÙŠÙ…ÙƒÙ†Ùƒ ØªØºÙŠÙŠØ± ÙƒÙ„Ù…Ø© Ù…Ø±ÙˆØ± Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ† ÙÙŠ ÙØ±Ø¹Ùƒ ÙÙ‚Ø·', message_en: 'Can only change password for users in your branch' });
+        return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'أ™إ أ™â€¦أ™ئ’أ™â€ أ™ئ’ أکآھأکآ؛أ™إ أ™إ أکآ± أ™ئ’أ™â€‍أ™â€¦أکآ© أ™â€¦أکآ±أ™ث†أکآ± أکآ§أ™â€‍أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦أ™إ أ™â€  أ™آپأ™إ  أ™آپأکآ±أکآ¹أ™ئ’ أ™آپأ™â€ڑأکآ·', message_en: 'Can only change password for users in your branch' });
       }
     }
 
     if (req.user.role === 'multi_branch_manager' && targetUser.shop_id !== req.user.shop_id) {
-      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'ØºÙŠØ± Ù…ØµØ±Ø­', message_en: 'Forbidden' });
+      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'أکآ؛أ™إ أکآ± أ™â€¦أکآµأکآ±أکآ­', message_en: 'Forbidden' });
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -4307,7 +4334,7 @@ app.get('/api/subscription', authenticateToken, async (req: any, res: Response) 
     const additionalUsersCount = Number((additionalCountRows as any[])[0]?.total || 0);
     const canAddUser = additionalUsersCount < additionalUsersLimit;
     res.json({
-      // Ù…ØµØ¯Ø± ÙˆØ§Ø¶Ø­ Ù„Ù„Ø¨Ø§Ù‚Ø© Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…Ø© ÙÙŠ Ø§Ù„Ù€ UI
+      // أ™â€¦أکآµأکآ¯أکآ± أ™ث†أکآ§أکآ¶أکآ­ أ™â€‍أ™â€‍أکآ¨أکآ§أ™â€ڑأکآ© أکآ§أ™â€‍أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦أکآ© أ™آپأ™إ  أکآ§أ™â€‍أ™â‚¬ UI
       planId: planName,
       planName,
       planStatus,
@@ -4417,7 +4444,7 @@ app.post('/api/products', authenticateToken, requireRole('super_admin', 'shop_ow
     const limitCheck = await enforceProductLimit(shopId, 1);
     if (!limitCheck.allowed) {
       return res.status(403).json({
-        message: `Ù„Ù‚Ø¯ ÙˆØµÙ„Øª Ù„Ù„Ø­Ø¯ Ø§Ù„Ø£Ù‚ØµÙ‰ Ù…Ù† Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª (${limitCheck.maxProducts}). ÙŠØ±Ø¬Ù‰ Ø§Ù„ØªØ±Ù‚ÙŠØ© Ù„Ù„Ø¨Ø§Ù‚Ø© Ø§Ù„ÙØ¶ÙŠØ© Ø£Ùˆ Ø§Ù„Ø°Ù‡Ø¨ÙŠØ©.`,
+        message: `أ™â€‍أ™â€ڑأکآ¯ أ™ث†أکآµأ™â€‍أکآھ أ™â€‍أ™â€‍أکآ­أکآ¯ أکآ§أ™â€‍أکآ£أ™â€ڑأکآµأ™â€° أ™â€¦أ™â€  أکآ§أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬أکآ§أکآھ (${limitCheck.maxProducts}). أ™إ أکآ±أکآ¬أ™â€° أکآ§أ™â€‍أکآھأکآ±أ™â€ڑأ™إ أکآ© أ™â€‍أ™â€‍أکآ¨أکآ§أ™â€ڑأکآ© أکآ§أ™â€‍أ™آپأکآ¶أ™إ أکآ© أکآ£أ™ث† أکآ§أ™â€‍أکآ°أ™â€،أکآ¨أ™إ أکآ©.`,
         code: 'PRODUCT_LIMIT_REACHED',
       });
     }
@@ -4611,7 +4638,7 @@ const handleProductsImportUpload = async (
       const remaining = limitCheck.remaining ?? 0;
       if (mode === 'import') {
         return res.status(403).json({
-          message: `Ø§Ù„Ø­Ø¯ Ø§Ù„Ø£Ù‚ØµÙ‰ Ù„Ù„Ù…Ù†ØªØ¬Ø§Øª ÙÙŠ Ø¨Ø§Ù‚ØªÙƒ ${limitCheck.maxProducts}. Ù„Ø¯ÙŠÙƒ ${limitCheck.existingCount} Ù…Ù†ØªØ¬ Ø­Ø§Ù„ÙŠØ§Ù‹ ÙˆÙŠÙ…ÙƒÙ†Ùƒ Ø¥Ø¶Ø§ÙØ© ${remaining} Ù…Ù†ØªØ¬ ÙÙ‚Ø·. ÙŠØ±Ø¬Ù‰ Ø§Ù„ØªØ±Ù‚ÙŠØ© Ù„Ù„Ø¨Ø§Ù‚Ø© Ø§Ù„ÙØ¶ÙŠØ© Ø£Ùˆ Ø§Ù„Ø°Ù‡Ø¨ÙŠØ©.`,
+          message: `أکآ§أ™â€‍أکآ­أکآ¯ أکآ§أ™â€‍أکآ£أ™â€ڑأکآµأ™â€° أ™â€‍أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬أکآ§أکآھ أ™آپأ™إ  أکآ¨أکآ§أ™â€ڑأکآھأ™ئ’ ${limitCheck.maxProducts}. أ™â€‍أکآ¯أ™إ أ™ئ’ ${limitCheck.existingCount} أ™â€¦أ™â€ أکآھأکآ¬ أکآ­أکآ§أ™â€‍أ™إ أکآ§أ™â€¹ أ™ث†أ™إ أ™â€¦أ™ئ’أ™â€ أ™ئ’ أکآ¥أکآ¶أکآ§أ™آپأکآ© ${remaining} أ™â€¦أ™â€ أکآھأکآ¬ أ™آپأ™â€ڑأکآ·. أ™إ أکآ±أکآ¬أ™â€° أکآ§أ™â€‍أکآھأکآ±أ™â€ڑأ™إ أکآ© أ™â€‍أ™â€‍أکآ¨أکآ§أ™â€ڑأکآ© أکآ§أ™â€‍أ™آپأکآ¶أ™إ أکآ© أکآ£أ™ث† أکآ§أ™â€‍أکآ°أ™â€،أکآ¨أ™إ أکآ©.`,
           code: 'PRODUCT_LIMIT_REACHED',
         });
       }
@@ -4983,7 +5010,7 @@ const handleProductsImportUpload = async (
               rowIndex: i + 2,
               rawData: dataRows[i],
               mappedData: canonical,
-              errors: ['ØªÙ… Ø§Ù„ÙˆØµÙˆÙ„ Ù„Ù„Ø­Ø¯ Ø§Ù„Ø£Ù‚ØµÙ‰ Ù„Ù„Ù…Ù†ØªØ¬Ø§Øª'],
+              errors: ['أکآھأ™â€¦ أکآ§أ™â€‍أ™ث†أکآµأ™ث†أ™â€‍ أ™â€‍أ™â€‍أکآ­أکآ¯ أکآ§أ™â€‍أکآ£أ™â€ڑأکآµأ™â€° أ™â€‍أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬أکآ§أکآھ'],
             });
             continue;
           }
@@ -5023,10 +5050,10 @@ const handleProductsImportUpload = async (
           [importedCount, failedCount, failedCount > 0 ? 'partial' : 'committed', batchId]
         );
         const msgAr = failedCount === 0
-          ? `ØªÙ… Ø§Ø³ØªÙŠØ±Ø§Ø¯ ${importedCount} ØµÙ†Ù Ø¨Ù†Ø¬Ø§Ø­`
+          ? `أکآھأ™â€¦ أکآ§أکآ³أکآھأ™إ أکآ±أکآ§أکآ¯ ${importedCount} أکآµأ™â€ أ™آپ أکآ¨أ™â€ أکآ¬أکآ§أکآ­`
           : failedCount > 0 && importedCount > 0
-            ? `ØªÙ… Ø§Ø³ØªÙŠØ±Ø§Ø¯ ${importedCount} ØµÙ†Ù. ØªØ¹Ø°Ø± Ø§Ø³ØªÙŠØ±Ø§Ø¯ ${failedCount} ØµÙ†Ù â€“ ØªØ­ØªØ§Ø¬ ØªØµØ­ÙŠØ­`
-            : `ØªØ¹Ø°Ø± Ø§Ø³ØªÙŠØ±Ø§Ø¯ ${failedCount} ØµÙ†Ù â€“ ØªØ­ØªØ§Ø¬ ØªØµØ­ÙŠØ­`;
+            ? `أکآھأ™â€¦ أکآ§أکآ³أکآھأ™إ أکآ±أکآ§أکآ¯ ${importedCount} أکآµأ™â€ أ™آپ. أکآھأکآ¹أکآ°أکآ± أکآ§أکآ³أکآھأ™إ أکآ±أکآ§أکآ¯ ${failedCount} أکآµأ™â€ أ™آپ أ¢â‚¬â€œ أکآھأکآ­أکآھأکآ§أکآ¬ أکآھأکآµأکآ­أ™إ أکآ­`
+            : `أکآھأکآ¹أکآ°أکآ± أکآ§أکآ³أکآھأ™إ أکآ±أکآ§أکآ¯ ${failedCount} أکآµأ™â€ أ™آپ أ¢â‚¬â€œ أکآھأکآ­أکآھأکآ§أکآ¬ أکآھأکآµأکآ­أ™إ أکآ­`;
         return res.json({
           ok: true,
           inserted: importedCount,
@@ -5357,7 +5384,7 @@ app.post(
       if (!limitCheck.allowed) {
         const remaining = limitCheck.remaining ?? 0;
         return res.status(403).json({
-          message: `Ø§Ù„Ø­Ø¯ Ø§Ù„Ø£Ù‚ØµÙ‰ Ù„Ù„Ù…Ù†ØªØ¬Ø§Øª ÙÙŠ Ø¨Ø§Ù‚ØªÙƒ ${limitCheck.maxProducts}. Ù„Ø¯ÙŠÙƒ ${limitCheck.existingCount} Ù…Ù†ØªØ¬ Ø­Ø§Ù„ÙŠØ§Ù‹ ÙˆÙŠÙ…ÙƒÙ†Ùƒ Ø¥Ø¶Ø§ÙØ© ${remaining} Ù…Ù†ØªØ¬ ÙÙ‚Ø·. ÙŠØ±Ø¬Ù‰ Ø§Ù„ØªØ±Ù‚ÙŠØ© Ù„Ù„Ø¨Ø§Ù‚Ø© Ø§Ù„ÙØ¶ÙŠØ© Ø£Ùˆ Ø§Ù„Ø°Ù‡Ø¨ÙŠØ©.`,
+          message: `أکآ§أ™â€‍أکآ­أکآ¯ أکآ§أ™â€‍أکآ£أ™â€ڑأکآµأ™â€° أ™â€‍أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬أکآ§أکآھ أ™آپأ™إ  أکآ¨أکآ§أ™â€ڑأکآھأ™ئ’ ${limitCheck.maxProducts}. أ™â€‍أکآ¯أ™إ أ™ئ’ ${limitCheck.existingCount} أ™â€¦أ™â€ أکآھأکآ¬ أکآ­أکآ§أ™â€‍أ™إ أکآ§أ™â€¹ أ™ث†أ™إ أ™â€¦أ™ئ’أ™â€ أ™ئ’ أکآ¥أکآ¶أکآ§أ™آپأکآ© ${remaining} أ™â€¦أ™â€ أکآھأکآ¬ أ™آپأ™â€ڑأکآ·. أ™إ أکآ±أکآ¬أ™â€° أکآ§أ™â€‍أکآھأکآ±أ™â€ڑأ™إ أکآ© أ™â€‍أ™â€‍أکآ¨أکآ§أ™â€ڑأکآ© أکآ§أ™â€‍أ™آپأکآ¶أ™إ أکآ© أکآ£أ™ث† أکآ§أ™â€‍أکآ°أ™â€،أکآ¨أ™إ أکآ©.`,
           code: 'PRODUCT_LIMIT_REACHED',
         });
       }
@@ -5671,7 +5698,7 @@ app.post(
       return res.json({
         ok: true,
         committed,
-        messageAr: committed > 0 ? `ØªÙ… Ø§Ø¹ØªÙ…Ø§Ø¯ ${committed} ØµÙ†Ù Ø¨Ù†Ø¬Ø§Ø­` : 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ø£ØµÙ†Ø§Ù ØµØ§Ù„Ø­Ø© Ù„Ù„Ø§Ø¹ØªÙ…Ø§Ø¯',
+        messageAr: committed > 0 ? `أکآھأ™â€¦ أکآ§أکآ¹أکآھأ™â€¦أکآ§أکآ¯ ${committed} أکآµأ™â€ أ™آپ أکآ¨أ™â€ أکآ¬أکآ§أکآ­` : 'أ™â€‍أکآ§ أکآھأ™ث†أکآ¬أکآ¯ أکآ£أکآµأ™â€ أکآ§أ™آپ أکآµأکآ§أ™â€‍أکآ­أکآ© أ™â€‍أ™â€‍أکآ§أکآ¹أکآھأ™â€¦أکآ§أکآ¯',
       });
     } catch (err: any) {
       return res.status(500).json({ ok: false, error: err?.message || 'Commit failed' });
@@ -5679,7 +5706,7 @@ app.post(
   }
 );
 
-// GET /api/products/import/last — last import batch summary for shop
+// GET /api/products/import/last â€” last import batch summary for shop
 app.get(
   '/api/products/import/last',
   authenticateToken,
@@ -5738,7 +5765,7 @@ app.get(
   }
 );
 
-// POST /api/products/import/rollback — undo last import (requires confirm:true)
+// POST /api/products/import/rollback â€” undo last import (requires confirm:true)
 app.post(
   '/api/products/import/rollback',
   authenticateToken,
@@ -5748,7 +5775,7 @@ app.post(
       if (req.body?.confirm !== true) {
         return res.status(400).json({
           ok: false,
-          error: 'ÙŠØ±Ø¬Ù‰ Ø§Ù„ØªØ£ÙƒÙŠØ¯: Ø£Ø±Ø³Ù„ { confirm: true } Ù„ØªÙ†ÙÙŠØ° Ø§Ù„ØªØ±Ø§Ø¬Ø¹',
+          error: 'أ™إ أکآ±أکآ¬أ™â€° أکآ§أ™â€‍أکآھأکآ£أ™ئ’أ™إ أکآ¯: أکآ£أکآ±أکآ³أ™â€‍ { confirm: true } أ™â€‍أکآھأ™â€ أ™آپأ™إ أکآ° أکآ§أ™â€‍أکآھأکآ±أکآ§أکآ¬أکآ¹',
         });
       }
       const shopId = resolveShopId(req);
@@ -5987,18 +6014,30 @@ app.post(
   requirePackageFeature('pos'),
   requireRole('super_admin', 'shop_owner', 'cashier'),
   async (req: any, res: Response) => {
-  try {
-    const result = await createSaleAndItems(req);
-    res.status(201).json(result);
-  } catch (error: any) {
-    if (error?.message === 'shopId is required') {
-      return res.status(400).json({ error: 'shopId is required' });
+    try {
+      console.log('INVOICE CREATE called');
+      console.log('INVOICE USER:', req.user?.id, req.user?.role);
+      console.log('INVOICE HEADERS shop:', req.headers['x-shop-id'], req.headers['x-branch-id']);
+      console.log('INVOICE PAYLOAD:', JSON.stringify(req.body, null, 2));
+
+      const result = await createSaleAndItems(req);
+      return res.status(201).json(result);
+    } catch (error: any) {
+      console.error('INVOICE ERROR:', error);
+      console.error('INVOICE STACK:', error?.stack);
+
+      if (error?.message === 'shopId is required') {
+        return res.status(400).json({ error: 'shopId is required' });
+      }
+      if (error?.message === 'Sale items required') {
+        return res.status(400).json({ error: 'Sale items required' });
+      }
+
+      return res.status(500).json({
+        message: 'INVOICE_FAILED',
+        error: error?.message || String(error),
+      });
     }
-    if (error?.message === 'Sale items required') {
-      return res.status(400).json({ error: 'Sale items required' });
-    }
-    res.status(500).json({ error: error.message });
-  }
   }
 );
 
@@ -6049,10 +6088,10 @@ const incrementInvoicePrintCount = async (req: any, saleId: number) => {
        VALUES (?, ?, 'pos', ?, ?)`,
       [shopId, saleId, req.user?.id ?? null, printCount]
     );
-    const titleAr = 'Ø·Ø¨Ø§Ø¹Ø© ÙØ§ØªÙˆØ±Ø© POS';
+    const titleAr = 'أکآ·أکآ¨أکآ§أکآ¹أکآ© أ™آپأکآ§أکآھأ™ث†أکآ±أکآ© POS';
     const titleEn = 'POS invoice printed';
-    const bodyAr = `ÙØ§ØªÙˆØ±Ø© #${invoiceRow?.invoice_number || saleId} — Ù†Ø³Ø®Ø© ${printCount}`;
-    const bodyEn = `Invoice #${invoiceRow?.invoice_number || saleId} — copy ${printCount}`;
+    const bodyAr = `أ™آپأکآ§أکآھأ™ث†أکآ±أکآ© #${invoiceRow?.invoice_number || saleId} â€” أ™â€ أکآ³أکآ®أکآ© ${printCount}`;
+    const bodyEn = `Invoice #${invoiceRow?.invoice_number || saleId} â€” copy ${printCount}`;
     await connection.execute(
       `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
        VALUES (?, 'pos', 'pos_invoice_printed', ?, ?, ?, ?, 0, ?)`,
@@ -6240,7 +6279,7 @@ app.get('/api/sales/:id/items', authenticateToken, async (req: any, res: Respons
   }
 });
 
-// ========== VAULT (Ø§Ù„Ø®Ø²Ù†Ø©) ==========
+// ========== VAULT (أکآ§أ™â€‍أکآ®أکآ²أ™â€ أکآ©) ==========
 app.get('/api/vault/summary', authenticateToken, requireRole('super_admin', 'shop_owner', 'cashier'), async (req: any, res: Response) => {
   try {
     const shopId = resolveShopId(req);
@@ -6342,7 +6381,7 @@ app.post('/api/vault/transactions', authenticateToken, requireRole('super_admin'
   }
 });
 
-// ========== AUDIT LOGS (Ø§Ù„Ù…Ø±Ø§Ø¬Ø¹) ==========
+// ========== AUDIT LOGS (أکآ§أ™â€‍أ™â€¦أکآ±أکآ§أکآ¬أکآ¹) ==========
 app.get('/api/audit-logs', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
   try {
     const shopId = resolveShopId(req);
@@ -6905,10 +6944,10 @@ app.get('/api/admin/inventory/slow-moving', authenticateToken, requireRole('supe
       let recommendationAr = '';
       let recommendationEn = '';
       if (isDead) {
-        if (stock >= 10) { suggestedDiscountPct = 20; recommendationAr = 'Ø§Ù‚ØªØ±Ø§Ø­: Ø®ØµÙ… 15-25% Ù„ØªØ³Ø±ÙŠØ¹ Ø§Ù„Ø¨ÙŠØ¹'; recommendationEn = 'Suggested: 15-25% discount to boost sales'; }
-        else { recommendationAr = 'Ø§Ù‚ØªØ±Ø§Ø­: Ø¹Ø±Ø¶ Ø­Ø²Ù…Ø© Ø£Ùˆ Ø¨ÙŠØ¹ Ø¥Ø¶Ø§ÙÙŠ'; recommendationEn = 'Suggested: Bundle or upsell offer'; }
+        if (stock >= 10) { suggestedDiscountPct = 20; recommendationAr = 'أکآ§أ™â€ڑأکآھأکآ±أکآ§أکآ­: أکآ®أکآµأ™â€¦ 15-25% أ™â€‍أکآھأکآ³أکآ±أ™إ أکآ¹ أکآ§أ™â€‍أکآ¨أ™إ أکآ¹'; recommendationEn = 'Suggested: 15-25% discount to boost sales'; }
+        else { recommendationAr = 'أکآ§أ™â€ڑأکآھأکآ±أکآ§أکآ­: أکآ¹أکآ±أکآ¶ أکآ­أکآ²أ™â€¦أکآ© أکآ£أ™ث† أکآ¨أ™إ أکآ¹ أکآ¥أکآ¶أکآ§أ™آپأ™إ '; recommendationEn = 'Suggested: Bundle or upsell offer'; }
       } else {
-        suggestedDiscountPct = 10; recommendationAr = 'Ø§Ù‚ØªØ±Ø§Ø­: Ø®ØµÙ… 5-15%'; recommendationEn = 'Suggested: 5-15% discount';
+        suggestedDiscountPct = 10; recommendationAr = 'أکآ§أ™â€ڑأکآھأکآ±أکآ§أکآ­: أکآ®أکآµأ™â€¦ 5-15%'; recommendationEn = 'Suggested: 5-15% discount';
       }
 
       items.push({
@@ -6940,9 +6979,9 @@ async function maybeCreateDeadStockAlert(shopId: number, deadCount: number, slow
     );
     if ((recent as any[]).length > 0) return;
     if (deadCount === 0 && slowCount === 0) return;
-    const titleAr = `ØªÙ†Ø¨ÙŠÙ‡ Ù…Ø®Ø²ÙˆÙ† Ø±Ø§ÙƒØ¯/Ø¨Ø·ÙŠØ¡: ${deadCount} Ø±Ø§ÙƒØ¯ | ${slowCount} Ø¨Ø·ÙŠØ¡`;
+    const titleAr = `أکآھأ™â€ أکآ¨أ™إ أ™â€، أ™â€¦أکآ®أکآ²أ™ث†أ™â€  أکآ±أکآ§أ™ئ’أکآ¯/أکآ¨أکآ·أ™إ أکآ،: ${deadCount} أکآ±أکآ§أ™ئ’أکآ¯ | ${slowCount} أکآ¨أکآ·أ™إ أکآ،`;
     const titleEn = `Dead/Slow stock alert: ${deadCount} dead | ${slowCount} slow`;
-    const bodyAr = `Ø±Ø§Ø¬Ø¹ ØµÙØ­Ø© Ø§Ù„Ù…Ø®Ø²ÙˆÙ† Ø§Ù„Ø±Ø§ÙƒØ¯/Ø§Ù„Ø¨Ø·ÙŠØ¡`;
+    const bodyAr = `أکآ±أکآ§أکآ¬أکآ¹ أکآµأ™آپأکآ­أکآ© أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™ث†أ™â€  أکآ§أ™â€‍أکآ±أکآ§أ™ئ’أکآ¯/أکآ§أ™â€‍أکآ¨أکآ·أ™إ أکآ،`;
     const bodyEn = `Review the Dead/Slow stock page`;
     await pool.execute(
       `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
@@ -6973,7 +7012,7 @@ app.get('/api/admin/reports/summary', authenticateToken, requireRole('super_admi
       return res.json({
         ok: true, range: { from: req.query.from || new Date().toISOString().slice(0, 10), to: req.query.to || new Date().toISOString().slice(0, 10) },
         sales: { totalRevenue: 0, ordersCount: 0, avgOrderValue: 0, posRevenue: 0, onlineRevenueConfirmed: 0, onlineOrdersConfirmedCount: 0, statusBreakdown: { pending: 0, confirmed: 0, completed: 0, cancelled: 0 } },
-        profit: { available: false, profitNoteAr: 'Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ù…ØªØ¬Ø± Ù…Ø­Ø¯Ø¯', profitNoteEn: 'No shop selected' },
+        profit: { available: false, profitNoteAr: 'أ™â€‍أکآ§ أ™إ أ™ث†أکآ¬أکآ¯ أ™â€¦أکآھأکآ¬أکآ± أ™â€¦أکآ­أکآ¯أکآ¯', profitNoteEn: 'No shop selected' },
         charts: { dailyRevenue: [], dailyProfit: undefined },
         topProducts: [],
       });
@@ -7097,8 +7136,8 @@ app.get('/api/admin/reports/summary', authenticateToken, requireRole('super_admi
       profit: {
         available: profitAvailable,
         totalProfit: profitAvailable ? dailyProfit.reduce((s, d) => s + d.profit, 0) : undefined,
-        profitNoteAr: isBranchManager ? 'مدير الفرع لا يمكنه رؤية الأرباح' : profitAvailable ? undefined : 'الأرباح غير متوفرة — تأكد من وجود سعر الشراء للمنتجات',
-        profitNoteEn: isBranchManager ? 'Branch Manager cannot view profits' : profitAvailable ? undefined : 'Gross profit unavailable — ensure buy_price is set for products',
+        profitNoteAr: isBranchManager ? 'ظ…ط¯ظٹط± ط§ظ„ظپط±ط¹ ظ„ط§ ظٹظ…ظƒظ†ظ‡ ط±ط¤ظٹط© ط§ظ„ط£ط±ط¨ط§ط­' : profitAvailable ? undefined : 'ط§ظ„ط£ط±ط¨ط§ط­ ط؛ظٹط± ظ…طھظˆظپط±ط© â€” طھط£ظƒط¯ ظ…ظ† ظˆط¬ظˆط¯ ط³ط¹ط± ط§ظ„ط´ط±ط§ط، ظ„ظ„ظ…ظ†طھط¬ط§طھ',
+        profitNoteEn: isBranchManager ? 'Branch Manager cannot view profits' : profitAvailable ? undefined : 'Gross profit unavailable â€” ensure buy_price is set for products',
       },
       charts: { dailyRevenue, dailyProfit: profitAvailable ? dailyProfit : undefined },
       topProducts,
@@ -7189,7 +7228,7 @@ app.get('/api/shop/public', async (req: Request, res: Response) => {
       shopId: shop.id,
       shopName: shop.business_name || shop.name,
       businessType: shop.activity_type || 'default',
-      currencySymbol: shop.currency_symbol || 'Ø¬.Ù…',
+      currencySymbol: shop.currency_symbol || 'أکآ¬.أ™â€¦',
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -7226,9 +7265,9 @@ app.get('/api/products/public', async (req: Request, res: Response) => {
 // Normalize payment method to stable codes (avoid DB truncation)
 function normalizePaymentMethod(value: unknown): string {
   const s = String(value || '').toLowerCase();
-  if (s.includes('cod') || s.includes('Ø§Ø³ØªÙ„Ø§Ù…') || s.includes('cash') || s.includes('Ù†Ù‚Ø¯')) return 'COD';
-  if (s.includes('transfer') || s.includes('ØªØ­ÙˆÙŠÙ„') || s.includes('bank')) return 'TRANSFER';
-  if (s.includes('card') || s.includes('Ø¨Ø·Ø§Ù‚Ø©') || s.includes('credit')) return 'CARD';
+  if (s.includes('cod') || s.includes('أکآ§أکآ³أکآھأ™â€‍أکآ§أ™â€¦') || s.includes('cash') || s.includes('أ™â€ أ™â€ڑأکآ¯')) return 'COD';
+  if (s.includes('transfer') || s.includes('أکآھأکآ­أ™ث†أ™إ أ™â€‍') || s.includes('bank')) return 'TRANSFER';
+  if (s.includes('card') || s.includes('أکآ¨أکآ·أکآ§أ™â€ڑأکآ©') || s.includes('credit')) return 'CARD';
   return 'COD';
 }
 
@@ -7357,26 +7396,26 @@ app.post('/api/storefront/orders', async (req: Request, res: Response) => {
       }
     }
     if (!Number.isFinite(shopId) || shopId <= 0) {
-      return res.status(400).json({ error: 'shopId or domain is required', ar: 'Ù…Ø¹Ø±Ù Ø§Ù„Ù…ØªØ¬Ø± Ø£Ùˆ Ø§Ù„Ø¯ÙˆÙ…ÙŠÙ† Ù…Ø·Ù„ÙˆØ¨' });
+      return res.status(400).json({ error: 'shopId or domain is required', ar: 'أ™â€¦أکآ¹أکآ±أ™آپ أکآ§أ™â€‍أ™â€¦أکآھأکآ¬أکآ± أکآ£أ™ث† أکآ§أ™â€‍أکآ¯أ™ث†أ™â€¦أ™إ أ™â€  أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨' });
     }
     if (!customerName || String(customerName).trim().length === 0) {
-      return res.status(400).json({ error: 'Customer name is required', ar: 'Ø§Ù„Ø§Ø³Ù… Ù…Ø·Ù„ÙˆØ¨' });
+      return res.status(400).json({ error: 'Customer name is required', ar: 'أکآ§أ™â€‍أکآ§أکآ³أ™â€¦ أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨' });
     }
     const phoneStr = String(phone || '').trim();
     if (!phoneStr || !/^[\d\s\-\+\(\)]{8,20}$/.test(phoneStr)) {
-      return res.status(400).json({ error: 'Valid phone is required', ar: 'Ø±Ù‚Ù… Ù‡Ø§ØªÙ ØµØ­ÙŠØ­ Ù…Ø·Ù„ÙˆØ¨' });
+      return res.status(400).json({ error: 'Valid phone is required', ar: 'أکآ±أ™â€ڑأ™â€¦ أ™â€،أکآ§أکآھأ™آپ أکآµأکآ­أ™إ أکآ­ أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨' });
     }
     if (!governorate || String(governorate).trim().length === 0) {
-      return res.status(400).json({ error: 'Governorate is required', ar: 'Ø§Ù„Ù…Ø­Ø§ÙØ¸Ø© Ù…Ø·Ù„ÙˆØ¨Ø©' });
+      return res.status(400).json({ error: 'Governorate is required', ar: 'أکآ§أ™â€‍أ™â€¦أکآ­أکآ§أ™آپأکآ¸أکآ© أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨أکآ©' });
     }
     if (!city || String(city).trim().length === 0) {
-      return res.status(400).json({ error: 'City is required', ar: 'Ø§Ù„Ù…Ø¯ÙŠÙ†Ø© Ù…Ø·Ù„ÙˆØ¨Ø©' });
+      return res.status(400).json({ error: 'City is required', ar: 'أکآ§أ™â€‍أ™â€¦أکآ¯أ™إ أ™â€ أکآ© أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨أکآ©' });
     }
     if (!addr || String(addr).trim().length === 0) {
-      return res.status(400).json({ error: 'Address is required', ar: 'Ø§Ù„Ø¹Ù†ÙˆØ§Ù† Ù…Ø·Ù„ÙˆØ¨' });
+      return res.status(400).json({ error: 'Address is required', ar: 'أکآ§أ™â€‍أکآ¹أ™â€ أ™ث†أکآ§أ™â€  أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨' });
     }
     if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: 'Cart items required', ar: 'Ø§Ù„Ø³Ù„Ø© ÙØ§Ø±ØºØ©' });
+      return res.status(400).json({ error: 'Cart items required', ar: 'أکآ§أ™â€‍أکآ³أ™â€‍أکآ© أ™آپأکآ§أکآ±أکآ؛أکآ©' });
     }
 
     const conn = await pool.getConnection();
@@ -7426,16 +7465,16 @@ app.post('/api/storefront/orders', async (req: Request, res: Response) => {
 
       if (orderItems.length === 0) {
         await conn.rollback();
-        return res.status(400).json({ error: 'No valid items', ar: 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ù…Ù†ØªØ¬Ø§Øª ØµØ§Ù„Ø­Ø©' });
+        return res.status(400).json({ error: 'No valid items', ar: 'أ™â€‍أکآ§ أکآھأ™ث†أکآ¬أکآ¯ أ™â€¦أ™â€ أکآھأکآ¬أکآ§أکآھ أکآµأکآ§أ™â€‍أکآ­أکآ©' });
       }
 
       for (const it of orderItems) {
         const available = await getAvailableStock(conn, shopId, it.productId);
         if (available < it.quantity) {
           await conn.rollback();
-          const titleAr = 'Ù…Ø­Ø§ÙˆÙ„Ø© Ø·Ù„Ø¨ Ø£ÙˆÙ†Ù„Ø§ÙŠÙ† ÙØ´Ù„Øª Ø¨Ø³Ø¨Ø¨ Ù†ÙØ§Ø¯ Ø§Ù„Ù…Ø®Ø²ÙˆÙ†';
+          const titleAr = 'أ™â€¦أکآ­أکآ§أ™ث†أ™â€‍أکآ© أکآ·أ™â€‍أکآ¨ أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€  أ™آپأکآ´أ™â€‍أکآھ أکآ¨أکآ³أکآ¨أکآ¨ أ™â€ أ™آپأکآ§أکآ¯ أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™ث†أ™â€ ';
           const titleEn = 'Online order failed due to insufficient stock';
-          const bodyAr = `Ø§Ù„Ù…Ù†ØªØ¬ ØºÙŠØ± Ù…ØªÙˆÙØ± Ø¨Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ù…Ø·Ù„ÙˆØ¨Ø©`;
+          const bodyAr = `أکآ§أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬ أکآ؛أ™إ أکآ± أ™â€¦أکآھأ™ث†أ™آپأکآ± أکآ¨أکآ§أ™â€‍أ™ئ’أ™â€¦أ™إ أکآ© أکآ§أ™â€‍أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨أکآ©`;
           const bodyEn = `Product not available in requested quantity`;
           try {
             await pool.execute(
@@ -7446,7 +7485,7 @@ app.post('/api/storefront/orders', async (req: Request, res: Response) => {
           } catch (_) {}
           return res.status(400).json({
             error: 'Insufficient stock. Product not available in requested quantity.',
-            ar: 'Ø§Ù„Ù…Ø®Ø²ÙˆÙ† ØºÙŠØ± ÙƒØ§ÙÙ. Ø§Ù„Ù…Ù†ØªØ¬ ØºÙŠØ± Ù…ØªÙˆÙØ± Ø¨Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ù…Ø·Ù„ÙˆØ¨Ø©.',
+            ar: 'أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™ث†أ™â€  أکآ؛أ™إ أکآ± أ™ئ’أکآ§أ™آپأ™آچ. أکآ§أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬ أکآ؛أ™إ أکآ± أ™â€¦أکآھأ™ث†أ™آپأکآ± أکآ¨أکآ§أ™â€‍أ™ئ’أ™â€¦أ™إ أکآ© أکآ§أ™â€‍أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨أکآ©.',
           });
         }
       }
@@ -7490,10 +7529,10 @@ app.post('/api/storefront/orders', async (req: Request, res: Response) => {
       await reserveStockForOrder(conn, shopId, orderId, orderItems.map((it) => ({ productId: it.productId, quantity: it.quantity })));
 
       const itemsCount = orderItems.length;
-      const titleAr = `Ø·Ù„Ø¨ Ø£ÙˆÙ†Ù„Ø§ÙŠÙ† Ø¬Ø¯ÙŠØ¯ (#${orderId})`;
+      const titleAr = `أکآ·أ™â€‍أکآ¨ أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€  أکآ¬أکآ¯أ™إ أکآ¯ (#${orderId})`;
       const titleEn = `New online order (#${orderId})`;
-      const bodyAr = `ØªÙ… Ø¥Ù†Ø´Ø§Ø¡ Ø·Ù„Ø¨ Ø¬Ø¯ÙŠØ¯ Ø¨Ù‚ÙŠÙ…Ø© ${total.toFixed(2)} Ø¬Ù†ÙŠÙ‡ — ${itemsCount} Ù…Ù†ØªØ¬`;
-      const bodyEn = `A new order was placed. Total: ${total.toFixed(2)} EGP — ${itemsCount} items`;
+      const bodyAr = `أکآھأ™â€¦ أکآ¥أ™â€ أکآ´أکآ§أکآ، أکآ·أ™â€‍أکآ¨ أکآ¬أکآ¯أ™إ أکآ¯ أکآ¨أ™â€ڑأ™إ أ™â€¦أکآ© ${total.toFixed(2)} أکآ¬أ™â€ أ™إ أ™â€، â€” ${itemsCount} أ™â€¦أ™â€ أکآھأکآ¬`;
+      const bodyEn = `A new order was placed. Total: ${total.toFixed(2)} EGP â€” ${itemsCount} items`;
       await conn.execute(
         `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
          VALUES (?, 'online', 'online_order_created', ?, ?, ?, ?, 0, ?)`,
@@ -7526,7 +7565,7 @@ app.post('/api/storefront/orders', async (req: Request, res: Response) => {
         total,
         trackingUrl,
         message: 'Order created',
-        ar: 'ØªÙ… ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø·Ù„Ø¨',
+        ar: 'أکآھأ™â€¦ أکآھأکآ³أکآ¬أ™إ أ™â€‍ أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨',
       });
     } catch (e) {
       await conn.rollback();
@@ -7545,10 +7584,10 @@ app.get('/api/storefront/orders/track', async (req: Request, res: Response) => {
     const code = String(req.query.code || '').trim().toUpperCase();
     const phone = String(req.query.phone || '').trim().replace(/\D/g, '');
     if (!code || code.length < 4) {
-      return res.status(400).json({ ok: false, error: 'Tracking code required', ar: 'ÙƒÙˆØ¯ Ø§Ù„ØªØªØ¨Ø¹ Ù…Ø·Ù„ÙˆØ¨' });
+      return res.status(400).json({ ok: false, error: 'Tracking code required', ar: 'أ™ئ’أ™ث†أکآ¯ أکآ§أ™â€‍أکآھأکآھأکآ¨أکآ¹ أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨' });
     }
     if (!phone || phone.length < 8) {
-      return res.status(400).json({ ok: false, error: 'Phone required', ar: 'Ø±Ù‚Ù… Ø§Ù„Ù‡Ø§ØªÙ Ù…Ø·Ù„ÙˆØ¨' });
+      return res.status(400).json({ ok: false, error: 'Phone required', ar: 'أکآ±أ™â€ڑأ™â€¦ أکآ§أ™â€‍أ™â€،أکآ§أکآھأ™آپ أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨' });
     }
     const phoneNorm = phone.replace(/\D/g, '');
     const [orders] = await pool.execute(
@@ -7563,7 +7602,7 @@ app.get('/api/storefront/orders/track', async (req: Request, res: Response) => {
     );
     const order = (orders as any[])[0];
     if (!order) {
-      return res.status(404).json({ ok: false, error: 'Order not found', ar: 'Ù„Ù… ÙŠØªÙ… Ø§Ù„Ø¹Ø«ÙˆØ± Ø¹Ù„Ù‰ Ø§Ù„Ø·Ù„Ø¨' });
+      return res.status(404).json({ ok: false, error: 'Order not found', ar: 'أ™â€‍أ™â€¦ أ™إ أکآھأ™â€¦ أکآ§أ™â€‍أکآ¹أکآ«أ™ث†أکآ± أکآ¹أ™â€‍أ™â€° أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨' });
     }
     const [items] = await pool.execute(
       'SELECT * FROM online_order_items WHERE order_id = ?',
@@ -7690,7 +7729,7 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requireRole('super_
             const p = (prods as any[])[0];
             await conn.rollback();
             const msg = `Insufficient stock for ${p?.name_en || p?.name_ar || 'product'}`;
-            const msgAr = `Ø§Ù„Ù…Ø®Ø²ÙˆÙ† ØºÙŠØ± ÙƒØ§ÙÙ Ù„Ù€ ${p?.name_ar || p?.name_en || 'Ø§Ù„Ù…Ù†ØªØ¬'}`;
+            const msgAr = `أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™ث†أ™â€  أکآ؛أ™إ أکآ± أ™ئ’أکآ§أ™آپأ™آچ أ™â€‍أ™â‚¬ ${p?.name_ar || p?.name_en || 'أکآ§أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬'}`;
             return res.status(400).json({ error: msg, ar: msgAr });
           }
         }
@@ -7726,9 +7765,9 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requireRole('super_
         const publicCode = order.public_code || String(orderId);
         const total = Number(order.total || 0);
         const itemsCount = (items as any[]).length;
-        const titleAr = `ØªÙ… ØªØ£ÙƒÙŠØ¯ Ø·Ù„Ø¨ Ø£ÙˆÙ†Ù„Ø§ÙŠÙ† (#${orderId})`;
+        const titleAr = `أکآھأ™â€¦ أکآھأکآ£أ™ئ’أ™إ أکآ¯ أکآ·أ™â€‍أکآ¨ أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€  (#${orderId})`;
         const titleEn = `Online order confirmed (#${orderId})`;
-        const bodyAr = `ØªÙ… ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø·Ù„Ø¨ Ø¨Ù‚ÙŠÙ…Ø© ${total.toFixed(2)} Ø¬Ù†ÙŠÙ‡`;
+        const bodyAr = `أکآھأ™â€¦ أکآھأکآ£أ™ئ’أ™إ أکآ¯ أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨ أکآ¨أ™â€ڑأ™إ أ™â€¦أکآ© ${total.toFixed(2)} أکآ¬أ™â€ أ™إ أ™â€،`;
         const bodyEn = `Order confirmed. Total: ${total.toFixed(2)} EGP`;
         await conn.execute(
           `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
@@ -7737,7 +7776,7 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requireRole('super_
         );
 
         await conn.commit();
-        return res.json({ status: 'confirmed', invoiceId, invoiceNumber: nextNum, message: 'Order confirmed and invoice created', ar: 'ØªÙ… ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø·Ù„Ø¨ ÙˆØ¥Ù†Ø´Ø§Ø¡ Ø§Ù„ÙØ§ØªÙˆØ±Ø©' });
+        return res.json({ status: 'confirmed', invoiceId, invoiceNumber: nextNum, message: 'Order confirmed and invoice created', ar: 'أکآھأ™â€¦ أکآھأکآ£أ™ئ’أ™إ أکآ¯ أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨ أ™ث†أکآ¥أ™â€ أکآ´أکآ§أکآ، أکآ§أ™â€‍أ™آپأکآ§أکآھأ™ث†أکآ±أکآ©' });
       } catch (e) {
         await conn.rollback();
         throw e;
@@ -7762,7 +7801,7 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requireRole('super_
       } finally {
         conn.release();
       }
-      return res.json({ status: 'cancelled', message: 'Order cancelled', ar: 'ØªÙ… Ø¥Ù„ØºØ§Ø¡ Ø§Ù„Ø·Ù„Ø¨' });
+      return res.json({ status: 'cancelled', message: 'Order cancelled', ar: 'أکآھأ™â€¦ أکآ¥أ™â€‍أکآ؛أکآ§أکآ، أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨' });
     }
 
     if (status === 'completed') {
@@ -7773,13 +7812,13 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requireRole('super_
       if ((existingInv as any[]).length === 0) {
         return res.status(400).json({
           error: 'Cannot complete: invoice not created. Confirm the order first.',
-          ar: 'Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø¥ÙƒÙ…Ø§Ù„ Ø§Ù„Ø·Ù„Ø¨: Ø§Ù„ÙØ§ØªÙˆØ±Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©. Ù‚Ù… Ø¨ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø·Ù„Ø¨ Ø£ÙˆÙ„Ø§Ù‹.',
+          ar: 'أ™â€‍أکآ§ أ™إ أ™â€¦أ™ئ’أ™â€  أکآ¥أ™ئ’أ™â€¦أکآ§أ™â€‍ أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨: أکآ§أ™â€‍أ™آپأکآ§أکآھأ™ث†أکآ±أکآ© أکآ؛أ™إ أکآ± أ™â€¦أ™ث†أکآ¬أ™ث†أکآ¯أکآ©. أ™â€ڑأ™â€¦ أکآ¨أکآھأکآ£أ™ئ’أ™إ أکآ¯ أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨ أکآ£أ™ث†أ™â€‍أکآ§أ™â€¹.',
         });
       }
       const total = Number(ord.total || 0);
-      const titleAr = `ØªÙ… Ø¥ÙƒÙ…Ø§Ù„ Ø·Ù„Ø¨ Ø£ÙˆÙ†Ù„Ø§ÙŠÙ† (#${orderId})`;
+      const titleAr = `أکآھأ™â€¦ أکآ¥أ™ئ’أ™â€¦أکآ§أ™â€‍ أکآ·أ™â€‍أکآ¨ أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€  (#${orderId})`;
       const titleEn = `Online order completed (#${orderId})`;
-      const bodyAr = `ØªÙ… Ø¥ÙƒÙ…Ø§Ù„ Ø§Ù„Ø·Ù„Ø¨ Ø¨Ù‚ÙŠÙ…Ø© ${total.toFixed(2)} Ø¬Ù†ÙŠÙ‡`;
+      const bodyAr = `أکآھأ™â€¦ أکآ¥أ™ئ’أ™â€¦أکآ§أ™â€‍ أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨ أکآ¨أ™â€ڑأ™إ أ™â€¦أکآ© ${total.toFixed(2)} أکآ¬أ™â€ أ™إ أ™â€،`;
       const bodyEn = `Order completed. Total: ${total.toFixed(2)} EGP`;
       await pool.execute(
         `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
@@ -7799,7 +7838,7 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requireRole('super_
     if ((result as any).affectedRows === 0) {
       return res.status(404).json({ error: 'Order not found' });
     }
-    const titleAr = `ØªØ­Ø¯ÙŠØ« Ø§Ù„Ø·Ù„Ø¨ #${orderId}: ${status}`;
+    const titleAr = `أکآھأکآ­أکآ¯أ™إ أکآ« أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨ #${orderId}: ${status}`;
     const titleEn = `Order #${orderId} status: ${status}`;
     // Update payment_status when confirming order
     if (status === 'confirmed') {
@@ -7808,7 +7847,7 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requireRole('super_
         await pool.execute('UPDATE online_orders SET payment_status = ? WHERE id = ? AND shop_id = ?', ['confirmed', orderId, shopId]);
       } catch (_) {}
     }
-    const bodyAr = `ØªÙ… ØªØºÙŠÙŠØ± Ø­Ø§Ù„Ø© Ø§Ù„Ø·Ù„Ø¨ Ø¥Ù„Ù‰ ${status}`;
+    const bodyAr = `أکآھأ™â€¦ أکآھأکآ؛أ™إ أ™إ أکآ± أکآ­أکآ§أ™â€‍أکآ© أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨ أکآ¥أ™â€‍أ™â€° ${status}`;
     const bodyEn = `Order status changed to ${status}`;
     await pool.execute(
       `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
@@ -7827,7 +7866,7 @@ const canAccessPaymentsOrders = (req: any) =>
 
 app.get('/api/admin/payments-orders/orders', authenticateToken, async (req: any, res: Response) => {
   try {
-    if (!canAccessPaymentsOrders(req)) return res.status(403).json({ error: 'Forbidden', ar: 'ØºÙŠØ± Ù…ØµØ±Ø­' });
+    if (!canAccessPaymentsOrders(req)) return res.status(403).json({ error: 'Forbidden', ar: 'أکآ؛أ™إ أکآ± أ™â€¦أکآµأکآ±أکآ­' });
     let shopId = resolveShopId(req);
     if (!shopId && req.user?.role === 'super_admin') {
       const [shops] = await pool.execute('SELECT id FROM shops ORDER BY id ASC LIMIT 1');
@@ -7893,7 +7932,7 @@ app.get('/api/admin/payments-orders/orders', authenticateToken, async (req: any,
 
 app.get('/api/admin/payments-orders/payments', authenticateToken, async (req: any, res: Response) => {
   try {
-    if (!canAccessPaymentsOrders(req)) return res.status(403).json({ error: 'Forbidden', ar: 'ØºÙŠØ± Ù…ØµØ±Ø­' });
+    if (!canAccessPaymentsOrders(req)) return res.status(403).json({ error: 'Forbidden', ar: 'أکآ؛أ™إ أکآ± أ™â€¦أکآµأکآ±أکآ­' });
     let shopId = resolveShopId(req);
     if (!shopId && req.user?.role === 'super_admin') {
       const [shops] = await pool.execute('SELECT id FROM shops ORDER BY id ASC LIMIT 1');
@@ -7973,7 +8012,7 @@ app.post('/api/admin/payments/:id/confirm', authenticateToken, requireRole('supe
     if (!pay) return res.status(404).json({ error: 'Payment not found' });
     await pool.execute('UPDATE payments SET status = ? WHERE id = ? AND shop_id = ?', ['confirmed', paymentId, shopId]);
     await pool.execute('UPDATE online_orders SET payment_status = ?, status = ?, order_status = ? WHERE id = ? AND shop_id = ?', ['confirmed', 'confirmed', 'PROCESSING', pay.order_id, shopId]);
-    res.json({ success: true, message: 'Payment confirmed', ar: 'ØªÙ… ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø¯ÙØ¹' });
+    res.json({ success: true, message: 'Payment confirmed', ar: 'أکآھأ™â€¦ أکآھأکآ£أ™ئ’أ™إ أکآ¯ أکآ§أ™â€‍أکآ¯أ™آپأکآ¹' });
   } catch (error: any) {
     res.status(500).json({ error: String(error?.message || 'Server error') });
   }
@@ -7991,7 +8030,7 @@ app.post('/api/admin/payments/:id/reject', authenticateToken, requireRole('super
     if (!pay) return res.status(404).json({ error: 'Payment not found' });
     await pool.execute('UPDATE payments SET status = ?, reject_reason = ? WHERE id = ? AND shop_id = ?', ['rejected', reason || rejectReason || null, paymentId, shopId]);
     await pool.execute('UPDATE online_orders SET payment_status = ? WHERE id = ? AND shop_id = ?', ['rejected', pay.order_id, shopId]);
-    res.json({ success: true, message: 'Payment rejected', ar: 'ØªÙ… Ø±ÙØ¶ Ø§Ù„Ø¯ÙØ¹' });
+    res.json({ success: true, message: 'Payment rejected', ar: 'أکآھأ™â€¦ أکآ±أ™آپأکآ¶ أکآ§أ™â€‍أکآ¯أ™آپأکآ¹' });
   } catch (error: any) {
     res.status(500).json({ error: String(error?.message || 'Server error') });
   }
@@ -8015,7 +8054,7 @@ app.get('/api/admin/inventory/availability', authenticateToken, requireRole('sup
     if (!hasBranches) {
       return res.status(403).json({
         error: 'FORBIDDEN',
-        message_ar: 'Ù…ÙŠØ²Ø© Ø§Ù„ÙØ±ÙˆØ¹ ØºÙŠØ± Ù…ØªÙˆÙØ±Ø© ÙÙŠ Ø¨Ø§Ù‚ØªÙƒ Ø§Ù„Ø­Ø§Ù„ÙŠØ©',
+        message_ar: 'أ™â€¦أ™إ أکآ²أکآ© أکآ§أ™â€‍أ™آپأکآ±أ™ث†أکآ¹ أکآ؛أ™إ أکآ± أ™â€¦أکآھأ™ث†أ™آپأکآ±أکآ© أ™آپأ™إ  أکآ¨أکآ§أ™â€ڑأکآھأ™ئ’ أکآ§أ™â€‍أکآ­أکآ§أ™â€‍أ™إ أکآ©',
         message_en: 'Branches feature is not available in your current plan',
       });
     }
@@ -8063,7 +8102,7 @@ app.get('/api/inventory/availability', authenticateToken, requireRole('super_adm
     if (!hasBranches) {
       return res.status(403).json({
         error: 'FORBIDDEN',
-        message_ar: 'Ù…ÙŠØ²Ø© Ø§Ù„ÙØ±ÙˆØ¹ ØºÙŠØ± Ù…ØªÙˆÙØ±Ø© ÙÙŠ Ø¨Ø§Ù‚ØªÙƒ Ø§Ù„Ø­Ø§Ù„ÙŠØ©',
+        message_ar: 'أ™â€¦أ™إ أکآ²أکآ© أکآ§أ™â€‍أ™آپأکآ±أ™ث†أکآ¹ أکآ؛أ™إ أکآ± أ™â€¦أکآھأ™ث†أ™آپأکآ±أکآ© أ™آپأ™إ  أکآ¨أکآ§أ™â€ڑأکآھأ™ئ’ أکآ§أ™â€‍أکآ­أکآ§أ™â€‍أ™إ أکآ©',
         message_en: 'Branches feature is not available in your current plan',
       });
     }
@@ -8513,7 +8552,7 @@ app.use((_req: Request, res: Response) => {
 const server = app.listen(PORT, '0.0.0.0', () => console.log('listening', PORT));
 
 server.on('error', (error) => {
-  console.error('âŒ Server error:', error);
+  console.error('أ¢آ‌إ’ Server error:', error);
 });
 
 app.use((err: any, _req: Request, res: Response, _next: any) => {
@@ -8521,16 +8560,16 @@ app.use((err: any, _req: Request, res: Response, _next: any) => {
     return res.status(400).json({ error: 'Invalid JSON body' });
   }
 
-  console.error('âŒ Unhandled API error:', err?.message || err);
-  console.error('âŒ Unhandled API error stack:', err?.stack || '(no stack)');
+  console.error('أ¢آ‌إ’ Unhandled API error:', err?.message || err);
+  console.error('أ¢آ‌إ’ Unhandled API error stack:', err?.stack || '(no stack)');
 
   res.status(500).json({ error: 'Internal server error' });
 });
 
 process.on('unhandledRejection', (reason) => {
-  console.error('âŒ Unhandled rejection:', reason);
+  console.error('أ¢آ‌إ’ Unhandled rejection:', reason);
 });
 
 process.on('uncaughtException', (error) => {
-  console.error('âŒ Uncaught exception:', error);
+  console.error('أ¢آ‌إ’ Uncaught exception:', error);
 });

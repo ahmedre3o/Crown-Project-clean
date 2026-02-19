@@ -81,6 +81,16 @@ if (process.env.NODE_ENV !== 'production') {
 
 // Create connection pool (connects lazily on first use)
 export const pool = mysql.createPool(poolConfig);
+// Ensure every new connection uses utf8mb4 (fix Arabic/emoji encoding globally)
+pool.on('connection', (conn: any) => {
+  try {
+    conn.query("SET NAMES utf8mb4 COLLATE utf8mb4_0900_ai_ci");
+  } catch (e) {
+    // never crash on charset init
+  }
+});
+
+
 
 // Dev-only SQL logging wrapper to help debug schema issues and keep server running on benign DDL errors
 if (process.env.NODE_ENV !== 'production') {

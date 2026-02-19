@@ -27,6 +27,8 @@ export default function RegisterPage() {
     errorDefault: t('register.errorDefault'),
   };
   const [loading, setLoading] = useState(false);
+  const [shopId, setShopId] = useState('');
+  const [needsShopId, setNeedsShopId] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     businessName: '',
@@ -57,7 +59,11 @@ export default function RegisterPage() {
           password: form.password,
         }),
       });
-      await login(form.username, form.password);
+      if (needsShopId && !shopId.trim()) {
+        setError('SHOP_ID_REQUIRED');
+        return;
+      }
+      await login(form.username, form.password, needsShopId ? shopId : undefined);
       try {
         sessionStorage.setItem('crown-trial-toast', '1');
       } catch {
@@ -65,6 +71,12 @@ export default function RegisterPage() {
       }
       router.push('/dashboard');
     } catch (err: any) {
+      if (err?.code === 'SHOP_ID_REQUIRED') {
+        setNeedsShopId(true);
+        setError(err?.message_ar || err?.message_en || 'SHOP_ID_REQUIRED');
+        return;
+      }
+
       setError(err.message || LABELS.errorDefault);
     } finally {
       setLoading(false);
@@ -146,7 +158,19 @@ export default function RegisterPage() {
             onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
             required
           />
+        
+      {needsShopId && (
+        <div className="mt-3">
+          <label className="block text-sm mb-1">Shop ID</label>
+          <input
+            name="shopId"
+            value={shopId}
+            onChange={(e) => setShopId(e.target.value)}
+            className="w-full rounded border px-3 py-2"
+            placeholder="مثال: 1"
+          />
         </div>
+      )}
 
         <div className="flex items-center justify-between text-xs text-slate-400">
           <Link href="/login" className="hover:text-cyan-300">

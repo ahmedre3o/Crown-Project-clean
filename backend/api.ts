@@ -23,6 +23,7 @@ import { loadSystemKnowledge } from './loadKnowledge';
 import { getLocalHelp } from './localHelp';
 import { getPlanFeaturesForBackend, PLANS } from './shared/plans';
 
+import { sanitizeDeep } from './encodingGuard';
 declare global {
   namespace Express {
     interface Request {
@@ -38,6 +39,14 @@ dotenv.config({ path: path.resolve(backendDir, '..', '.env') });
 
 const app = express();
 
+app.use((req, res, next) => {
+  const origJson = res.json.bind(res);
+  res.json = (body: any) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    return origJson(sanitizeDeep(body));
+  };
+  next();
+});
 // ===== GLOBAL_CORS_PREFLIGHT (added) =====
 const ALLOWED_ORIGINS = new Set([
   'https://crowncs.org',

@@ -51,7 +51,7 @@ logs/
 *.pem
 
 # local backups / temp files
-api.ts
+/api.ts
 backend/*.bak_*
 backend/*.bak_before_*
 *.bak

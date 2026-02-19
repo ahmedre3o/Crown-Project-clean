@@ -1,23 +1,35 @@
-const fs = require("fs");
+#!/usr/bin/env node
+/* eslint-disable no-console */
+const fs = require('fs');
+const path = require('path');
 
-const BAD = ["Ø", "Ã", "â€", "�", "أک", "™", "Â", "ï»¿"];
-
+const ROOT = path.resolve(__dirname, '..');
 const TARGETS = [
-  "backend/api.ts",
+  path.join(ROOT, 'backend', 'api.ts'),
+  path.join(ROOT, 'backend', 'i18n', 'ar.ts'),
+  path.join(ROOT, 'backend', 'i18n', 'en.ts'),
 ];
 
-let bad = [];
-for (const rel of TARGETS) {
-  if (!fs.existsSync(rel)) continue;
-  const txt = fs.readFileSync(rel, "utf8");
-  const hits = BAD.filter(m => txt.includes(m));
-  if (hits.length) bad.push({ file: rel, hits });
+// Mojibake markers
+const pattern = /Ø|Ã|â€|�|أک|™|Â|ï»¿/;
+
+let hasError = false;
+
+for (const file of TARGETS) {
+  if (!fs.existsSync(file)) continue;
+  const content = fs.readFileSync(file, 'utf8');
+  const lines = content.split(/\r?\n/);
+  lines.forEach((line, idx) => {
+    if (pattern.test(line)) {
+      hasError = true;
+      console.error(`[mojibake] ${path.relative(ROOT, file)}:${idx + 1}: ${line.slice(0, 200)}`);
+    }
+  });
 }
 
-if (bad.length) {
-  console.error("❌ Mojibake markers found:");
-  for (const b of bad) console.error(` - ${b.file}: ${b.hits.join(", ")}`);
+if (hasError) {
+  console.error('Mojibake markers found. Failing.');
   process.exit(1);
-} else {
-  console.log("✅ No mojibake markers found in targets.");
 }
+
+console.log('No mojibake markers detected.');

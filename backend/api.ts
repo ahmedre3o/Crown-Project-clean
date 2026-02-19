@@ -1653,8 +1653,8 @@ const createSaleAndItems = async (req: any, paymentMethodOverride?: string) => {
     const itemsCount = items.length;
     const titleAr = 'Ø¹Ù…Ù„ÙŠØ© Ø¨ÙŠØ¹ Ø¬Ø¯ÙŠØ¯Ø© (POS)';
     const titleEn = 'New POS sale';
-    const bodyAr = `ÙØ§ØªÙˆØ±Ø© Ø¬Ø¯ÙŠØ¯Ø© Ø¨Ù‚ÙŠÙ…Ø© ${totalAmount.toFixed(2)} â€” ${itemsCount} Ù…Ù†ØªØ¬`;
-    const bodyEn = `New sale. Total: ${totalAmount.toFixed(2)} EGP â€” ${itemsCount} items`;
+    const bodyAr = `ÙØ§ØªÙˆØ±Ø© Ø¬Ø¯ÙŠØ¯Ø© Ø¨Ù‚ÙŠÙ…Ø© ${totalAmount.toFixed(2)} — ${itemsCount} Ù…Ù†ØªØ¬`;
+    const bodyEn = `New sale. Total: ${totalAmount.toFixed(2)} EGP — ${itemsCount} items`;
     await connection.execute(
       `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
        VALUES (?, 'pos', 'pos_sale_created', ?, ?, ?, ?, 0, ?)`,
@@ -2494,14 +2494,14 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
     const last7DaysContextAr =
       last7.length > 0
         ? last7
-            .map((d) => `- ${d.date}: ${d.revenue} Ø¬Ù†ÙŠÙ‡ â€” ${d.invoices} ÙØ§ØªÙˆØ±Ø©`)
+            .map((d) => `- ${d.date}: ${d.revenue} Ø¬Ù†ÙŠÙ‡ — ${d.invoices} ÙØ§ØªÙˆØ±Ø©`)
             .join('\n')
         : 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ù…Ø¨ÙŠØ¹Ø§Øª Ø®Ù„Ø§Ù„ Ø¢Ø®Ø± 7 Ø£ÙŠØ§Ù….';
 
     const last7DaysContextEn =
       last7.length > 0
         ? last7
-            .map((d) => `- ${d.date}: ${d.revenue} EGP â€” ${d.invoices} invoices`)
+            .map((d) => `- ${d.date}: ${d.revenue} EGP — ${d.invoices} invoices`)
             .join('\n')
         : 'No sales in the last 7 days.';
 
@@ -2572,13 +2572,13 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
 
 ${systemKnowledge}
 
-Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…: "${userName}" â€” Ø§Ù„Ù…Ø­Ù„: "${businessName}" (Shop ${shopId}).
+Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…: "${userName}" — Ø§Ù„Ù…Ø­Ù„: "${businessName}" (Shop ${shopId}).
 ${ctxLine}
 ${roleInstructionAr}
 
 Ù…Ù„Ø®Øµ Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª Ù„Ø¢Ø®Ø± 7 Ø£ÙŠØ§Ù…:
 ${last7DaysContextAr}
-Ø§Ù…Ø¨Ø§Ø±Ø­: ${Number(yesterday.revenue || 0)} Ø¬Ù†ÙŠÙ‡ â€” ${Number(yesterday.invoices || 0)} ÙØ§ØªÙˆØ±Ø©.
+Ø§Ù…Ø¨Ø§Ø±Ø­: ${Number(yesterday.revenue || 0)} Ø¬Ù†ÙŠÙ‡ — ${Number(yesterday.invoices || 0)} ÙØ§ØªÙˆØ±Ø©.
 
 Ø¢Ø®Ø± 25 ÙØ§ØªÙˆØ±Ø©:
 ${recentInvoices.length ? JSON.stringify(recentInvoices, null, 2) : 'Ù„Ø§ ØªÙˆØ¬Ø¯.'}
@@ -2606,13 +2606,13 @@ Reports: date range + source filter (All/POS/Online) + bucket (daily/weekly/mont
 
 ${systemKnowledge}
 
-User: "${userName}" â€” Shop: "${businessName}" (Shop ${shopId}).
+User: "${userName}" — Shop: "${businessName}" (Shop ${shopId}).
 ${ctxLine}
 ${roleInstructionEn}
 
 Sales summary (past 7 days):
 ${last7DaysContextEn}
-Yesterday: ${Number(yesterday.revenue || 0)} EGP â€” ${Number(yesterday.invoices || 0)} invoices.
+Yesterday: ${Number(yesterday.revenue || 0)} EGP — ${Number(yesterday.invoices || 0)} invoices.
 
 Recent invoices (up to 25):
 ${recentInvoices.length ? JSON.stringify(recentInvoices, null, 2) : 'None.'}
@@ -5679,7 +5679,7 @@ app.post(
   }
 );
 
-// GET /api/products/import/last â€” last import batch summary for shop
+// GET /api/products/import/last — last import batch summary for shop
 app.get(
   '/api/products/import/last',
   authenticateToken,
@@ -5738,7 +5738,7 @@ app.get(
   }
 );
 
-// POST /api/products/import/rollback â€” undo last import (requires confirm:true)
+// POST /api/products/import/rollback — undo last import (requires confirm:true)
 app.post(
   '/api/products/import/rollback',
   authenticateToken,
@@ -6051,8 +6051,8 @@ const incrementInvoicePrintCount = async (req: any, saleId: number) => {
     );
     const titleAr = 'Ø·Ø¨Ø§Ø¹Ø© ÙØ§ØªÙˆØ±Ø© POS';
     const titleEn = 'POS invoice printed';
-    const bodyAr = `ÙØ§ØªÙˆØ±Ø© #${invoiceRow?.invoice_number || saleId} â€” Ù†Ø³Ø®Ø© ${printCount}`;
-    const bodyEn = `Invoice #${invoiceRow?.invoice_number || saleId} â€” copy ${printCount}`;
+    const bodyAr = `ÙØ§ØªÙˆØ±Ø© #${invoiceRow?.invoice_number || saleId} — Ù†Ø³Ø®Ø© ${printCount}`;
+    const bodyEn = `Invoice #${invoiceRow?.invoice_number || saleId} — copy ${printCount}`;
     await connection.execute(
       `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
        VALUES (?, 'pos', 'pos_invoice_printed', ?, ?, ?, ?, 0, ?)`,
@@ -7097,8 +7097,8 @@ app.get('/api/admin/reports/summary', authenticateToken, requireRole('super_admi
       profit: {
         available: profitAvailable,
         totalProfit: profitAvailable ? dailyProfit.reduce((s, d) => s + d.profit, 0) : undefined,
-        profitNoteAr: isBranchManager ? 'Ù…Ø¯ÙŠØ± Ø§Ù„ÙØ±Ø¹ Ù„Ø§ ÙŠÙ…ÙƒÙ†Ù‡ Ø±Ø¤ÙŠØ© Ø§Ù„Ø£Ø±Ø¨Ø§Ø­' : profitAvailable ? undefined : 'Ø§Ù„Ø£Ø±Ø¨Ø§Ø­ ØºÙŠØ± Ù…ØªÙˆÙØ±Ø© â€” ØªØ£ÙƒØ¯ Ù…Ù† ÙˆØ¬ÙˆØ¯ Ø³Ø¹Ø± Ø§Ù„Ø´Ø±Ø§Ø¡ Ù„Ù„Ù…Ù†ØªØ¬Ø§Øª',
-        profitNoteEn: isBranchManager ? 'Branch Manager cannot view profits' : profitAvailable ? undefined : 'Gross profit unavailable â€” ensure buy_price is set for products',
+        profitNoteAr: isBranchManager ? 'مدير الفرع لا يمكنه رؤية الأرباح' : profitAvailable ? undefined : 'الأرباح غير متوفرة — تأكد من وجود سعر الشراء للمنتجات',
+        profitNoteEn: isBranchManager ? 'Branch Manager cannot view profits' : profitAvailable ? undefined : 'Gross profit unavailable — ensure buy_price is set for products',
       },
       charts: { dailyRevenue, dailyProfit: profitAvailable ? dailyProfit : undefined },
       topProducts,
@@ -7492,8 +7492,8 @@ app.post('/api/storefront/orders', async (req: Request, res: Response) => {
       const itemsCount = orderItems.length;
       const titleAr = `Ø·Ù„Ø¨ Ø£ÙˆÙ†Ù„Ø§ÙŠÙ† Ø¬Ø¯ÙŠØ¯ (#${orderId})`;
       const titleEn = `New online order (#${orderId})`;
-      const bodyAr = `ØªÙ… Ø¥Ù†Ø´Ø§Ø¡ Ø·Ù„Ø¨ Ø¬Ø¯ÙŠØ¯ Ø¨Ù‚ÙŠÙ…Ø© ${total.toFixed(2)} Ø¬Ù†ÙŠÙ‡ â€” ${itemsCount} Ù…Ù†ØªØ¬`;
-      const bodyEn = `A new order was placed. Total: ${total.toFixed(2)} EGP â€” ${itemsCount} items`;
+      const bodyAr = `ØªÙ… Ø¥Ù†Ø´Ø§Ø¡ Ø·Ù„Ø¨ Ø¬Ø¯ÙŠØ¯ Ø¨Ù‚ÙŠÙ…Ø© ${total.toFixed(2)} Ø¬Ù†ÙŠÙ‡ — ${itemsCount} Ù…Ù†ØªØ¬`;
+      const bodyEn = `A new order was placed. Total: ${total.toFixed(2)} EGP — ${itemsCount} items`;
       await conn.execute(
         `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
          VALUES (?, 'online', 'online_order_created', ?, ?, ?, ?, 0, ?)`,

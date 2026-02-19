@@ -24,8 +24,6 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      setError(null);
-      // If server asked for Shop ID, require it before retry
       if (needsShopId && !shopId.trim()) {
         setError('SHOP_ID_REQUIRED');
         return;
@@ -38,14 +36,7 @@ export default function LoginPage() {
         setError(err?.message_ar || err?.message_en || 'SHOP_ID_REQUIRED');
         return;
       }
-      const msg = err?.message || 'Login failed';
-      setError(msg);
-    }
-  }
 
-  // ---
-
-  try (err: any) {
       const msg = err?.message || 'Login failed';
       let friendly = msg;
       if (msg === 'Invalid credentials') {
@@ -133,22 +124,22 @@ export default function LoginPage() {
                 type="password"
                 className="w-full rounded bg-[#0f172a] border border-cyan-500/20 px-3 py-2 text-sm focus:outline-none focus:border-cyan-400"
                 value={password}
-                onChange={(e) =>
-      {needsShopId && (
-        <div className="mt-3">
-          <label className="block text-sm mb-1">Shop ID</label>
-          <input
-            name="shopId"
-            value={shopId}
-            onChange={(e) => setShopId(e.target.value)}
-            className="w-full border rounded p-2"
-            placeholder="مثال: 1"
-          />
-          <p className="text-xs opacity-70 mt-1">لو بتسجّل بـ Username/ID لموظف، ممكن تحتاج Shop ID لتحديد المحل.</p>
-        </div>
-      )}
- setPassword(e.target.value)}
+                onChange={(e) => setPassword(e.target.value)}
               />
+            
+              {needsShopId && (
+                <div className="mt-3">
+                  <label className="block text-sm mb-1">Shop ID</label>
+                  <input
+                    name="shopId"
+                    value={shopId}
+                    onChange={(e) => setShopId(e.target.value)}
+                    className="w-full rounded bg-[#0f172a] border border-cyan-500/20 px-3 py-2 text-sm focus:outline-none focus:border-cyan-400"
+                    placeholder="مثال: 1"
+                  />
+                  <p className="text-xs opacity-70 mt-1">لو بتسجّل بـ Username/ID لموظف، ممكن تحتاج Shop ID لتحديد المحل.</p>
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
               <Link href="/forgot-password" className="hover:text-cyan-300">

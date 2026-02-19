@@ -61,3 +61,7 @@ backend/*.bak_before_*
 # local backups
 *.bak-*
 *.fixbak-*
+
+# backups
+*.bak
+*.bak2

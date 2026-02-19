@@ -202,7 +202,7 @@ export function getStoredToken() {
 }
 
 export const apiRequest = async (url: string, options: RequestInit = {}) => {
-  const token = localStorage.getItem('token');
+  const token = getStoredToken();
   const storedUser = localStorage.getItem('user');
   const userObj = storedUser ? JSON.parse(storedUser) : null;
   const isSuperAdmin = userObj?.role === 'super_admin';

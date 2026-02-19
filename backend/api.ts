@@ -22,6 +22,7 @@ import { domainToASCII } from 'url';
 import { loadSystemKnowledge } from './loadKnowledge';
 import { getLocalHelp } from './localHelp';
 import { getPlanFeaturesForBackend, PLANS } from './shared/plans';
+import { AR, EN } from './i18n';
 
 import { sanitizeDeep } from './encodingGuard';
 declare global {
@@ -76,7 +77,7 @@ app.use((req: any, res: any, next: any) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// أ¢إ“â€¦ Hard stop for preflight (must be BEFORE any cors() middleware or routes). Never throw.
+// (cleaned)
 app.use((req, res, next) => {
   if (req.method !== 'OPTIONS') return next();
 
@@ -149,7 +150,7 @@ app.get('/api/plans', (req: Request, res: Response) => {
     ...p,
     pricingForLang: p.pricing[lang],
     currency: lang === 'ar' ? 'EGP' : 'USD',
-    currencySymbol: lang === 'ar' ? 'أکآ¬.أ™â€¦' : '$',
+    currencySymbol: lang === 'ar' ? 'ج.م' : '$',
   }));
   res.json(plans);
 });
@@ -223,7 +224,7 @@ const genAI = (() => {
     // Use stable (v1) endpoints to avoid v1beta model issues.
     return new GoogleGenAI({ apiKey: GEMINI_API_KEY, apiVersion: 'v1' });
   } catch (error) {
-    console.error('أ¢آ‌إ’ Gemini SDK init error:', error);
+    console.error('ERROR: Gemini SDK init error:', error);
     return null;
   }
 })();
@@ -243,7 +244,7 @@ const ensureSuperAdmin = async () => {
     connection = await pool.getConnection();
     await connection.beginTransaction();
 
-    // أکآ§أکآ¹أکآھأ™â€¦أکآ¯ أکآ¹أ™â€‍أ™â€° أکآ§أ™â€‍أکآ£أکآ¹أ™â€¦أکآ¯أکآ© أکآ§أ™â€‍أکآ­أکآ§أ™â€‍أ™إ أکآ© أ™آپأ™إ  أکآ¬أکآ¯أ™ث†أ™â€‍ users أکآ¨أکآ¯أ™ث†أ™â€  أ™آپأکآ±أکآ¶ أ™ث†أکآ¬أ™ث†أکآ¯ password_hash / is_admin / is_super_admin
+    // (cleaned)
     const [userRows] = await connection.execute(
       'SELECT id, password FROM users WHERE email = ? OR username = ?',
       [SUPER_ADMIN_EMAIL, SUPER_ADMIN_EMAIL]
@@ -257,7 +258,7 @@ const ensureSuperAdmin = async () => {
          VALUES (?, ?, ?, 'super_admin', NOW())`,
         [SUPER_ADMIN_EMAIL, SUPER_ADMIN_EMAIL, hashed]
       );
-      console.log('أ¢إ“â€¦ SUPER ADMIN READY (created)');
+      console.log('حدث خطأ. حاول مرة أخرى.');
     } else {
       const forceReset = process.env.FORCE_SUPER_ADMIN_RESET === 'true';
       if (forceReset) {
@@ -269,13 +270,13 @@ const ensureSuperAdmin = async () => {
       } else {
         await connection.execute('UPDATE users SET role = ? WHERE id = ?', ['super_admin', existing.id]);
       }
-      console.log('أ¢إ“â€¦ SUPER ADMIN READY (updated)');
+      console.log('حدث خطأ. حاول مرة أخرى.');
     }
 
     await connection.commit();
   } catch (error) {
     if (connection) await connection.rollback().catch(() => {});
-    console.error('أ¢آ‌إ’ Failed to ensure super admin:', (error as any).message);
+    console.error('ERROR: Failed to ensure super admin:', (error as any).message);
   } finally {
     if (connection) connection.release();
   }
@@ -288,7 +289,7 @@ testConnection().then(async () => {
     try {
       await pool.execute('ALTER TABLE shops MODIFY COLUMN logo_url LONGTEXT');
     } catch (migrationError) {
-      console.error('أ¢آ‌إ’ logo_url migration error:', (migrationError as any)?.message || migrationError);
+      console.error('ERROR: logo_url migration error:', (migrationError as any)?.message || migrationError);
     }
     await ensureSuperAdmin();
   } catch (error) {
@@ -687,7 +688,7 @@ app.post('/api/products/bulk-delete', authenticateToken, requireRole('super_admi
       : [];
 
     if (!ids.length) {
-      return res.status(400).json({ ok: false, error: 'أ™â€‍أ™â€¦ أ™إ أکآھأ™â€¦ أکآھأکآ­أکآ¯أ™إ أکآ¯ أکآ£أ™إ  أکآµأ™â€ أ™آپ' });
+      return res.status(400).json({ ok: false, error: 'حدث خطأ. حاول مرة أخرى.' });
     }
 
     const shopId = req.user?.shopId ?? req.user?.shop_id ?? resolveShopId(req);
@@ -703,7 +704,7 @@ app.post('/api/products/bulk-delete', authenticateToken, requireRole('super_admi
     );
     const ownedCount = (ownershipRows as any[])[0]?.c ?? 0;
     if (ownedCount < ids.length) {
-      return res.status(403).json({ ok: false, error: 'أکآ¨أکآ¹أکآ¶ أکآ§أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬أکآ§أکآھ أکآ§أ™â€‍أ™â€¦أکآ­أکآ¯أکآ¯أکآ© أ™â€‍أکآ§ أکآھأ™â€ أکآھأ™â€¦أ™إ  أ™â€‍أ™â€‍أ™â€¦أکآھأکآ¬أکآ± أکآ§أ™â€‍أکآ­أکآ§أ™â€‍أ™إ ' });
+      return res.status(403).json({ ok: false, error: 'حدث خطأ. حاول مرة أخرى.' });
     }
 
     const [result] = await pool.execute(
@@ -748,7 +749,7 @@ app.get('/api/models', authenticateToken, requireRole('super_admin'), async (req
 
     res.json({ count: models.length, models });
   } catch (error: any) {
-    console.error('أ¢آ‌إ’ /api/models error:', { name: error?.name, status: error?.status, message: error?.message });
+    console.error('ERROR: /api/models error:', { name: error?.name, status: error?.status, message: error?.message });
     res.status(500).json({ error: 'Failed to list models' });
   }
 });
@@ -950,7 +951,7 @@ const getTtsLocaleForLang = (lang: 'ar' | 'en') => {
   return lang === 'ar' ? 'ar-EG' : 'en-US';
 };
 
-/** Strip Markdown from assistant reply so users never see ** or ### etc.; also remove bullets that cause "أ™â€ أکآ¬أ™ث†أ™â€¦" in TTS. */
+/** Strip Markdown from assistant reply so users never see ** or ### etc.; also remove bullets that cause "حدث خطأ. حاول مرة أخرى." in TTS. */
 function sanitizeReply(text: string): string {
   if (!text || typeof text !== 'string') return '';
   let s = text
@@ -991,18 +992,18 @@ const fieldMatchers: Record<string, string[]> = {
     'Part_Name',
     'description',
     'item name',
-    'أکآ§أکآ³أ™â€¦ أکآ§أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬',
-    'أکآ§أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬',
-    'أکآ§أکآ³أ™â€¦',
-    'أکآ§أکآ³أ™â€¦ أکآ§أ™â€‍أکآµأ™â€ أ™آپ',
-    'أکآ§أ™â€‍أ™ث†أکآµأ™آپ',
+    'حدث خطأ. حاول مرة أخرى.',
+    'حدث خطأ. حاول مرة أخرى.',
+    'حدث خطأ. حاول مرة أخرى.',
+    'حدث خطأ. حاول مرة أخرى.',
+    'حدث خطأ. حاول مرة أخرى.',
   ],
-  nameAr: ['name_ar', 'name ar', 'arabic', 'arabicname', 'أکآ§أکآ³أ™â€¦ أکآ¹أکآ±أکآ¨أ™إ ', 'أکآ§أکآ³أ™â€¦'],
-  brand: ['brand', 'Brand', 'manufacturer', 'company', 'mark', 'أکآ§أ™â€‍أ™â€¦أکآ§أکآ±أ™ئ’أکآ©', 'أکآ§أ™â€‍أکآ¹أ™â€‍أکآ§أ™â€¦أکآ©'],
-  sku: ['sku', 'itemcode', 'code', 'partnumber', 'part', 'reference', 'ref', 'أکآ±أ™â€ڑأ™â€¦ أکآ§أ™â€‍أکآµأ™â€ أ™آپ'],
-  barcode: ['barcode', 'bar code', 'ean', 'upc', 'gtin', 'أکآ¨أکآ§أکآ±أ™ئ’أ™ث†أکآ¯', 'qr code', 'qr_code', 'qrcode', 'QR_Code'],
+  nameAr: ['name_ar', 'name ar', 'arabic', 'arabicname', 'حدث خطأ. حاول مرة أخرى.', 'حدث خطأ. حاول مرة أخرى.'],
+  brand: ['brand', 'Brand', 'manufacturer', 'company', 'mark', 'حدث خطأ. حاول مرة أخرى.', 'حدث خطأ. حاول مرة أخرى.'],
+  sku: ['sku', 'itemcode', 'code', 'partnumber', 'part', 'reference', 'ref', 'حدث خطأ. حاول مرة أخرى.'],
+  barcode: ['barcode', 'bar code', 'ean', 'upc', 'gtin', 'حدث خطأ. حاول مرة أخرى.', 'qr code', 'qr_code', 'qrcode', 'QR_Code'],
   qrCode: ['qr', 'qrcode', 'qr code'],
-  category: ['category', 'group', 'type', 'أ™â€ڑأکآ³أ™â€¦', 'أکآ§أ™â€‍أ™آپأکآ¦أکآ©', 'أکآھأکآµأ™â€ أ™إ أ™آپ'],
+  category: ['category', 'group', 'type', 'حدث خطأ. حاول مرة أخرى.', 'حدث خطأ. حاول مرة أخرى.', 'حدث خطأ. حاول مرة أخرى.'],
   buyPrice: [
     'buy',
     'buy price',
@@ -1013,10 +1014,10 @@ const fieldMatchers: Record<string, string[]> = {
     'purchase',
     'purchaseprice',
     'costprice',
-    'أکآ³أکآ¹أکآ± أکآ§أ™â€‍أکآ´أکآ±أکآ§أکآ،',
-    'أکآ´أکآ±أکآ§أکآ،',
-    'أکآھأ™ئ’أ™â€‍أ™آپأکآ©',
-    'أکآ³أکآ¹أکآ± أکآ§أ™â€‍أکآھأ™ئ’أ™â€‍أ™آپأکآ©',
+    'حدث خطأ. حاول مرة أخرى.',
+    'حدث خطأ. حاول مرة أخرى.',
+    'حدث خطأ. حاول مرة أخرى.',
+    'حدث خطأ. حاول مرة أخرى.',
   ],
   sellPrice: [
     'sell',
@@ -1026,13 +1027,13 @@ const fieldMatchers: Record<string, string[]> = {
     'selling price',
     'price',
     'unitprice',
-    'أکآ³أکآ¹أکآ± أکآ§أ™â€‍أکآ¨أ™إ أکآ¹',
-    'أکآ¨أ™إ أکآ¹',
-    'أکآ§أ™â€‍أکآ³أکآ¹أکآ±',
-    'أکآ³أکآ¹أکآ±',
+    'حدث خطأ. حاول مرة أخرى.',
+    'حدث خطأ. حاول مرة أخرى.',
+    'حدث خطأ. حاول مرة أخرى.',
+    'حدث خطأ. حاول مرة أخرى.',
   ],
-  stockQuantity: ['qty', 'quantity', 'stock', 'Stock', 'available', 'onhand', 'أ™ئ’أ™â€¦أ™إ أکآ©', 'أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™ث†أ™â€ '],
-  minStockLevel: ['min', 'minimum', 'reorder', 'minstock', 'min stock', 'أکآ­أکآ¯ أکآ§أکآ¯أ™â€ أ™â€°', 'أکآ­أکآ¯ أکآ£أکآ¯أ™â€ أ™â€°'],
+  stockQuantity: ['qty', 'quantity', 'stock', 'Stock', 'available', 'onhand', 'حدث خطأ. حاول مرة أخرى.', 'حدث خطأ. حاول مرة أخرى.'],
+  minStockLevel: ['min', 'minimum', 'reorder', 'minstock', 'min stock', 'حدث خطأ. حاول مرة أخرى.', 'حدث خطأ. حاول مرة أخرى.'],
   imageUrl: ['image url', 'image_url', 'imageurl', 'img', 'photo', 'picture', 'Image_URL'],
 };
 
@@ -1053,8 +1054,8 @@ const buildProductImportMappingGuide = (headers: string[], columnMap: Record<str
     detectedHeaders: headers,
     currentMapping: columnMap,
     optionalFields: [
-      { field: 'name', note: 'Product name (empty أ¢â€ â€™ draft name).', acceptedHeaders: fieldMatchers.name },
-      { field: 'sellPrice', note: 'Sell price (empty أ¢â€ â€™ 0, row saved as draft).', acceptedHeaders: [...fieldMatchers.sellPrice, ...fieldMatchers.buyPrice] },
+      { field: 'name', note: 'حدث خطأ. حاول مرة أخرى.', acceptedHeaders: fieldMatchers.name },
+      { field: 'sellPrice', note: 'حدث خطأ. حاول مرة أخرى.', acceptedHeaders: [...fieldMatchers.sellPrice, ...fieldMatchers.buyPrice] },
     ],
     suggestedHeaders: {
       name: fieldMatchers.name,
@@ -1074,7 +1075,7 @@ const buildProductImportMappingGuide = (headers: string[], columnMap: Record<str
   };
 };
 
-// --- Power Queryأ¢â‚¬â€œstyle import: canonical keys + auto-mapping (no user mapping UI) ---
+// (cleaned)
 const PRODUCT_IMPORT_CANONICAL_KEYS = [
   'partName',
   'nameAr',
@@ -1092,18 +1093,18 @@ const PRODUCT_IMPORT_CANONICAL_KEYS = [
 type CanonicalKey = (typeof PRODUCT_IMPORT_CANONICAL_KEYS)[number];
 
 const PRODUCT_IMPORT_ALIASES: Record<CanonicalKey, string[]> = {
-  partName: ['part_name', 'part name', 'product name', 'name', 'productname', 'item', 'title', 'description', 'أکآ§أکآ³أ™â€¦ أکآ§أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬', 'أکآ§أکآ³أ™â€¦', 'أکآ§أ™â€‍أ™ث†أکآµأ™آپ'],
-  nameAr: ['name_ar', 'name ar', 'arabic name', 'namear', 'أکآ§أکآ³أ™â€¦ أکآ¹أکآ±أکآ¨أ™إ ', 'أکآ§أ™â€‍أکآ§أکآ³أ™â€¦'],
-  brand: ['brand', 'brand_name', 'manufacturer', 'company', 'mark', 'أکآ§أ™â€‍أ™â€¦أکآ§أکآ±أ™ئ’أکآ©', 'أکآ§أ™â€‍أکآ´أکآ±أ™ئ’أکآ©', 'أکآ§أ™â€‍أکآ¹أ™â€‍أکآ§أ™â€¦أکآ©'],
-  category: ['category', 'group', 'type', 'أ™â€ڑأکآ³أ™â€¦', 'أکآ§أ™â€‍أ™آپأکآ¦أکآ©', 'أکآھأکآµأ™â€ أ™إ أ™آپ'],
-  sellPrice: ['sellprice', 'sell_price', 'price', 'sale', 'أکآ³أکآ¹أکآ± أکآ§أ™â€‍أکآ¨أ™إ أکآ¹', 'أکآ¨أ™إ أکآ¹', 'أکآ§أ™â€‍أکآ³أکآ¹أکآ±', 'أکآ³أکآ¹أکآ±'],
-  buyPrice: ['buyprice', 'buy_price', 'cost', 'purchase', 'أکآ³أکآ¹أکآ± أکآ§أ™â€‍أکآ´أکآ±أکآ§أکآ،', 'أکآ´أکآ±أکآ§أکآ،', 'أکآھأ™ئ’أ™â€‍أ™آپأکآ©'],
-  stockQty: ['stock', 'stockqty', 'stock_qty', 'quantity', 'qty', 'أکآ§أ™â€‍أ™ئ’أ™â€¦أ™إ أکآ©', 'أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™ث†أ™â€ '],
-  sku: ['sku', 'sku_code', 'code', 'partnumber', 'أکآ±أ™â€ڑأ™â€¦ أکآ§أ™â€‍أکآµأ™â€ أ™آپ'],
-  barcode: ['barcode', 'bar_code', 'ean', 'upc', 'أکآ¨أکآ§أکآ±أ™ئ’أ™ث†أکآ¯'],
+  partName: ['part_name', 'part name', 'product name', 'name', 'productname', 'item', 'title', 'description', 'حدث خطأ. حاول مرة أخرى.', 'حدث خطأ. حاول مرة أخرى.', 'حدث خطأ. حاول مرة أخرى.'],
+  nameAr: ['name_ar', 'name ar', 'arabic name', 'namear', 'حدث خطأ. حاول مرة أخرى.', 'حدث خطأ. حاول مرة أخرى.'],
+  brand: ['brand', 'brand_name', 'manufacturer', 'company', 'mark', 'حدث خطأ. حاول مرة أخرى.', 'حدث خطأ. حاول مرة أخرى.', 'حدث خطأ. حاول مرة أخرى.'],
+  category: ['category', 'group', 'type', 'حدث خطأ. حاول مرة أخرى.', 'حدث خطأ. حاول مرة أخرى.', 'حدث خطأ. حاول مرة أخرى.'],
+  sellPrice: ['sellprice', 'sell_price', 'price', 'sale', 'حدث خطأ. حاول مرة أخرى.', 'حدث خطأ. حاول مرة أخرى.', 'حدث خطأ. حاول مرة أخرى.', 'حدث خطأ. حاول مرة أخرى.'],
+  buyPrice: ['buyprice', 'buy_price', 'cost', 'purchase', 'حدث خطأ. حاول مرة أخرى.', 'حدث خطأ. حاول مرة أخرى.', 'حدث خطأ. حاول مرة أخرى.'],
+  stockQty: ['stock', 'stockqty', 'stock_qty', 'quantity', 'qty', 'حدث خطأ. حاول مرة أخرى.', 'حدث خطأ. حاول مرة أخرى.'],
+  sku: ['sku', 'sku_code', 'code', 'partnumber', 'حدث خطأ. حاول مرة أخرى.'],
+  barcode: ['barcode', 'bar_code', 'ean', 'upc', 'حدث خطأ. حاول مرة أخرى.'],
   qrCode: ['qr_code', 'qrcode', 'qr code'],
   imageUrl: ['image_url', 'imageurl', 'image url', 'image', 'photo', 'picture', 'url'],
-  minStockLevel: ['minstock', 'min_stock', 'minimum', 'أکآ­أکآ¯ أکآ§أکآ¯أ™â€ أ™â€°', 'أکآ­أکآ¯ أکآ£أکآ¯أ™â€ أ™â€°'],
+  minStockLevel: ['minstock', 'min_stock', 'minimum', 'حدث خطأ. حاول مرة أخرى.', 'حدث خطأ. حاول مرة أخرى.'],
 };
 
 function normalizeHeaderForImport(value: string): string {
@@ -1322,12 +1323,12 @@ async function parseExcelOrCsv(buffer: Buffer, filename: string, opts?: { sheetI
 }
 
 const AR_ERRORS: Record<string, string> = {
-  name_required: 'أکآ§أ™â€‍أکآ§أکآ³أ™â€¦ أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨',
-  sell_price_invalid: 'أکآ³أکآ¹أکآ± أکآ§أ™â€‍أکآ¨أ™إ أکآ¹ أکآ؛أ™إ أکآ± أکآµأکآ§أ™â€‍أکآ­',
-  buy_price_invalid: 'أکآ³أکآ¹أکآ± أکآ§أ™â€‍أکآ´أکآ±أکآ§أکآ، أکآ؛أ™إ أکآ± أکآµأکآ§أ™â€‍أکآ­',
-  stock_invalid: 'أکآ§أ™â€‍أ™ئ’أ™â€¦أ™إ أکآ© أکآ؛أ™إ أکآ± أکآµأکآ§أ™â€‍أکآ­أکآ©',
-  sku_duplicate: 'SKU أ™â€¦أ™ئ’أکآ±أکآ±',
-  barcode_duplicate: 'أکآ§أ™â€‍أکآ¨أکآ§أکآ±أ™ئ’أ™ث†أکآ¯ أ™â€¦أ™ئ’أکآ±أکآ±',
+  name_required: 'حدث خطأ. حاول مرة أخرى.',
+  sell_price_invalid: 'حدث خطأ. حاول مرة أخرى.',
+  buy_price_invalid: 'حدث خطأ. حاول مرة أخرى.',
+  stock_invalid: 'حدث خطأ. حاول مرة أخرى.',
+  sku_duplicate: 'حدث خطأ. حاول مرة أخرى.',
+  barcode_duplicate: 'حدث خطأ. حاول مرة أخرى.',
 };
 
 function validateCanonicalRow(
@@ -1339,26 +1340,26 @@ function validateCanonicalRow(
   const errs: string[] = [];
   const partName = (canonical.partName ?? '').trim();
   const nameAr = (canonical.nameAr ?? '').trim();
-  if (!partName && !nameAr) errs.push(`أکآ§أ™â€‍أکآµأ™â€ أ™آپ أکآ±أ™â€ڑأ™â€¦ ${rowIndex + 1}: ${AR_ERRORS.name_required}`);
+  if (!partName && !nameAr) errs.push(`حدث خطأ. حاول مرة أخرى.`);
   const sellRaw = (canonical.sellPrice ?? '').trim();
   const buyRaw = (canonical.buyPrice ?? '').trim();
   if (sellRaw) {
     const n = normalizeNumber(sellRaw);
-    if (n === null || n < 0) errs.push(`أکآ§أ™â€‍أکآµأ™â€ أ™آپ أکآ±أ™â€ڑأ™â€¦ ${rowIndex + 1}: ${AR_ERRORS.sell_price_invalid}`);
+    if (n === null || n < 0) errs.push(`حدث خطأ. حاول مرة أخرى.`);
   }
   if (buyRaw) {
     const n = normalizeNumber(buyRaw);
-    if (n === null || n < 0) errs.push(`أکآ§أ™â€‍أکآµأ™â€ أ™آپ أکآ±أ™â€ڑأ™â€¦ ${rowIndex + 1}: ${AR_ERRORS.buy_price_invalid}`);
+    if (n === null || n < 0) errs.push(`حدث خطأ. حاول مرة أخرى.`);
   }
   const sq = (canonical.stockQty ?? '').trim();
   if (sq) {
     const n = normalizeNumber(sq);
-    if (n === null || Math.floor(Number(n)) < 0) errs.push(`أکآ§أ™â€‍أکآµأ™â€ أ™آپ أکآ±أ™â€ڑأ™â€¦ ${rowIndex + 1}: ${AR_ERRORS.stock_invalid}`);
+    if (n === null || Math.floor(Number(n)) < 0) errs.push(`حدث خطأ. حاول مرة أخرى.`);
   }
   const sku = (canonical.sku ?? '').trim();
-  if (sku && skuSet.has(normalizeText(sku))) errs.push(`أکآ§أ™â€‍أکآµأ™â€ أ™آپ أکآ±أ™â€ڑأ™â€¦ ${rowIndex + 1}: ${AR_ERRORS.sku_duplicate}`);
+  if (sku && skuSet.has(normalizeText(sku))) errs.push(`حدث خطأ. حاول مرة أخرى.`);
   const barcode = (canonical.barcode ?? '').trim() || (canonical.qrCode ?? '').trim();
-  if (barcode && barcodeSet.has(normalizeText(barcode))) errs.push(`أکآ§أ™â€‍أکآµأ™â€ أ™آپ أکآ±أ™â€ڑأ™â€¦ ${rowIndex + 1}: ${AR_ERRORS.barcode_duplicate}`);
+  if (barcode && barcodeSet.has(normalizeText(barcode))) errs.push(`حدث خطأ. حاول مرة أخرى.`);
   return errs;
 }
 
@@ -1536,7 +1537,7 @@ const enforcePlanLimits = async (shopId: number, requestedRole: string) => {
   const additionalUsersCount = Number((counts as any[])[0]?.total || 0);
   if (additionalUsersCount >= additionalLimit) {
     const err = new Error('PLAN_USER_LIMIT_REACHED') as any;
-    err.message_ar = 'أ™â€‍أ™â€ڑأکآ¯ أ™ث†أکآµأ™â€‍أکآھ أ™â€‍أ™â€‍أکآ­أکآ¯ أکآ§أ™â€‍أکآ£أ™â€ڑأکآµأ™â€° أ™â€‍أکآ¹أکآ¯أکآ¯ أکآ§أ™â€‍أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦أ™إ أ™â€  أ™آپأ™إ  أکآ¨أکآ§أ™â€ڑأکآھأ™ئ’. أ™â€ڑأ™â€¦ أکآ¨أکآ§أ™â€‍أکآھأکآ±أ™â€ڑأ™إ أکآ© أکآ£أ™ث† أکآ§أکآ­أکآ°أ™آپ أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦أ™â€¹أکآ§.';
+    err.message_ar = 'حدث خطأ. حاول مرة أخرى.';
     err.message_en = "You have reached your plan's user limit. Upgrade your plan or remove a user.";
     throw err;
   }
@@ -1687,13 +1688,8 @@ const createSaleAndItems = async (req: any, paymentMethodOverride?: string) => {
     );
 
     const itemsCount = items.length;
-    const titleAr = 'أکآ¹أ™â€¦أ™â€‍أ™إ أکآ© أکآ¨أ™إ أکآ¹ أکآ¬أکآ¯أ™إ أکآ¯أکآ© (POS)';
-    const titleEn = 'New POS sale';
-    const bodyAr = `أ™آپأکآ§أکآھأ™ث†أکآ±أکآ© أکآ¬أکآ¯أ™إ أکآ¯أکآ© أکآ¨أ™â€ڑأ™إ أ™â€¦أکآ© ${totalAmount.toFixed(2)} â€” ${itemsCount} أ™â€¦أ™â€ أکآھأکآ¬`;
-    const bodyEn = `New sale. Total: ${totalAmount.toFixed(2)} EGP â€” ${itemsCount} items`;
-    await connection.execute(
-      `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
-       VALUES (?, 'pos', 'pos_sale_created', ?, ?, ?, ?, 0, ?)`,
+    const titleAr = 'عملية بيع جديدة (POS)';
+    const titleEn = 'New POS sale'حدث خطأ. حاول مرة أخرى.'pos', 'pos_sale_created', ?, ?, ?, ?, 0, ?)`,
       [shopId, titleAr, titleEn, bodyAr, bodyEn, JSON.stringify({ invoiceId: saleId, saleId, total: totalAmount, itemsCount })]
     );
     if (process.env.NODE_ENV !== 'production') console.log('[notifications] INSERT pos_sale_created shopId=', shopId, 'saleId=', saleId);
@@ -1792,597 +1788,14 @@ async function findUserByIdentifier(identifier: string, resolvedShopId: number |
     const shopFilter = resolvedShopId != null ? ' AND (shop_id = ? OR shop_id IS NULL)' : '';
     const shopArgs = resolvedShopId != null ? [resolvedShopId] : [];
     const [r] = await pool.execute(
-      `SELECT * FROM users WHERE (LOWER(COALESCE(email,'')) = LOWER(?) OR LOWER(username) = LOWER(?))${shopFilter}`,
-      [raw, raw, ...shopArgs]
-    );
-    rows = r as any[];
-  } else if (/^\d+$/.test(raw)) {
-    if (resolvedShopId == null) return null;
-    const [r] = await pool.execute(
-      'SELECT * FROM users WHERE CAST(COALESCE(employee_id, 0) AS CHAR) = ? AND shop_id = ?',
-      [raw, resolvedShopId]
-    );
-    rows = r as any[];
-  } else {
-    if (resolvedShopId == null) return null;
-    const [r] = await pool.execute(
-      'SELECT * FROM users WHERE username = ? AND shop_id = ?',
-      [raw, resolvedShopId]
-    );
-    rows = r as any[];
-  }
-  return rows.length > 0 ? rows[0] : null;
-}
-
-const SUPER_ADMIN_EMAIL_ONLY_AR = 'أکآ­أکآ³أکآ§أکآ¨ أ™â€¦أکآ¯أ™إ أکآ± أکآ§أ™â€‍أ™â€ أکآ¸أکآ§أ™â€¦ أ™إ أکآ¬أکآ¨ أکآھأکآ³أکآ¬أ™إ أ™â€‍ أکآ§أ™â€‍أکآ¯أکآ®أ™ث†أ™â€‍ أکآ¨أکآ§أ™â€‍أکآ¨أکآ±أ™إ أکآ¯ أکآ§أ™â€‍أکآ¥أ™â€‍أ™ئ’أکآھأکآ±أ™ث†أ™â€ أ™إ .';
-const SUPER_ADMIN_EMAIL_ONLY_EN = 'Super admin must sign in using email.';
-
-let userColumnSet: Set<string> | null = null;
-
-async function ensureUserColumnsLoaded() {
-  if (userColumnSet) return;
-  try {
-    const [rows] = await pool.execute<RowDataPacket[]>('SHOW COLUMNS FROM users');
-    const cols = (rows as any[]).map((r) => String(r.Field || r.field || '').toLowerCase());
-    userColumnSet = new Set(cols);
-  } catch (err: any) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[login] SHOW COLUMNS FAILED', err?.code, err?.message);
-    }
-    // Fallback minimal set so SELECTs remain safe
-    userColumnSet = new Set(['id', 'role']);
-  }
-}
-
-const hasUserColumn = (name: string): boolean =>
-  !!userColumnSet && userColumnSet.has(name.toLowerCase());
-
-app.post('/api/auth/login', async (req: Request, res: Response) => {
-  const body = req.body || {};
-  const identifierRaw = body.identifier ?? body.email ?? body.username ?? body.id ?? '';
-  const identifier = String(identifierRaw).trim();
-  const password = String(body.password ?? '').trim();
-
-  if (!identifier || !password) {
-    return res.status(400).json({ error: 'Missing credentials' });
-  }
-
-  const resolvedShopId: number | null =
-    body.shopId != null ? Number(body.shopId) : req.query.shopId != null ? Number(req.query.shopId) : (() => {
-      const h = req.headers['x-shop-id'];
-      const v = Array.isArray(h) ? h[0] : h;
-      return v != null ? Number(v) : null;
-    })();
-  const shopIdNum = Number(resolvedShopId);
-  const hasValidShopId = Number.isFinite(shopIdNum) && shopIdNum > 0;
-
-  if (!identifier.includes('@') && !hasValidShopId) {
-    return res.status(400).json({
-      error: 'SHOP_ID_REQUIRED',
-      message_ar: 'أ™â€¦أکآ¹أکآ±أ™آپ أکآ§أ™â€‍أ™â€¦أکآھأکآ¬أکآ± أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨ أکآ¹أ™â€ أکآ¯ أکآھأکآ³أکآ¬أ™إ أ™â€‍ أکآ§أ™â€‍أکآ¯أکآ®أ™ث†أ™â€‍ أکآ¨أکآ±أ™â€ڑأ™â€¦ أکآ§أ™â€‍أ™â€¦أ™ث†أکآ¸أ™آپ أکآ£أ™ث† أکآ§أکآ³أ™â€¦ أکآ§أ™â€‍أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦.',
-      message_en: 'Shop ID is required when logging in with employee ID or username.',
-    });
-  }
-
-  let user: any = null;
-  try {
-    user = await findUserByIdentifier(identifier, hasValidShopId ? shopIdNum : undefined);
-  } catch (err: any) {
-    if (process.env.NODE_ENV !== 'production') console.log('[login] findUserByIdentifier error', err?.message);
-    return res.status(500).json({ error: 'SERVER_ERROR', code: 'SELECT_FAILED' });
-  }
-
-  if (!user) {
-    return res.status(404).json({
-      error: 'USER_NOT_FOUND',
-      message_ar: 'أکآ§أ™â€‍أکآ­أکآ³أکآ§أکآ¨ أکآ؛أ™إ أکآ± أ™â€¦أ™ث†أکآ¬أ™ث†أکآ¯. أکآ§أکآ·أ™â€‍أکآ¨ أ™â€¦أ™â€  أ™â€¦أکآ¯أ™إ أکآ±أ™ئ’ أکآ¥أ™â€ أکآ´أکآ§أکآ، أکآ­أکآ³أکآ§أکآ¨ أ™â€‍أ™ئ’.',
-      message_en: 'User not found. Ask your manager to create an account for you.',
-    });
-  }
-
-  const rawHash =
-    user.password_hash ?? user.passwordHash ?? (user as any).PASSWORD_HASH ?? user.password ?? null;
-  const hash = typeof rawHash === 'string' && rawHash.trim().length > 0 ? rawHash : null;
-
-  if (!hash) {
-    return res.status(401).json({ error: 'Invalid credentials', code: 'HASH_MISSING' });
-  }
-
-  if (user.is_active === 0 || user.is_active === false) {
-    return res.status(401).json({ error: 'Invalid credentials', code: 'INACTIVE_USER' });
-  }
-
-  if (user.role === 'super_admin' && !identifier.includes('@')) {
-    return res.status(401).json({
-      error: 'SUPER_ADMIN_EMAIL_ONLY',
-      message_ar: SUPER_ADMIN_EMAIL_ONLY_AR,
-      message_en: SUPER_ADMIN_EMAIL_ONLY_EN,
-    });
-  }
-
-  let ok = false;
-  try {
-    if (hash.startsWith('$2a$') || hash.startsWith('$2b$') || hash.startsWith('$2y$')) {
-      ok = await bcrypt.compare(password, hash);
-    } else {
-      ok = password === hash;
-    }
-  } catch (e: any) {
-    return res.status(500).json({ error: 'SERVER_ERROR', code: 'COMPARE_THROW' });
-  }
-
-  if (!ok) {
-    return res.status(401).json({ error: 'Invalid credentials', code: 'PASSWORD_MISMATCH' });
-  }
-
-  if (!process.env.JWT_SECRET) {
-    return res.status(500).json({ error: 'SERVER_ERROR', code: 'JWT_SECRET_MISSING' });
-  }
-
-  let shopId: number | null = (user.shop_id ?? user.shopId) ?? null;
-
-  if (!shopId && user.role === 'super_admin') {
-    try {
-      shopId = await resolveOrCreateShopForUser(user);
-      user.shop_id = shopId;
-    } catch (e: any) {
-      if (process.env.NODE_ENV !== 'production') console.log('[login] resolveOrCreateShopForUser failed:', (e as any)?.message);
-    }
-  }
-
-  const effective = await getEffectivePlanForUser({ ...user, shop_id: shopId });
-
-  const token = jwt.sign(
-    {
-      userId: user.id,
-      role: user.role,
-      package: effective.planId,
-      shopId: user.shop_id ?? shopId,
-    },
-    JWT_SECRET,
-    { expiresIn: '7d' }
-  );
-
-  res.json({
-    token,
-    user: {
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      role: user.role,
-      package: effective.planId,
-      shopId: user.shop_id ?? shopId,
-    },
-  });
-});
-
-app.get('/api/auth/me', authenticateToken, async (req: any, res: Response) => {
-  try {
-    let shopId: number | null =
-      (req.user.shop_id as number | undefined) ??
-      (req.user.shopId as number | undefined) ??
-      null;
-
-    if (!shopId && req.user.role === 'super_admin') {
-      try {
-        shopId = await resolveOrCreateShopForUser(req.user);
-        req.user.shop_id = shopId;
-      } catch (e: any) {
-        if (process.env.NODE_ENV !== 'production') {
-          console.log('[auth/me] resolveOrCreateShopForUser failed:', e?.message || e);
-        }
-      }
-    }
-
-    const effective = await getEffectivePlanForUser({ ...req.user, shop_id: shopId });
-
-    res.json({
-      user: {
-        id: req.user.id,
-        email: req.user.email,
-        username: req.user.username,
-        role: req.user.role,
-        package: effective.planId,
-        shopId,
-      },
-    });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/auth/signup', async (req: Request, res: Response) => {
-  try {
-    const { username, password, email, businessName, ownerName } = req.body || {};
-    const u = String(username ?? '').trim();
-    const p = String(password ?? '').trim();
-    const e = email != null ? String(email).trim() : null;
-    const biz = businessName != null ? String(businessName).trim() : null;
-    const owner = ownerName != null ? String(ownerName).trim() : null;
-
-    if (!u || !p) {
-      return res.status(400).json({ error: 'Username and password required' });
-    }
-
-    if (!JWT_SECRET) {
-      return res.status(500).json({ error: 'SERVER_ERROR', code: 'JWT_SECRET_MISSING' });
-    }
-
-    const hashedPassword = await bcrypt.hash(p, 10);
-    const connection = await pool.getConnection();
-    try {
-      await connection.beginTransaction();
-      const [userResult] = await connection.execute(
-        'INSERT INTO users (username, email, password, role, package, shop_id) VALUES (?, ?, ?, ?, ?, ?)',
-        [u, e || null, hashedPassword, 'shop_owner', 'bronze', null]
-      );
-      const userInsert = userResult as any;
-      const userId = userInsert.insertId;
-
-      const displayName = biz || e || u;
-      const ownerDisplay = owner || e || u;
-      const [shopResult] = await connection.execute(
-        `INSERT INTO shops (name, business_name, owner_name, owner_id, package, plan_type, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)`,
-        [displayName, displayName || null, ownerDisplay, userId, 'bronze', 'bronze']
-      );
-      const shopId = (shopResult as any).insertId;
-
-      await connection.execute('UPDATE users SET shop_id = ? WHERE id = ?', [shopId, userId]);
-      await connection.commit();
-
-      const token = jwt.sign(
-        { userId, role: 'shop_owner', package: 'bronze', shopId },
-        JWT_SECRET,
-        { expiresIn: '7d' }
-      );
-
-      return res.status(201).json({
-        token,
-        user: { id: userId, username: u, email: e || null, role: 'shop_owner', package: 'bronze', shopId },
-      });
-    } catch (err: any) {
-      await connection.rollback().catch(() => {});
-      if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'Username or email already exists' });
-      throw err;
-    } finally {
-      connection.release();
-    }
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/auth/accept-invite', async (req: Request, res: Response) => {
-  try {
-    const { shopId, inviteCode, password, identifier } = req.body || {};
-    const sid = Number(shopId);
-    const code = String(inviteCode ?? '').trim();
-    const pwd = String(password ?? '').trim();
-
-    if (!Number.isFinite(sid) || sid <= 0 || !code || !pwd) {
-      return res.status(400).json({ error: 'shopId, inviteCode, and password required' });
-    }
-
-    if (!JWT_SECRET) return res.status(500).json({ error: 'SERVER_ERROR', code: 'JWT_SECRET_MISSING' });
-
-    const [invRows] = await pool.execute(
-      'SELECT id, shop_id, role, employee_id, email, expires_at, used_at FROM user_invites WHERE shop_id = ? AND invite_code = ? LIMIT 1',
-      [sid, code]
-    );
-    const inv = (invRows as any[])[0];
-    if (!inv) return res.status(404).json({ error: 'INVITE_NOT_FOUND', message_ar: 'أکآ§أ™â€‍أکآ¯أکآ¹أ™ث†أکآ© أکآ؛أ™إ أکآ± أ™â€¦أ™ث†أکآ¬أ™ث†أکآ¯أکآ© أکآ£أ™ث† أکآ؛أ™إ أکآ± أکآµأکآ§أ™â€‍أکآ­أکآ©.', message_en: 'Invite not found or invalid.' });
-    if (inv.used_at != null) return res.status(400).json({ error: 'INVITE_ALREADY_USED', message_ar: 'أکآھأ™â€¦ أکآ§أکآ³أکآھأکآ®أکآ¯أکآ§أ™â€¦ أ™â€،أکآ°أ™â€، أکآ§أ™â€‍أکآ¯أکآ¹أ™ث†أکآ© أ™â€¦أکآ³أکآ¨أ™â€ڑأکآ§أ™â€¹.', message_en: 'This invite has already been used.' });
-    if (new Date(inv.expires_at) < new Date()) return res.status(400).json({ error: 'INVITE_EXPIRED', message_ar: 'أکآ§أ™â€ أکآھأ™â€،أکآھ أکآµأ™â€‍أکآ§أکآ­أ™إ أکآ© أکآ§أ™â€‍أکآ¯أکآ¹أ™ث†أکآ©.', message_en: 'Invite has expired.' });
-
-    const [shopRows] = await pool.execute('SELECT package FROM shops WHERE id = ?', [sid]);
-    const shopPkg = (shopRows as any[])[0]?.package || 'bronze';
-
-    let username: string;
-    let email: string | null = null;
-    let employee_id: string | null = null;
-
-    const idRaw = identifier != null ? String(identifier).trim() : null;
-    if (idRaw) {
-      if (idRaw.includes('@')) {
-        username = idRaw.toLowerCase();
-        email = idRaw;
-      } else if (/^\d+$/.test(idRaw)) {
-        username = 'emp_' + idRaw;
-        employee_id = idRaw;
-      } else {
-        username = idRaw;
-      }
-    } else {
-      if (inv.email) {
-        username = inv.email.toLowerCase();
-        email = inv.email;
-      } else if (inv.employee_id) {
-        username = 'emp_' + String(inv.employee_id);
-        employee_id = String(inv.employee_id);
-      } else {
-        return res.status(400).json({ error: 'identifier required when invite has no email/employee_id' });
-      }
-    }
-
-    const [existingByEmail] = email ? await pool.execute('SELECT id FROM users WHERE LOWER(email) = LOWER(?)', [email]) : [[]];
-    if (email && (existingByEmail as any[]).length > 0) {
-      return res.status(400).json({ error: 'USER_EXISTS', message_ar: 'أ™إ أ™ث†أکآ¬أکآ¯ أکآ­أکآ³أکآ§أکآ¨ أکآ¨أ™â€،أکآ°أکآ§ أکآ§أ™â€‍أکآ¨أکآ±أ™إ أکآ¯ أ™â€¦أکآ³أکآ¨أ™â€ڑأکآ§أ™â€¹.', message_en: 'An account with this email already exists.' });
-    }
-    const [existingByUsername] = await pool.execute('SELECT id FROM users WHERE username = ? AND shop_id = ?', [username, sid]);
-    if ((existingByUsername as any[]).length > 0) {
-      return res.status(400).json({ error: 'USER_EXISTS', message_ar: 'أ™إ أ™ث†أکآ¬أکآ¯ أکآ­أکآ³أکآ§أکآ¨ أکآ¨أ™â€،أکآ°أکآ§ أکآ§أ™â€‍أکآ§أکآ³أ™â€¦ أ™آپأ™إ  أکآ§أ™â€‍أ™â€¦أکآھأکآ¬أکآ±.', message_en: 'An account with this username already exists in this shop.' });
-    }
-    if (employee_id) {
-      const [existingByEmp] = await pool.execute('SELECT id FROM users WHERE employee_id = ? AND shop_id = ?', [employee_id, sid]);
-      if ((existingByEmp as any[]).length > 0) {
-        return res.status(400).json({ error: 'USER_EXISTS', message_ar: 'أ™إ أ™ث†أکآ¬أکآ¯ أکآ­أکآ³أکآ§أکآ¨ أکآ¨أکآ±أ™â€ڑأ™â€¦ أ™â€،أکآ°أکآ§ أکآ§أ™â€‍أ™â€¦أ™ث†أکآ¸أ™آپ أ™آپأ™إ  أکآ§أ™â€‍أ™â€¦أکآھأکآ¬أکآ±.', message_en: 'An account with this employee ID already exists in this shop.' });
-      }
-    }
-
-    const hashedPassword = await bcrypt.hash(pwd, 10);
-    const [insertResult] = await pool.execute(
-      'INSERT INTO users (username, email, employee_id, password, role, package, shop_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [username, email, employee_id, hashedPassword, inv.role, shopPkg, sid]
-    );
-    const userId = (insertResult as any).insertId;
-
-    await pool.execute('UPDATE user_invites SET used_at = NOW() WHERE id = ?', [inv.id]);
-
-    const token = jwt.sign(
-      { userId, role: inv.role, package: shopPkg, shopId: sid },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    return res.status(201).json({
-      token,
-      user: { id: userId, username, email, employee_id, role: inv.role, package: shopPkg, shopId: sid },
-    });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/auth/register-shop', async (req: Request, res: Response) => {
-  try {
-    const {
-      username,
-      password,
-      businessName,
-      ownerName,
-      activityType,
-      activity_type: bodyActivityType,
-      businessType,
-      business_type: bodyBusinessType,
-      address,
-      contactEmail,
-      contactPhone,
-    } = req.body;
-
-    if (!username || !password || !businessName) {
-      return res.status(400).json({ error: 'Username, password, and business name are required' });
-    }
-
-    const activityRaw =
-      bodyActivityType ??
-      activityType ??
-      bodyBusinessType ??
-      businessType ??
-      '';
-    const activityTypeValue =
-      String(activityRaw).trim().slice(0, 128) || null;
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const connection = await pool.getConnection();
-    const defaultPlan = 'gold';
-    const trialDays = 7;
-    const trialEndsAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
-
-    try {
-      await connection.beginTransaction();
-      const [userResult] = await connection.execute(
-        'INSERT INTO users (username, password, role, package, shop_id) VALUES (?, ?, ?, ?, ?)',
-        [username, hashedPassword, 'shop_owner', defaultPlan, null]
-      );
-      const userInsert = userResult as any;
-
-      const [shopResult] = await connection.execute(
-        `INSERT INTO shops (name, business_name, owner_name, activity_type, address, contact_email, contact_phone, owner_id, package, plan_type, trial_ends_at, is_active)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-        [
-          businessName,
-          businessName,
-          ownerName || null,
-          activityTypeValue,
-          address || null,
-          contactEmail || null,
-          contactPhone || null,
-          userInsert.insertId,
-          defaultPlan,
-          defaultPlan,
-          trialEndsAt,
-        ]
-      );
-      const shopInsert = shopResult as any;
-      const shopId = shopInsert.insertId;
-
-      await connection.execute('UPDATE users SET shop_id = ? WHERE id = ?', [shopId, userInsert.insertId]);
-
-      const [branchResult] = await connection.execute(
-        'INSERT INTO branches (shop_id, name, name_ar, name_en, code) VALUES (?, ?, ?, ?, ?)',
-        [shopId, 'أکآ§أ™â€‍أ™آپأکآ±أکآ¹ أکآ§أ™â€‍أکآ±أکآ¦أ™إ أکآ³أ™إ ', 'أکآ§أ™â€‍أ™آپأکآ±أکآ¹ أکآ§أ™â€‍أکآ±أکآ¦أ™إ أکآ³أ™إ ', 'Main Branch', 'main']
-      );
-      const branchId = (branchResult as any).insertId;
-      await connection.execute('UPDATE shops SET default_branch_id = ? WHERE id = ?', [branchId, shopId]);
-
-      await connection.execute(
-        'INSERT INTO subscriptions (shop_id, plan_name, started_at, expires_at, last_activated_at) VALUES (?, ?, NOW(), ?, NOW())',
-        [shopId, defaultPlan, trialEndsAt]
-      );
-
-      await connection.commit();
-
-      const token = jwt.sign(
-        { userId: userInsert.insertId, role: 'shop_owner', package: defaultPlan, shopId },
-        JWT_SECRET,
-        { expiresIn: '24h' }
-      );
-
-      res.status(201).json({
-        token,
-        user: {
-          id: userInsert.insertId,
-          username,
-          role: 'shop_owner',
-          package: defaultPlan,
-          shopId,
-        },
-        trialDays,
-        trialEndsAt: trialEndsAt.toISOString(),
-      });
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
-  } catch (error: any) {
-    if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(400).json({ error: 'Username already exists' });
-    }
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/auth/forgot-password', async (req: Request, res: Response) => {
-  try {
-    const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: 'Email is required' });
-    }
-
-    const [users] = await pool.execute('SELECT * FROM users WHERE email = ?', [email]);
-    const userArray = users as any[];
-    if (userArray.length === 0) {
-      return res.json({ message: 'If an account exists, a reset link will be sent.' });
-    }
-
-    const user = userArray[0];
-    const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-
-    await pool.execute(
-      'INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)',
-      [user.id, token, expiresAt]
-    );
-
-    const smtpHost = process.env.SMTP_HOST;
-    const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
-    const smtpFrom = process.env.SMTP_FROM || smtpUser;
-    const appUrl = process.env.APP_URL || 'http://localhost:3000';
-
-    if (!smtpHost || !smtpUser || !smtpPass || !smtpFrom) {
-      return res.status(500).json({ error: 'Email service not configured' });
-    }
-
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpPort === 465,
-      auth: {
-        user: smtpUser,
-        pass: smtpPass,
-      },
-    });
-
-    const resetLink = `${appUrl}/reset-password/${token}`;
+      `SELECT * FROM users WHERE (LOWER(COALESCE(email,'')) = LOWER(?) OR LOWER(username) = LOWER(?))${shopFilter}`حدث خطأ. حاول مرة أخرى.`INSERT INTO shops (name, business_name, owner_name, owner_id, package, plan_type, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)`حدث خطأ. حاول مرة أخرى.`INSERT INTO shops (name, business_name, owner_name, activity_type, address, contact_email, contact_phone, owner_id, package, plan_type, trial_ends_at, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`حدث خطأ. حاول مرة أخرى.`${appUrl}/reset-password/${token}`;
     await transporter.sendMail({
       from: smtpFrom,
       to: email,
       subject: 'Reset your Crown ERP password',
       text: `Use this secure link to reset your password: ${resetLink}`,
-      html: `<p>Use this secure link to reset your password:</p><p><a href="${resetLink}">${resetLink}</a></p>`,
-    });
-
-    res.json({ message: 'Password reset email sent' });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/auth/reset-password', async (req: Request, res: Response) => {
-  try {
-    const { token, password } = req.body;
-    if (!token || !password) {
-      return res.status(400).json({ error: 'Token and password are required' });
-    }
-
-    const [rows] = await pool.execute(
-      'SELECT * FROM password_resets WHERE token = ? AND expires_at > NOW()',
-      [token]
-    );
-    const resetArray = rows as any[];
-    if (resetArray.length === 0) {
-      return res.status(400).json({ error: 'Invalid or expired token' });
-    }
-
-    const reset = resetArray[0];
-    const hashedPassword = await bcrypt.hash(password, 10);
-    await pool.execute('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, reset.user_id]);
-    await pool.execute('DELETE FROM password_resets WHERE user_id = ?', [reset.user_id]);
-
-    res.json({ message: 'Password updated successfully' });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ========== GEMINI AI ASSISTANT ==========
-app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req: Request, res: Response) => {
-  let lang: 'ar' | 'en' = 'en';
-  try {
-    if (!GEMINI_API_KEY || !genAI) {
-      // Graceful disable when key/client missing
-      const detectedLang: 'ar' | 'en' = (req.body?.lang === 'ar' || req.body?.language === 'ar') ? 'ar' : 'en';
-      const ttsLang = getTtsLocaleForLang(detectedLang);
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[AI] /api/chat disabled: missing GEMINI_API_KEY or genAI client');
-      }
-      const ctx = typeof req.body?.context === 'object' && req.body.context !== null ? req.body.context : {};
-      const pathname = (ctx as any).pathname || '';
-      const question = String(req.body?.message || '');
-      const answer = getLocalHelp(detectedLang, pathname, question);
-      return res.status(200).json({
-        ok: false,
-        mode: 'offline',
-        error: 'AI_UNAVAILABLE',
-        reason: 'AI_DISABLED',
-        message_en: 'AI cloud unavailable, using local help.',
-        message_ar: 'أکآ§أ™â€‍أ™â€¦أکآ³أکآ§أکآ¹أکآ¯ أکآ§أ™â€‍أکآ³أکآ­أکآ§أکآ¨أ™إ  أکآ؛أ™إ أکآ± أ™â€¦أکآھأکآ§أکآ­ أکآ­أکآ§أ™â€‍أ™إ أکآ§أ™â€¹أکإ’ أکآ³أ™إ أکآھأ™â€¦ أکآ§أکآ³أکآھأکآ®أکآ¯أکآ§أ™â€¦ أکآ§أ™â€‍أ™â€¦أکآ³أکآ§أکآ¹أکآ¯أکآ© أکآ§أ™â€‍أ™â€¦أکآ­أ™â€‍أ™إ أکآ©.',
-        answer,
-        lang: detectedLang,
-        ttsLang,
-      });
-    }
-    const { message, lang: bodyLang, context: liveContext, history: chatHistory } = req.body;
-    if (!message || typeof message !== 'string') {
-      return res.status(400).json({ ok: false, error: 'message is required' });
-    }
-    lang = bodyLang === 'ar' || bodyLang === 'en' ? bodyLang : detectUserLanguage(message);
-    const ttsLang = getTtsLocaleForLang(lang);
-    console.log('أ°إ¸â€œآ© Chat message:', { lang, preview: String(message).slice(0, 120) });
-
-    const resolvedShopId =
-      resolveShopId(req) || (req as any).user?.shop_id || (req as any).user?.shopId || 1;
-    const shopId = Number(resolvedShopId);
-    if (!Number.isFinite(shopId) || shopId <= 0) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
-
-    const [inventoryRows] = await pool.execute(
-      `
+      html: `<p>Use this secure link to reset your password:</p><p><a href="${resetLink}">${resetLink}</a></p>`حدث خطأ. حاول مرة أخرى.`
       SELECT p.name_en, p.name_ar, p.stock_quantity, p.sell_price, p.brand
       FROM products p
       WHERE p.shop_id = ?
@@ -2464,18 +1877,7 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
     );
 
     const [shopRows] = await pool.execute(
-      'SELECT business_name, activity_type FROM shops WHERE id = ?',
-      [shopId]
-    );
-    const shopProfile = (shopRows as any[])[0] || {};
-
-    const inventoryContextAr = (inventoryRows as any[])
-      .map((item) => {
-        const name = item.name_ar || item.name_en;
-        const brand = item.brand ? `, أ™â€¦أکآ§أکآ±أ™ئ’أکآ© ${item.brand}` : '';
-        return `- ${name}: ${item.stock_quantity} أ™آپأ™إ  أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™â€ أکإ’ أکآ§أ™â€‍أکآ³أکآ¹أکآ± ${item.sell_price} أکآ¬أ™â€ أ™إ أ™â€،${brand}`;
-      })
-      .join('\n');
+      'SELECT business_name, activity_type FROM shops WHERE id = ?'حدث خطأ. حاول مرة أخرى.''حدث خطأ. حاول مرة أخرى.'\n');
 
     const inventoryContextEn = (inventoryRows as any[])
       .map((item) => {
@@ -2483,194 +1885,23 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
         const brand = item.brand ? `, brand ${item.brand}` : '';
         return `- ${name}: ${item.stock_quantity} in stock, price ${item.sell_price} EGP${brand}`;
       })
-      .join('\n');
-
-    const stats = (todayStatsRows as any[])[0] || { today_revenue: 0, today_sales: 0 };
-    const todayOnline = (todayOnlineRows as any[])[0] || { amount: 0, cnt: 0 };
-    const totalProducts = Number((totalProductsRows as any[])[0]?.total_products || 0);
-    const lowStockCount = Number((lowStockCountRows as any[])[0]?.low_stock_count || 0);
-    const yesterday = (yesterdayRows as any[])[0] || { revenue: 0, invoices: 0 };
-
-    const todayRevenue = Number(stats.today_revenue ?? 0);
-    const todaySales = Number(stats.today_sales ?? 0);
-    const todayOnlineAmount = Number(todayOnline.amount ?? 0);
-    const todayOnlineCount = Number(todayOnline.cnt ?? 0);
-    const totalTodayAmount = todayRevenue + todayOnlineAmount;
-    const totalTodayOps = todaySales + todayOnlineCount;
-
-    const msg = String(message).trim().toLowerCase();
-    const numericIntentAr =
-      /أ™â€¦أکآ¨أ™إ أکآ¹أکآ§أکآھ أکآ§أ™â€‍أ™â€ أ™â€،أکآ§أکآ±أکآ¯أ™â€،|أ™â€¦أکآ¨أ™إ أکآ¹أکآ§أکآھ أکآ§أ™â€‍أ™إ أ™ث†أ™â€¦|أ™ئ’أکآ§أ™â€¦ أکآ§أ™â€‍أ™â€ أ™â€،أکآ§أکآ±أکآ¯أ™â€،|أکآ¹أکآ¯أکآ¯ أکآ§أ™â€‍أکآ¹أ™â€¦أ™â€‍أ™إ أکآ§أکآھ|أکآ·أ™â€‍أکآ¨أکآ§أکآھ أ™â€¦أکآ¤أ™ئ’أکآ¯أکآ©|أکآ£أ™ث†أکآ±أکآ¯أکآ±أکآ§أکآھ|أ™â€¦أکآ¨أ™إ أکآ¹أکآ§أکآھ أکآ§أ™â€¦أکآ¨أکآ§أکآ±أکآ­|أکآ¥أ™إ أ™â€، أ™ث†أکآ¶أکآ¹ أکآ§أ™â€‍أ™â€ أ™â€،أکآ§أکآ±أکآ¯أ™â€،|أ™ئ’أکآ§أ™â€¦ أکآ¨أکآ¹أکآھأ™â€ أکآ§ أکآ§أ™â€‍أ™â€ أ™â€،أکآ§أکآ±أکآ¯أ™â€،|أ™آپأ™ث†أکآ§أکآھأ™إ أکآ± أکآ§أ™â€‍أ™â€ أ™â€،أکآ§أکآ±أکآ¯أ™â€،/i.test(
-        message
-      );
-    const numericIntentEn = /today'?s? sales|sales today|how much today|operations count|confirmed orders|invoices today/i.test(msg);
+      .join('\n'حدث خطأ. حاول مرة أخرى.'?s? sales|sales today|how much today|operations count|confirmed orders|invoices today/i.test(msg);
     const isNumericIntent = numericIntentAr || numericIntentEn;
 
     if (isNumericIntent) {
       const quickAr =
-        lang === 'ar'
-          ? `أ™â€¦أکآ¨أ™إ أکآ¹أکآ§أکآھ أکآ§أ™â€‍أ™â€ أ™â€،أکآ§أکآ±أکآ¯أ™â€،: ${totalTodayAmount} أکآ¬.أ™â€¦ (${todaySales} أ™آپأکآ§أکآھأ™ث†أکآ±أکآ© POS + ${todayOnlineCount} أکآ·أ™â€‍أکآ¨أکآ§أکآھ أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€  أ™â€¦أکآ¤أ™ئ’أکآ¯أکآ©).\n${totalTodayAmount === 0 ? 'أ™â€¦أ™آپأ™إ أکآ´ أکآ¹أ™â€¦أ™â€‍أ™إ أکآ§أکآھ أ™â€‍أکآ­أکآ¯ أکآ¯أ™â€‍أ™ث†أ™â€ڑأکآھأ™إ .' : 'أکآ¹أکآ§أ™إ أکآ² أکآھأ™آپأکآµأ™إ أ™â€‍ POS أ™ث†أ™â€‍أکآ§ أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€ أکإ¸'}`
-          : null;
+          lang === 'ar'
+            ? `مبيعات اليوم: ${totalTodayAmount} ج.م (${todaySales} فواتير POS + ${todayOnlineCount} طلبات أونلاين مؤكدة).
+${
+                totalTodayAmount === 0 ? 'لا توجد عمليات حتى الآن.' : 'تحب تفصيل POS مقابل أونلاين؟'
+              }`
+            : null;
       const quickEn =
         lang === 'en'
-          ? `Today's sales: ${totalTodayAmount} EGP (${todaySales} POS invoices + ${todayOnlineCount} confirmed online orders).\n${totalTodayAmount === 0 ? 'No operations yet.' : 'Want POS vs online breakdown?'}`
-          : null;
-      const quickReply = lang === 'ar' ? quickAr : quickEn;
-      if (quickReply) {
-        return res.json({ ok: true, reply: sanitizeReply(quickReply), message: sanitizeReply(quickReply), lang, ttsLang });
-      }
-    }
-
-    const last7 = (last7DaysRows as any[]).map((row) => ({
-      date: row.sale_date ? String(row.sale_date).slice(0, 10) : null,
-      revenue: Number(row.revenue || 0),
-      invoices: Number(row.invoices || 0),
-    }));
-
-    const last7DaysContextAr =
-      last7.length > 0
-        ? last7
-            .map((d) => `- ${d.date}: ${d.revenue} أکآ¬أ™â€ أ™إ أ™â€، â€” ${d.invoices} أ™آپأکآ§أکآھأ™ث†أکآ±أکآ©`)
-            .join('\n')
-        : 'أ™â€‍أکآ§ أکآھأ™ث†أکآ¬أکآ¯ أ™â€¦أکآ¨أ™إ أکآ¹أکآ§أکآھ أکآ®أ™â€‍أکآ§أ™â€‍ أکآ¢أکآ®أکآ± 7 أکآ£أ™إ أکآ§أ™â€¦.';
-
-    const last7DaysContextEn =
-      last7.length > 0
-        ? last7
-            .map((d) => `- ${d.date}: ${d.revenue} EGP â€” ${d.invoices} invoices`)
-            .join('\n')
-        : 'No sales in the last 7 days.';
-
-    const recentInvoices = (recentInvoicesRows as any[]).map((row) => ({
-      id: row.id,
-      invoiceNumber: row.invoice_number,
-      totalAmount: Number(row.total_amount || 0),
-      paymentMethod: row.payment_method,
-      customerName: row.customer_name,
-      createdAt: row.created_at,
-    }));
-
-    const rawUserName = (req as any).user?.username || '';
-    const firstToken = String(rawUserName || '').split(' ')[0];
-    const userName = firstToken && !firstToken.includes('@') ? firstToken : 'Ahmed';
-    const businessName = shopProfile.business_name || (lang === 'en' ? 'the shop' : 'أکآ§أ™â€‍أ™â€¦أکآ­أ™â€‍');
-    const activityType = String(shopProfile.activity_type || '').toLowerCase();
-    const businessType =
-      activityType === 'pharmacy'
-        ? 'pharmacy'
-        : activityType === 'supermarket'
-        ? 'supermarket'
-        : activityType === 'decor'
-        ? 'decor'
-        : 'auto_parts';
-
-    const businessTypeAr =
-      businessType === 'pharmacy'
-        ? 'أکآµأ™إ أکآ¯أ™â€‍أ™إ أکآ©'
-        : businessType === 'supermarket'
-        ? 'أکآ³أ™ث†أکآ¨أکآ± أ™â€¦أکآ§أکآ±أ™ئ’أکآھ'
-        : businessType === 'decor'
-        ? 'أکآ¯أ™إ أ™ئ’أ™ث†أکآ± أ™ث†أ™â€¦أ™آپأکآ±أ™ث†أکآ´أکآ§أکآھ'
-        : 'أ™â€ڑأکآ·أکآ¹ أکآ؛أ™إ أکآ§أکآ± أکآ³أ™إ أکآ§أکآ±أکآ§أکآھ';
-
-    const liveCtx = typeof liveContext === 'object' && liveContext !== null ? liveContext : {};
-    const ctxLine =
-      Object.keys(liveCtx).length > 0
-        ? (lang === 'ar' ? 'أکآ³أ™إ أکآ§أ™â€ڑ أکآ§أ™â€‍أکآ¬أ™â€‍أکآ³أکآ© أکآ§أ™â€‍أکآ­أ™إ أکآ©: ' : 'Live context: ') + JSON.stringify(liveCtx)
-        : '';
-    const effectiveRole = (liveCtx as any).effectiveRole || (req as any).user?.role || '';
-    const pathname = (liveCtx as any).pathname || '';
-    const roleInstructionAr =
-      effectiveRole
-        ? `أکآ¯أ™ث†أکآ± أکآ§أ™â€‍أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦ أکآ§أ™â€‍أکآ­أکآ§أ™â€‍أ™إ : ${effectiveRole}. أکآ§أ™â€‍أکآµأ™آپأکآ­أکآ©: ${pathname || '/'}. أ™â€‍أکآ§ أکآھأ™â€ أکآµأکآ­ أکآ¨أکآ¥أکآ¬أکآ±أکآ§أکآ،أکآ§أکآھ أکآ؛أ™إ أکآ± أ™â€¦أکآ³أ™â€¦أ™ث†أکآ­أکآ© أ™â€‍أ™â€،أکآ°أکآ§ أکآ§أ™â€‍أکآ¯أ™ث†أکآ±.`
-        : '';
-    const roleInstructionEn =
-      effectiveRole
-        ? `Current user role: ${effectiveRole}. Page: ${pathname || '/'}. Do NOT advise actions not allowed for this role.`
-        : '';
-
-    const systemKnowledge = loadSystemKnowledge();
-
-    const systemPromptAr = `أکآ£أ™â€ أکآھ أکآ§أ™â€‍أ™â€¦أکآ³أکآ§أکآ¹أکآ¯ أکآ¯أکآ§أکآ®أ™â€‍ أ™â€ أکآ¸أکآ§أ™â€¦ "Crown Services ERP".
-أ™â€‍أکآ§أکآ²أ™â€¦:
-- أکآھأکآ±أکآ¯ أکآ¹أکآ±أکآ¨أ™إ  أ™â€¦أکآµأکآ±أ™إ  أکآ·أکآ¨أ™إ أکآ¹أ™إ  (أ™â€¦أکآ´ أ™آپأکآµأکآ­أ™â€° أکآھأ™â€ڑأ™إ أ™â€‍أکآ©).
-- أکآ±أکآ¯أ™ث†أکآ¯ أکآ³أکآ±أ™إ أکآ¹أکآ© أ™ث†أ™â€¦أکآ®أکآھأکآµأکآ±أکآ©: 1أ¢â‚¬â€œ3 أکآ³أکآ·أ™ث†أکآ± أکآ§أ™آپأکآھأکآ±أکآ§أکآ¶أ™إ أ™â€¹أکآ§. أکآ¬أکآ§أ™ث†أکآ¨ أکآ¨أکآ§أ™â€‍أ™â€ أکآھأ™إ أکآ¬أکآ© أکآ§أ™â€‍أکآ£أ™ث†أ™â€‍.
-- أ™â€¦أکآ§ أکآھأکآ³أکآ£أ™â€‍أکآ´ أکآ£أ™ئ’أکآھأکآ± أ™â€¦أ™â€  أکآ³أکآ¤أکآ§أ™â€‍ أکآھأ™ث†أکآ¶أ™إ أکآ­أ™إ  أ™ث†أکآ§أکآ­أکآ¯ أ™â€‍أ™ث† أ™â€‍أکآ§أکآ²أ™â€¦.
-- أ™â€¦أ™â€¦أ™â€ أ™ث†أکآ¹ أکآھأکآ³أکآھأکآ®أکآ¯أ™â€¦ أکآ±أ™â€¦أ™ث†أکآ² أ™â€¦أکآ§أکآ±أ™ئ’أکآ¯أکآ§أ™ث†أ™â€  أکآ²أ™إ  ** أکآ£أ™ث† * أکآ£أ™ث† \` أ™â€ أ™â€،أکآ§أکآ¦أ™إ أ™â€¹أکآ§. أکآ§أ™ئ’أکآھأکآ¨ أ™â€ أکآµ أکآ¹أکآ§أکآ¯أ™إ  أ™آپأ™â€ڑأکآ·.
-- أ™â€‍أ™ث† أکآ§أ™â€‍أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦ أکآ³أکآ£أ™â€‍: "أ™آپأ™إ أ™â€، أ™â€¦أکآھأکآ¬أکآ± أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€ أکإ¸/أکآµأ™آپأکآ­أکآ© أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€ أکإ¸" أکآ§أ™â€‍أکآ¥أکآ¬أکآ§أکآ¨أکآ© أ™â€‍أکآ§أکآ²أ™â€¦ أکآھأ™ئ’أ™ث†أ™â€ : أکآ£أ™إ أ™ث†أ™â€،. أکآ§أ™â€‍أ™â€¦أکآھأکآ¬أکآ±: /storefront. أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨أکآ§أکآھ أکآ§أ™â€‍أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€  أکآ¨أکآھأکآھأکآ£أ™ئ’أکآ¯ أ™â€¦أ™â€  أکآµأ™آپأکآ­أکآ© أکآ·أ™â€‍أکآ¨أکآ§أکآھ أکآ§أ™â€‍أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€  أ™آپأ™إ  أکآ§أ™â€‍أکآ£أکآ¯أ™â€¦أ™â€ أکإ’ أ™ث†أکآ¨أکآھأکآ£أکآ«أکآ± أکآ¹أ™â€‍أ™â€° أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™ث†أ™â€  أکآ¨أ™â€ أکآ¸أکآ§أ™â€¦ أکآ§أ™â€‍أکآ­أکآ¬أکآ² (reservations)أکإ’ أ™ث†أکآ¨أکآھأکآ¸أ™â€،أکآ± أ™آپأ™إ  أکآ§أ™â€‍أکآ¥أکآ´أکآ¹أکآ§أکآ±أکآ§أکآھ أ™ث†أ™â€‍أ™ث†أکآ­أکآ© أکآ§أ™â€‍أکآھأکآ­أ™ئ’أ™â€¦ أ™ث†أکآ§أ™â€‍أکآھأ™â€ڑأکآ§أکآ±أ™إ أکآ±.
-أکآ£أ™â€ أکآھ أکآ¹أکآ§أکآ±أ™آپ أکآ£أ™â€ڑأکآ³أکآ§أ™â€¦ أکآ§أ™â€‍أ™â€ أکآ¸أکآ§أ™â€¦:
-أ™â€‍أ™ث†أکآ­أکآ© أکآ§أ™â€‍أکآھأکآ­أ™ئ’أ™â€¦: أکآ§أ™â€‍أ™â€¦أکآ¨أ™إ أکآ¹أکآ§أکآھ + أ™â€¦أکآ¨أ™إ أکآ¹أکآ§أکآھ أکآ§أ™â€‍أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€  أکآ§أ™â€‍أ™â€¦أکآ¤أ™ئ’أکآ¯أکآ© + أکآ§أ™â€‍أکآ¹أ™â€¦أ™â€‍أ™إ أکآ§أکآھ + أکآ§أ™â€‍أکآ±أکآ§أ™ئ’أکآ¯/أکآ§أ™â€‍أکآ¨أکآ·أ™إ أکآ،.
-أ™â€ أ™â€ڑأکآ·أکآ© أکآ§أ™â€‍أکآ¨أ™إ أکآ¹ POS: أکآ¨أ™إ أکآ¹ أ™ث†أ™آپأ™ث†أکآ§أکآھأ™إ أکآ± + available_stock.
-أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™â€ : أ™â€¦أ™â€ أکآھأکآ¬أکآ§أکآھ أ™ث†أکآھأ™â€ أکآ¨أ™إ أ™â€،أکآ§أکآھ + أکآµأ™آپأکآ­أکآ© أکآ§أ™â€‍أکآ±أکآ§أ™ئ’أکآ¯/أکآ§أ™â€‍أکآ¨أکآ·أ™إ أکآ،.
-أکآ§أ™â€‍أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€ : أکآ§أ™â€‍أ™â€¦أکآھأکآ¬أکآ± + أکآ¥أ™â€ أکآ´أکآ§أکآ، أکآ·أ™â€‍أکآ¨ + أکآھأکآ£أ™ئ’أ™إ أکآ¯/أکآ¥أ™â€‍أکآ؛أکآ§أکآ،/أکآ¥أ™ئ’أ™â€¦أکآ§أ™â€‍ + أکآ­أکآ¬أکآ² أ™â€¦أکآ®أکآ²أ™ث†أ™â€ .
-أکآ§أ™â€‍أکآ¥أکآ´أکآ¹أکآ§أکآ±أکآ§أکآھ: أکآ§أ™â€‍أکآ¬أکآ±أکآ³ + أکآ§أ™â€‍أ™â€ڑأکآ§أکآ¦أ™â€¦أکآ© + أکآ§أ™â€‍أکآ¹أکآ¯أکآ¯ + أکآ±أ™ث†أکآ§أکآ¨أکآ· أ™â€¦أکآ¨أکآ§أکآ´أکآ±أکآ©.
-أکآ§أ™â€‍أکآھأ™â€ڑأکآ§أکآ±أ™إ أکآ±: أ™آپأکآھأکآ±أکآ© + أکآ§أ™â€‍أ™â€¦أکآµأکآ¯أکآ± (أکآ§أ™â€‍أ™ئ’أ™â€‍/POS/أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€ ) + أکآھأکآ¬أ™â€¦أ™إ أکآ¹أکآ© (أ™إ أ™ث†أ™â€¦أ™إ /أکآ£أکآ³أکآ¨أ™ث†أکآ¹أ™إ /أکآ´أ™â€،أکآ±أ™إ ) + أکآھأکآµأکآ¯أ™إ أکآ± CSV/Excel/PDF + أکآ·أکآ¨أکآ§أکآ¹أکآ©.
-
-${systemKnowledge}
-
-أکآ§أ™â€‍أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦: "${userName}" â€” أکآ§أ™â€‍أ™â€¦أکآ­أ™â€‍: "${businessName}" (Shop ${shopId}).
-${ctxLine}
-${roleInstructionAr}
-
-أ™â€¦أ™â€‍أکآ®أکآµ أکآ§أ™â€‍أ™â€¦أکآ¨أ™إ أکآ¹أکآ§أکآھ أ™â€‍أکآ¢أکآ®أکآ± 7 أکآ£أ™إ أکآ§أ™â€¦:
-${last7DaysContextAr}
-أکآ§أ™â€¦أکآ¨أکآ§أکآ±أکآ­: ${Number(yesterday.revenue || 0)} أکآ¬أ™â€ أ™إ أ™â€، â€” ${Number(yesterday.invoices || 0)} أ™آپأکآ§أکآھأ™ث†أکآ±أکآ©.
-
-أکآ¢أکآ®أکآ± 25 أ™آپأکآ§أکآھأ™ث†أکآ±أکآ©:
-${recentInvoices.length ? JSON.stringify(recentInvoices, null, 2) : 'أ™â€‍أکآ§ أکآھأ™ث†أکآ¬أکآ¯.'}
-
-أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™ث†أ™â€  أکآ§أ™â€‍أکآ­أکآ§أ™â€‍أ™إ :
-${inventoryContextAr || 'أ™â€‍أکآ§ أکآھأ™ث†أکآ¬أکآ¯ أ™â€¦أ™â€ أکآھأکآ¬أکآ§أکآھ.'}
-
-أکآ¥أکآ­أکآµأکآ§أکآ¦أ™إ أکآ§أکآھ أکآ§أ™â€‍أ™إ أ™ث†أ™â€¦: أ™â€¦أکآ¨أ™إ أکآ¹أکآ§أکآھ ${stats.today_revenue} أکآ¬أ™â€ أ™إ أ™â€،أکإ’ أ™آپأ™ث†أکآ§أکآھأ™إ أکآ± ${stats.today_sales}أکإ’ أ™â€¦أ™â€ أکآھأکآ¬أکآ§أکآھ ${totalProducts}أکإ’ أ™â€ڑأ™â€‍أ™إ أ™â€‍أکآ© أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™ث†أ™â€  ${lowStockCount}.
-أ™â€ أ™ث†أکآ¹ أکآ§أ™â€‍أ™â€ أکآ´أکآ§أکآ·: ${businessTypeAr}.`;
-
-    const systemPromptEn = `You are the in-app assistant for "Crown Services ERP".
-You MUST:
-- Answer in English.
-- Be concise and fast: default to 1أ¢â‚¬â€œ3 short lines. Give the final answer first.
-- Ask at most ONE clarification question only if required.
-- Never output Markdown formatting markers (**, *, backticks). Use plain text only.
-- When user asks "do we have an online shop/storefront?" you MUST answer YES and explain: Storefront: /storefront. Online orders are confirmed from Admin Orders, affect stock via reservations, and appear in notifications, dashboard, and reports.
-You KNOW these modules:
-Dashboard: sales + online confirmed sales + operations count + dead/slow KPI.
-POS: sales, invoice, stock checks with available_stock.
-Inventory: products, low stock, dead/slow-moving page.
-Online: storefront products, online order create, admin confirm/cancel/complete, reservations.
-Notifications: bell + list + unread count + deep links.
-Reports: date range + source filter (All/POS/Online) + bucket (daily/weekly/monthly) + export CSV/Excel/PDF + Print.
-
-${systemKnowledge}
-
-User: "${userName}" â€” Shop: "${businessName}" (Shop ${shopId}).
-${ctxLine}
-${roleInstructionEn}
-
-Sales summary (past 7 days):
-${last7DaysContextEn}
-Yesterday: ${Number(yesterday.revenue || 0)} EGP â€” ${Number(yesterday.invoices || 0)} invoices.
-
-Recent invoices (up to 25):
-${recentInvoices.length ? JSON.stringify(recentInvoices, null, 2) : 'None.'}
-
-Inventory snapshot:
-${inventoryContextEn || 'No products.'}
-
-Today: revenue ${stats.today_revenue} EGP, invoices ${stats.today_sales}, total products ${totalProducts}, low stock ${lowStockCount}.
-Business type: ${businessType}.`;
+          ? `Today's sales: ${totalTodayAmount} EGP (${todaySales} POS invoices + ${todayOnlineCount} confirmed online orders).\n${totalTodayAmount === 0 ? 'No operations yet.' : 'Want POS vs online breakdown?'}`حدث خطأ. حاول مرة أخرى.`Current user role: ${effectiveRole}. Page: ${pathname || '/'}. Do NOT advise actions not allowed for this role.`حدث خطأ. حاول مرة أخرى.`;
 
     const systemPrompt = lang === 'ar' ? systemPromptAr : systemPromptEn;
-    const userLine = lang === 'ar' ? `أکآ±أکآ³أکآ§أ™â€‍أکآ© أکآ§أ™â€‍أکآ¹أ™â€¦أ™إ أ™â€‍: ${message}` : `User: ${message}`;
-
-    const parts: string[] = [systemPrompt];
-    if (Array.isArray(chatHistory) && chatHistory.length > 0) {
-      for (const h of chatHistory.slice(-10)) {
-        if (h.role === 'user') parts.push(lang === 'ar' ? `أکآ±أکآ³أکآ§أ™â€‍أکآ© أکآ§أ™â€‍أکآ¹أ™â€¦أ™إ أ™â€‍: ${h.content}` : `User: ${h.content}`);
-        else if (h.role === 'assistant') parts.push(lang === 'ar' ? `أکآ±أکآ¯ أکآ§أ™â€‍أ™â€¦أکآ³أکآ§أکآ¹أکآ¯: ${h.content}` : `Assistant: ${h.content}`);
-      }
-    }
-    parts.push(userLine);
-    const contents = parts.join('\n\n');
+    const userLine = lang === 'ar'حدث خطأ. حاول مرة أخرى.'user') parts.push(lang === 'ar'حدث خطأ. حاول مرة أخرى.'assistant') parts.push(lang === 'ar'حدث خطأ. حاول مرة أخرى.'\n\n');
 
     const result = await genAI.models.generateContent({
       model: GEMINI_MODEL,
@@ -2683,18 +1914,18 @@ Business type: ${businessType}.`;
       return res.json({ ok: true, reply: text, message: text, lang, ttsLang });
     }
 
-    console.error('أ¢آ‌إ’ Gemini empty response');
+    console.error('ERROR: Gemini empty response');
     return res.status(200).json({
       ok: false,
       error: 'AI_UNAVAILABLE',
       reason: 'EMPTY_RESPONSE',
       message_en: 'AI is temporarily unavailable. Please try again later.',
-      message_ar: 'أکآ§أ™â€‍أ™â€¦أکآ³أکآ§أکآ¹أکآ¯ أکآ؛أ™إ أکآ± أ™â€¦أکآھأکآ§أکآ­ أکآ­أکآ§أ™â€‍أ™إ أکآ§أ™â€¹أکإ’ أ™إ أکآ±أکآ¬أ™â€° أکآ§أ™â€‍أ™â€¦أکآ­أکآ§أ™ث†أ™â€‍أکآ© أ™â€¦أکآ±أکآ© أکآ£أکآ®أکآ±أ™â€° أ™â€‍أکآ§أکآ­أ™â€ڑأکآ§أ™â€¹.',
+      message_ar: 'حدث خطأ. حاول مرة أخرى.',
       lang,
       ttsLang,
     });
   } catch (error: any) {
-    console.error('أ¢آ‌إ’ Chat error:', { name: error?.name, message: error?.message, status: error?.status });
+    console.error('ERROR: Chat error:', { name: error?.name, message: error?.message, status: error?.status });
     const detectedLang: 'ar' | 'en' = lang === 'ar' ? 'ar' : 'en';
     const ttsLang = getTtsLocaleForLang(detectedLang);
 
@@ -2715,7 +1946,7 @@ Business type: ${businessType}.`;
         error: 'AI_UNAVAILABLE',
         reason: 'API_KEY_INVALID',
         message_en: 'AI cloud unavailable (invalid or expired API key), using local help.',
-        message_ar: 'أکآ§أ™â€‍أ™â€¦أکآ³أکآ§أکآ¹أکآ¯ أکآ§أ™â€‍أکآ³أکآ­أکآ§أکآ¨أ™إ  أکآ؛أ™إ أکآ± أ™â€¦أکآھأکآ§أکآ­ أکآ­أکآ§أ™â€‍أ™إ أکآ§أ™â€¹ (أ™â€¦أ™آپأکآھأکآ§أکآ­ API أکآ؛أ™إ أکآ± أکآµأکآ§أ™â€‍أکآ­ أکآ£أ™ث† أ™â€¦أ™â€ أکآھأ™â€،أ™إ )أکإ’ أکآ³أ™إ أکآھأ™â€¦ أکآ§أکآ³أکآھأکآ®أکآ¯أکآ§أ™â€¦ أکآ§أ™â€‍أ™â€¦أکآ³أکآ§أکآ¹أکآ¯أکآ© أکآ§أ™â€‍أ™â€¦أکآ­أ™â€‍أ™إ أکآ©.',
+        message_ar: 'حدث خطأ. حاول مرة أخرى.',
         answer,
         lang: detectedLang,
         ttsLang,
@@ -2728,7 +1959,7 @@ Business type: ${businessType}.`;
       error: 'AI_UNAVAILABLE',
       reason: 'PROVIDER_ERROR',
       message_en: 'AI cloud unavailable due to an internal error, using local help.',
-      message_ar: 'أکآ§أ™â€‍أ™â€¦أکآ³أکآ§أکآ¹أکآ¯ أکآ§أ™â€‍أکآ³أکآ­أکآ§أکآ¨أ™إ  أکآ؛أ™إ أکآ± أ™â€¦أکآھأکآ§أکآ­ أکآ­أکآ§أ™â€‍أ™إ أکآ§أ™â€¹ أکآ¨أکآ³أکآ¨أکآ¨ أکآ®أکآ·أکآ£ أکآ¯أکآ§أکآ®أ™â€‍أ™إ أکإ’ أکآ³أ™إ أکآھأ™â€¦ أکآ§أکآ³أکآھأکآ®أکآ¯أکآ§أ™â€¦ أکآ§أ™â€‍أ™â€¦أکآ³أکآ§أکآ¹أکآ¯أکآ© أکآ§أ™â€‍أ™â€¦أکآ­أ™â€‍أ™إ أکآ©.',
+      message_ar: 'حدث خطأ. حاول مرة أخرى.',
       answer,
       lang: detectedLang,
       ttsLang,
@@ -2831,52 +2062,16 @@ app.post('/api/ai/data-chat', authenticateToken, requirePackageFeature('ai'), as
     let shopProfile = null;
     if (shopId) {
       const [shopRows] = await pool.execute(
-        'SELECT business_name, owner_name, activity_type FROM shops WHERE id = ?',
-        [shopId]
-      );
-      shopProfile = (shopRows as any[])[0] || null;
-    }
-
-    const summary = {
-      user: {
-        id: req.user.id,
-        username: req.user.username,
-        role: req.user.role,
-      },
-      shopProfile,
-      shopId: shopId || null,
-      monthlyRevenue: (stats as any[])[0]?.monthly_revenue || 0,
-      monthlyTransactions: (stats as any[])[0]?.transactions || 0,
-      todayRevenue: (todaySales as any[])[0]?.today_revenue || 0,
-      todayTransactions: (todaySales as any[])[0]?.today_transactions || 0,
-      inventory: {
-        totalProducts: (inventorySummary as any[])[0]?.total_products || 0,
-        totalUnits: (inventorySummary as any[])[0]?.total_units || 0,
-        inventoryCost: (inventorySummary as any[])[0]?.inventory_cost || 0,
-      },
-      lowStock,
-      topCustomers,
-      recentSales,
-    };
-
-    const result = await genAI.models.generateContent({
-      model: GEMINI_MODEL,
-      contents: `أکآ£أ™â€ أکآھ أ™ئ’أکآ±أکآ§أ™ث†أ™â€  - أکآ§أ™â€‍أ™â€¦أکآ³أکآ§أکآ¹أکآ¯ أکآ§أ™â€‍أکآ°أ™ئ’أ™إ . أکآ§أکآ³أکآھأکآ®أکآ¯أ™â€¦ أکآ§أ™â€‍أکآ¨أ™إ أکآ§أ™â€ أکآ§أکآھ أکآ§أ™â€‍أکآھأکآ§أ™â€‍أ™إ أکآ© أ™آپأ™â€ڑأکآ· أ™â€‍أ™â€‍أکآ¥أکآ¬أکآ§أکآ¨أکآ©أکإ’ أ™ث†أ™â€‍أ™ث† أکآ§أ™â€‍أکآ³أکآ¤أکآ§أ™â€‍ أکآ®أکآ§أکآ±أکآ¬ أکآ§أ™â€‍أکآ¨أ™إ أکآ§أ™â€ أکآ§أکآھ أ™â€ڑأ™ث†أ™â€‍ أکآ¥أ™â€  أکآ§أ™â€‍أ™â€¦أکآ¹أ™â€‍أ™ث†أ™â€¦أکآ© أ™â€¦أکآ´ أ™â€¦أکآھأکآ§أکآ­أکآ©. أکآ±أکآ¯ أکآ¨أکآ§أ™â€‍أ™â€‍أ™â€،أکآ¬أکآ© أکآ§أ™â€‍أ™â€¦أکآµأکآ±أ™إ أکآ© أ™ث†أکآ¨أکآ§أکآ®أکآھأکآµأکآ§أکآ±.\n\nأکآ§أ™â€‍أکآ¨أ™إ أکآ§أ™â€ أکآ§أکآھ:\n${JSON.stringify(
-        summary,
-        null,
-        2
-      )}\n\nأکآ³أکآ¤أکآ§أ™â€‍ أکآ§أ™â€‍أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦: ${question}`,
-    });
-    const text = String((result as any)?.text || '').trim();
+        'SELECT business_name, owner_name, activity_type FROM shops WHERE id = ?'حدث خطأ. حاول مرة أخرى.'').trim();
 
     if (text) {
       res.json({ text, data: summary });
     } else {
-      console.error('أ¢آ‌إ’ Gemini empty response');
+      console.error('ERROR: Gemini empty response');
       return res.status(500).json({ error: 'AI provider response empty' });
     }
   } catch (error: any) {
-    console.error('أ¢آ‌إ’ Data chat error:', error);
+    console.error('ERROR: Data chat error:', error);
     res.status(500).json({ error: 'AI data chat unavailable' });
   }
 });
@@ -2908,49 +2103,28 @@ app.get('/api/ai/context', authenticateToken, async (req: any, res: Response) =>
       .map(([k]) => k);
 
     const routesSummary = {
-      pos: language === 'ar' ? 'أ™â€ أ™â€ڑأکآ·أکآ© أکآ§أ™â€‍أکآ¨أ™إ أکآ¹ أ™ث†أکآ§أ™â€‍أ™آپأ™ث†أکآ§أکآھأ™إ أکآ± أکآ§أ™â€‍أکآ³أکآ±أ™إ أکآ¹أکآ© أکآ¯أکآ§أکآ®أ™â€‍ أکآ§أ™â€‍أ™â€¦أکآھأکآ¬أکآ±' : 'POS and quick in-store invoicing',
+      pos: language === 'ar' ? AR.PLAN_POS : EN.PLAN_POS,
       inventory:
-        language === 'ar'
-          ? 'أکآ¥أکآ¯أکآ§أکآ±أکآ© أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™ث†أ™â€  أ™ث†أکآ§أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬أکآ§أکآھ أ™ث†أکآ§أ™â€‍أکآھأ™â€ أکآ¨أ™إ أ™â€،أکآ§أکآھ'
-          : 'Inventory, products, and low-stock alerts',
+          language === 'ar' ? AR.PLAN_INVENTORY : EN.PLAN_INVENTORY,
       invoices:
-        language === 'ar'
-          ? 'أ™آپأ™ث†أکآ§أکآھأ™إ أکآ± أ™ث†أکآھأ™â€ڑأکآ§أکآ±أ™إ أکآ± أکآ§أ™â€‍أ™â€¦أکآ¨أ™إ أکآ¹أکآ§أکآھ PDF/Excel'
-          : 'Invoices and sales reports (PDF/Excel)',
+          language === 'ar' ? AR.PLAN_INVOICES : EN.PLAN_INVOICES,
       onlineOrders:
-        language === 'ar'
-          ? 'أکآ·أ™â€‍أکآ¨أکآ§أکآھ أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€ أکإ’ أکآھأکآ£أ™ئ’أ™إ أکآ¯ أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨ أ™ث†أکآ®أکآµأ™â€¦ أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™ث†أ™â€ '
-          : 'Online orders, confirmation, and stock deduction',
+          language === 'ar' ? AR.PLAN_ONLINE_ORDERS : EN.PLAN_ONLINE_ORDERS,
       notifications:
-        language === 'ar'
-          ? 'أکآ³أکآ¬أ™â€‍ أکآ§أ™â€‍أ™â€ أکآ´أکآ§أکآ· أ™ث†أکآ§أ™â€‍أکآھأ™â€ أکآ¨أ™إ أ™â€،أکآ§أکآھ أ™â€‍أ™â€‍أ™â€¦أکآ¨أ™إ أکآ¹أکآ§أکآھ أ™ث†أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨أکآ§أکآھ'
-          : 'Activity log and notifications for sales/orders',
+          language === 'ar' ? AR.PLAN_NOTIFICATIONS : EN.PLAN_NOTIFICATIONS,
       importExport:
-        language === 'ar'
-          ? 'أکآ§أکآ³أکآھأ™إ أکآ±أکآ§أکآ¯/أکآھأکآµأکآ¯أ™إ أکآ± أکآ§أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬أکآ§أکآھ أکآ¹أکآ¨أکآ± Excel/CSV (أکآ­أکآ³أکآ¨ أکآ§أ™â€‍أکآ¨أکآ§أ™â€ڑأکآ©)'
-          : 'Import/export products via Excel/CSV (depending on plan)',
+          language === 'ar' ? AR.PLAN_IMPORT_EXPORT : EN.PLAN_IMPORT_EXPORT,
       branches:
-        language === 'ar'
-          ? 'أکآ¥أکآ¯أکآ§أکآ±أکآ© أکآ§أ™â€‍أ™آپأکآ±أ™ث†أکآ¹ أ™ث†أکآµأ™â€‍أکآ§أکآ­أ™إ أکآ§أکآھ أکآ§أ™â€‍أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦أ™إ أ™â€  أ™â€‍أ™ئ’أ™â€‍ أ™آپأکآ±أکآ¹'
-          : 'Branch management and per-branch user roles',
+          language === 'ar' ? AR.PLAN_BRANCHES : EN.PLAN_BRANCHES,
       users:
-        language === 'ar'
-          ? 'أکآ¥أکآ¶أکآ§أ™آپأکآ© أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦أ™إ أ™â€  أ™ث†أکآµأ™â€‍أکآ§أکآ­أ™إ أکآ§أکآھ أ™â€¦أکآ«أ™â€‍ أکآ§أ™â€‍أ™ئ’أکآ§أکآ´أ™إ أکآ± أ™ث†أکآ§أ™â€‍أ™آپأکآ±أکآ¹ أ™ث†أکآ§أ™â€‍أ™â€¦أکآ¯أ™إ أکآ±'
-          : 'User management and roles such as cashier, branch manager, owner',
+          language === 'ar' ? AR.PLAN_USERS : EN.PLAN_USERS,
       licenses:
-        language === 'ar'
-          ? 'أکآ£أ™ئ’أ™ث†أکآ§أکآ¯ أکآ§أ™â€‍أکآھأ™آپأکآ¹أ™إ أ™â€‍ أ™â€‍أکآھأکآ؛أ™إ أ™إ أکآ± أکآ§أ™â€‍أکآ¨أکآ§أ™â€ڑأکآ© أ™â€‍أ™â€¦أکآ¯أکآ© أکآ´أ™â€،أکآ±/أکآ³أ™â€ أکآ©/أ™â€¦أکآ¯أ™â€° أکآ§أ™â€‍أکآ­أ™إ أکآ§أکآ©'
-          : 'Activation codes to change plans for month/year/lifetime',
+          language === 'ar' ? AR.PLAN_LICENSES : EN.PLAN_LICENSES,
       subscriptions:
-        language === 'ar'
-          ? 'أکآ¥أکآ¯أکآ§أکآ±أکآ© أکآ§أ™â€‍أکآ§أکآ´أکآھأکآ±أکآ§أ™ئ’ أکآ§أ™â€‍أکآ­أکآ§أ™â€‍أ™إ  أ™ث†أکآھأکآ§أکآ±أ™إ أکآ® أکآ§أ™â€‍أکآھأ™آپأکآ¹أ™إ أ™â€‍ أ™ث†أکآ§أ™â€‍أکآ§أ™â€ أکآھأ™â€،أکآ§أکآ،'
-          : 'Manage current subscription and activation/expiry history',
+          language === 'ar' ? AR.PLAN_SUBSCRIPTIONS : EN.PLAN_SUBSCRIPTIONS,
     };
 
-    const systemPrompt =
-      language === 'ar'
-        ? 'أکآ£أ™â€ أکآھ أ™â€¦أکآ³أکآ§أکآ¹أکآ¯ أکآ°أ™ئ’أ™إ  أ™â€‍أ™â€ أکآ¸أکآ§أ™â€¦ Crown ERP. أکآ±أکآ¯ أکآ¯أکآ§أکآ¦أ™â€¦أکآ§أ™â€¹ أکآ¨أکآ§أکآ®أکآھأکآµأکآ§أکآ± أکآ´أکآ¯أ™إ أکآ¯ (أ™آ£أ¢â‚¬â€œأ™آ¦ أ™â€ أ™â€ڑأکآ§أکآ· أ™â€¦أکآ±أ™â€ڑأ™â€¦أکآ© أکآ£أ™ث† أ™آپأ™â€ڑأکآ±أکآ§أکآھ أ™â€ڑأکآµأ™إ أکآ±أکآ©)أکإ’ أ™ث†أ™ث†أکآ¶أکآ­ أکآ§أ™â€‍أکآ®أکآ·أ™ث†أکآ§أکآھ أکآ§أ™â€‍أکآ¹أ™â€¦أ™â€‍أ™إ أکآ© أکآ¯أکآ§أکآ®أ™â€‍ أ™â€‍أ™ث†أکآ­أکآ© أکآ§أ™â€‍أکآھأکآ­أ™ئ’أ™â€¦ (أکآ§أ™â€‍أ™â€¦أکآ³أکآ§أکآ± أ™آپأ™إ  أکآ§أ™â€‍أ™â‚¬ UI أکآ£أ™ث† أکآ§أکآ³أ™â€¦ أکآ§أ™â€‍أکآµأ™آپأکآ­أکآ©) أ™ث†أکآ£أ™إ  endpoint أ™â€¦أ™â€،أ™â€¦ أ™آپأ™إ  أکآ§أ™â€‍أ™â‚¬ API أکآ¥أ™â€  أ™â€‍أکآ²أ™â€¦. أ™â€‍أکآ§ أکآھأکآ®أکآھأکآ±أکآ¹ أ™â€¦أکآ¹أ™â€‍أ™ث†أ™â€¦أکآ§أکآھ أکآ؛أ™إ أکآ± أ™â€¦أ™ث†أکآ¬أ™ث†أکآ¯أکآ© أ™آپأ™إ  أکآ§أ™â€‍أکآ³أ™إ أکآ§أ™â€ڑ أکآ£أ™ث† أ™â€¦أ™â€ أکآ·أ™â€ڑ أکآ§أ™â€‍أ™â€ أکآ¸أکآ§أ™â€¦أکâ€؛ أکآ¥أکآ°أکآ§ أ™ئ’أکآ§أ™â€ أکآھ أکآ§أ™â€‍أ™â€¦أکآ¹أ™â€‍أ™ث†أ™â€¦أکآ© أ™â€ أکآ§أ™â€ڑأکآµأکآ© أکآ§أکآ³أکآ£أ™â€‍ أکآ³أکآ¤أکآ§أ™â€‍أکآ§أ™â€¹ أ™ث†أکآ§أکآ­أکآ¯أکآ§أ™â€¹ أ™آپأ™â€ڑأکآ· أ™â€‍أکآھأ™ث†أکآ¶أ™إ أکآ­ أکآ§أ™â€‍أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨ أکآ«أ™â€¦ أکآ§أ™â€ڑأکآھأکآ±أکآ­ أکآ£أ™آپأکآ¶أ™â€‍ أ™â€¦أ™â€¦أکآ§أکآ±أکآ³أکآ©. أکآ±أ™ئ’أ™â€کأکآ² أکآ¹أ™â€‍أ™â€°: أکآ§أ™â€‍أ™â€¦أکآ¨أ™إ أکآ¹أکآ§أکآھأکإ’ أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™ث†أ™â€ أکإ’ أکآ§أ™â€‍أ™آپأ™ث†أکآ§أکآھأ™إ أکآ±أکإ’ أکآ§أ™â€‍أکآ£أ™ئ’أ™ث†أکآ§أکآ¯ أ™ث†أکآ§أ™â€‍أکآ§أکآ´أکآھأکآ±أکآ§أ™ئ’أکآ§أکآھأکإ’ أکآ§أ™â€‍أکآ£أکآ¯أ™ث†أکآ§أکآ± أ™ث†أکآ§أ™â€‍أکآµأ™â€‍أکآ§أکآ­أ™إ أکآ§أکآھأکإ’ أکآ§أ™â€‍أ™â€¦أکآھأکآ§أکآ¬أکآ± أ™ث†أکآ§أ™â€‍أ™آپأکآ±أ™ث†أکآ¹أکإ’ أ™ث†أکآ§أ™â€‍أکآ§أکآ³أکآھأ™إ أکآ±أکآ§أکآ¯/أکآ§أ™â€‍أکآھأکآµأکآ¯أ™إ أکآ±. أکآ§أکآ­أکآھأکآ±أ™â€¦ أکآ®أکآ·أکآ© أکآ§أ™â€‍أکآ¹أ™â€¦أ™إ أ™â€‍ (أکآ§أ™â€‍أکآ¨أکآ§أ™â€ڑأکآ©) أ™ث†أکآ§أکآ°أ™ئ’أکآ± أکآ¥أ™â€  أ™ئ’أکآ§أ™â€ أکآھ أکآ§أ™â€‍أکآ®أکآ§أکآµأ™إ أکآ© أ™â€¦أکآھأکآ§أکآ­أکآ© أ™آپأ™إ  أکآ®أکآ·أکآھأ™â€، أکآ£أ™â€¦ أکآھأکآ­أکآھأکآ§أکآ¬ أکآھأکآ±أ™â€ڑأ™إ أکآ©.'
-        : 'You are a smart assistant for the Crown ERP system. Always answer concisely (3أ¢â‚¬â€œ6 short bullet points or paragraphs), and highlight practical steps inside the dashboard (UI route or page name) plus any relevant API endpoint when useful. Do not hallucinate or invent features; if key information is missing, ask exactly one clarifying question before proposing best practices. Focus on: sales, inventory, invoices, licenses & subscriptions, roles & permissions, shops & branches, and import/export. Respect the customer plan (subscription) and mention when a feature requires a higher plan.';
+    const systemPrompt = language === 'ar' ? AR.AI_PROMPT : EN.AI_PROMPT;
 
     const shopPayload = shop
       ? {
@@ -3583,12 +2757,12 @@ app.get('/api/users', authenticateToken, requireRole('super_admin', 'shop_owner'
     }
     if (!shopId) {
       if (req.user?.role === 'super_admin') {
-        return res.status(400).json({ error: 'SHOP_ID_REQUIRED', message_ar: 'أکآ§أکآ®أکآھأکآ± أکآ§أ™â€‍أ™â€¦أکآھأکآ¬أکآ± أکآ£أ™ث†أ™â€‍أکآ§أ™â€¹', message_en: 'Please select a shop first' });
+        return res.status(400).json({ error: 'SHOP_ID_REQUIRED', message_ar: 'يرجى اختيار محل أولاً', message_en: 'Please select a shop first' });
       }
       return res.status(400).json({ error: 'shopId is required' });
     }
     if (req.user.role !== 'super_admin' && req.user.shop_id !== shopId) {
-      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'أکآ؛أ™إ أکآ± أ™â€¦أکآµأکآ±أکآ­', message_en: 'Forbidden' });
+      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'غير مصرح', message_en: 'Forbidden' });
     }
 
     const [users] = await pool.execute(
@@ -3654,7 +2828,7 @@ app.post('/api/users', authenticateToken, requireRole('super_admin', 'shop_owner
       if (req.user?.role === 'super_admin') {
         return res.status(400).json({
           error: 'SHOP_ID_REQUIRED',
-          message_ar: 'أکآ§أکآ®أکآھأکآ± أکآ§أ™â€‍أ™â€¦أکآھأکآ¬أکآ± أکآ£أ™ث†أ™â€‍أکآ§أ™â€¹',
+          message_ar: 'يرجى اختيار محل أولاً',
           message_en: 'Please select a shop first',
         });
       }
@@ -3668,7 +2842,7 @@ app.post('/api/users', authenticateToken, requireRole('super_admin', 'shop_owner
       if (planError.message === 'PLAN_USER_LIMIT_REACHED') {
         return res.status(403).json({
           error: 'PLAN_USER_LIMIT_REACHED',
-          message_ar: planError.message_ar || 'أ™â€‍أ™â€ڑأکآ¯ أ™ث†أکآµأ™â€‍أکآھ أ™â€‍أ™â€‍أکآ­أکآ¯ أکآ§أ™â€‍أکآ£أ™â€ڑأکآµأ™â€° أ™â€‍أکآ¹أکآ¯أکآ¯ أکآ§أ™â€‍أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦أ™إ أ™â€  أ™آپأ™إ  أکآ¨أکآ§أ™â€ڑأکآھأ™ئ’. أ™â€ڑأ™â€¦ أکآ¨أکآ§أ™â€‍أکآھأکآ±أ™â€ڑأ™إ أکآ© أکآ£أ™ث† أکآ§أکآ­أکآ°أ™آپ أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦أ™â€¹أکآ§.',
+          message_ar: planError.message_ar || 'حدث خطأ. حاول مرة أخرى.',
           message_en: planError.message_en || "You have reached your plan's user limit. Upgrade your plan or remove a user.",
         });
       }
@@ -3738,10 +2912,10 @@ app.post('/api/users/invite', authenticateToken, requireRole('super_admin', 'sho
 
     const shopId = resolveShopId(req) ?? (req.user.role === 'shop_owner' ? req.user.shop_id : null);
     if (!shopId && req.user?.role !== 'super_admin') {
-      return res.status(400).json({ error: 'SHOP_ID_REQUIRED', message_ar: 'أکآ§أکآ®أکآھأکآ± أکآ§أ™â€‍أ™â€¦أکآھأکآ¬أکآ± أکآ£أ™ث†أ™â€‍أکآ§أ™â€¹', message_en: 'Please select a shop first' });
+      return res.status(400).json({ error: 'SHOP_ID_REQUIRED', message_ar: 'يرجى اختيار محل أولاً', message_en: 'Please select a shop first' });
     }
     if (req.user?.role === 'super_admin' && !shopId) {
-      return res.status(400).json({ error: 'SHOP_ID_REQUIRED', message_ar: 'أکآ§أکآ®أکآھأکآ± أکآ§أ™â€‍أ™â€¦أکآھأکآ¬أکآ± أکآ£أ™ث†أ™â€‍أکآ§أ™â€¹', message_en: 'Please select a shop first' });
+      return res.status(400).json({ error: 'SHOP_ID_REQUIRED', message_ar: 'يرجى اختيار محل أولاً', message_en: 'Please select a shop first' });
     }
     const resolvedShopId = Number(shopId);
     if (!Number.isFinite(resolvedShopId) || resolvedShopId <= 0) {
@@ -3784,7 +2958,7 @@ app.delete('/api/users/:id', authenticateToken, requireRole('super_admin', 'shop
     if (targetUser.role === 'super_admin') return res.status(403).json({ error: 'Only super_admin can delete super_admin' });
 
     const shopId = req.user.role === 'super_admin' ? targetUser.shop_id : req.user.shop_id;
-    if (req.user.role !== 'super_admin' && targetUser.shop_id !== shopId) return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'أکآ؛أ™إ أکآ± أ™â€¦أکآµأکآ±أکآ­', message_en: 'Not allowed' });
+    if (req.user.role !== 'super_admin' && targetUser.shop_id !== shopId) return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'غير مصرح', message_en: 'Not allowed' });
 
     await pool.execute('DELETE FROM users WHERE id = ?', [userId]);
     res.json({ success: true });
@@ -3807,30 +2981,30 @@ app.post('/api/users/:id/change-password', authenticateToken, requireRole('super
     const targetUser = userArray[0];
 
     if (targetUser.role === 'super_admin' && req.user.role !== 'super_admin') {
-      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'أ™â€‍أکآ§ أ™إ أ™â€¦أ™ئ’أ™â€  أکآھأکآ؛أ™إ أ™إ أکآ± أ™ئ’أ™â€‍أ™â€¦أکآ© أ™â€¦أکآ±أ™ث†أکآ± أکآ§أ™â€‍أ™â€¦أکآ¯أ™إ أکآ± أکآ§أ™â€‍أکآ¹أکآ§أ™â€¦', message_en: 'Cannot change super_admin password' });
+      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'حدث خطأ. حاول مرة أخرى.', message_en: 'Cannot change super_admin password' });
     }
 
     if (req.user.role === 'shop_owner' && targetUser.shop_id !== req.user.shop_id) {
-      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'أکآ؛أ™إ أکآ± أ™â€¦أکآµأکآ±أکآ­', message_en: 'Forbidden' });
+      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'غير مصرح', message_en: 'Forbidden' });
     }
 
     if (req.user.role === 'branch_manager') {
       if (targetUser.shop_id !== req.user.shop_id) {
-        return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'أکآ؛أ™إ أکآ± أ™â€¦أکآµأکآ±أکآ­', message_en: 'Forbidden' });
+        return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'غير مصرح', message_en: 'Forbidden' });
       }
       const [myAssignments] = await pool.execute('SELECT branch_id FROM user_branch_assignments WHERE user_id = ?', [req.user.id]);
       const myBranchIds = (myAssignments as any[]).map((r) => Number(r.branch_id));
-      if (myBranchIds.length === 0) return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'أکآ؛أ™إ أکآ± أ™â€¦أکآµأکآ±أکآ­', message_en: 'Forbidden' });
+      if (myBranchIds.length === 0) return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'غير مصرح', message_en: 'Forbidden' });
       const [targetAssignments] = await pool.execute('SELECT branch_id FROM user_branch_assignments WHERE user_id = ?', [userId]);
       const targetBranchIds = (targetAssignments as any[]).map((r) => Number(r.branch_id));
       const overlap = myBranchIds.some((b) => targetBranchIds.includes(b));
       if (!overlap) {
-        return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'أ™إ أ™â€¦أ™ئ’أ™â€ أ™ئ’ أکآھأکآ؛أ™إ أ™إ أکآ± أ™ئ’أ™â€‍أ™â€¦أکآ© أ™â€¦أکآ±أ™ث†أکآ± أکآ§أ™â€‍أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦أ™إ أ™â€  أ™آپأ™إ  أ™آپأکآ±أکآ¹أ™ئ’ أ™آپأ™â€ڑأکآ·', message_en: 'Can only change password for users in your branch' });
+        return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'حدث خطأ. حاول مرة أخرى.', message_en: 'Can only change password for users in your branch' });
       }
     }
 
     if (req.user.role === 'multi_branch_manager' && targetUser.shop_id !== req.user.shop_id) {
-      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'أکآ؛أ™إ أکآ± أ™â€¦أکآµأکآ±أکآ­', message_en: 'Forbidden' });
+      return res.status(403).json({ error: 'FORBIDDEN', message_ar: 'غير مصرح', message_en: 'Forbidden' });
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -4343,7 +3517,7 @@ app.get('/api/subscription', authenticateToken, async (req: any, res: Response) 
     const additionalUsersCount = Number((additionalCountRows as any[])[0]?.total || 0);
     const canAddUser = additionalUsersCount < additionalUsersLimit;
     res.json({
-      // أ™â€¦أکآµأکآ¯أکآ± أ™ث†أکآ§أکآ¶أکآ­ أ™â€‍أ™â€‍أکآ¨أکآ§أ™â€ڑأکآ© أکآ§أ™â€‍أ™â€¦أکآ³أکآھأکآ®أکآ¯أ™â€¦أکآ© أ™آپأ™إ  أکآ§أ™â€‍أ™â‚¬ UI
+      // (cleaned)
       planId: planName,
       planName,
       planStatus,
@@ -4447,14 +3621,7 @@ app.post('/api/products', authenticateToken, requireRole('super_admin', 'shop_ow
     } = req.body;
     const shopId = resolveShopId(req);
     if (!shopId) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
-
-    const limitCheck = await enforceProductLimit(shopId, 1);
-    if (!limitCheck.allowed) {
-      return res.status(403).json({
-        message: `أ™â€‍أ™â€ڑأکآ¯ أ™ث†أکآµأ™â€‍أکآھ أ™â€‍أ™â€‍أکآ­أکآ¯ أکآ§أ™â€‍أکآ£أ™â€ڑأکآµأ™â€° أ™â€¦أ™â€  أکآ§أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬أکآ§أکآھ (${limitCheck.maxProducts}). أ™إ أکآ±أکآ¬أ™â€° أکآ§أ™â€‍أکآھأکآ±أ™â€ڑأ™إ أکآ© أ™â€‍أ™â€‍أکآ¨أکآ§أ™â€ڑأکآ© أکآ§أ™â€‍أ™آپأکآ¶أ™إ أکآ© أکآ£أ™ث† أکآ§أ™â€‍أکآ°أ™â€،أکآ¨أ™إ أکآ©.`,
-        code: 'PRODUCT_LIMIT_REACHED',
+      return res.status(400).json({ error: 'shopId is required'حدث خطأ. حاول مرة أخرى.'PRODUCT_LIMIT_REACHED',
       });
     }
 
@@ -4645,10 +3812,7 @@ const handleProductsImportUpload = async (
     const limitCheck = await enforceProductLimit(shopId, 0);
     if (!limitCheck.allowed) {
       const remaining = limitCheck.remaining ?? 0;
-      if (mode === 'import') {
-        return res.status(403).json({
-          message: `أکآ§أ™â€‍أکآ­أکآ¯ أکآ§أ™â€‍أکآ£أ™â€ڑأکآµأ™â€° أ™â€‍أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬أکآ§أکآھ أ™آپأ™إ  أکآ¨أکآ§أ™â€ڑأکآھأ™ئ’ ${limitCheck.maxProducts}. أ™â€‍أکآ¯أ™إ أ™ئ’ ${limitCheck.existingCount} أ™â€¦أ™â€ أکآھأکآ¬ أکآ­أکآ§أ™â€‍أ™إ أکآ§أ™â€¹ أ™ث†أ™إ أ™â€¦أ™ئ’أ™â€ أ™ئ’ أکآ¥أکآ¶أکآ§أ™آپأکآ© ${remaining} أ™â€¦أ™â€ أکآھأکآ¬ أ™آپأ™â€ڑأکآ·. أ™إ أکآ±أکآ¬أ™â€° أکآ§أ™â€‍أکآھأکآ±أ™â€ڑأ™إ أکآ© أ™â€‍أ™â€‍أکآ¨أکآ§أ™â€ڑأکآ© أکآ§أ™â€‍أ™آپأکآ¶أ™إ أکآ© أکآ£أ™ث† أکآ§أ™â€‍أکآ°أ™â€،أکآ¨أ™إ أکآ©.`,
-          code: 'PRODUCT_LIMIT_REACHED',
+      if (mode === 'import'حدث خطأ. حاول مرة أخرى.'PRODUCT_LIMIT_REACHED',
         });
       }
     }
@@ -5019,7 +4183,7 @@ const handleProductsImportUpload = async (
               rowIndex: i + 2,
               rawData: dataRows[i],
               mappedData: canonical,
-              errors: ['أکآھأ™â€¦ أکآ§أ™â€‍أ™ث†أکآµأ™ث†أ™â€‍ أ™â€‍أ™â€‍أکآ­أکآ¯ أکآ§أ™â€‍أکآ£أ™â€ڑأکآµأ™â€° أ™â€‍أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬أکآ§أکآھ'],
+              errors: [AR.GENERIC_ERROR],
             });
             continue;
           }
@@ -5056,26 +4220,7 @@ const handleProductsImportUpload = async (
         const failedCount = stagedRows.length;
         await pool.execute(
           'UPDATE import_batches SET imported_count = ?, failed_count = ?, status = ? WHERE id = ?',
-          [importedCount, failedCount, failedCount > 0 ? 'partial' : 'committed', batchId]
-        );
-        const msgAr = failedCount === 0
-          ? `أکآھأ™â€¦ أکآ§أکآ³أکآھأ™إ أکآ±أکآ§أکآ¯ ${importedCount} أکآµأ™â€ أ™آپ أکآ¨أ™â€ أکآ¬أکآ§أکآ­`
-          : failedCount > 0 && importedCount > 0
-            ? `أکآھأ™â€¦ أکآ§أکآ³أکآھأ™إ أکآ±أکآ§أکآ¯ ${importedCount} أکآµأ™â€ أ™آپ. أکآھأکآ¹أکآ°أکآ± أکآ§أکآ³أکآھأ™إ أکآ±أکآ§أکآ¯ ${failedCount} أکآµأ™â€ أ™آپ أ¢â‚¬â€œ أکآھأکآ­أکآھأکآ§أکآ¬ أکآھأکآµأکآ­أ™إ أکآ­`
-            : `أکآھأکآ¹أکآ°أکآ± أکآ§أکآ³أکآھأ™إ أکآ±أکآ§أکآ¯ ${failedCount} أکآµأ™â€ أ™آپ أ¢â‚¬â€œ أکآھأکآ­أکآھأکآ§أکآ¬ أکآھأکآµأکآ­أ™إ أکآ­`;
-        return res.json({
-          ok: true,
-          inserted: importedCount,
-          updated: 0,
-          skippedCount: skipped.length,
-          failedCount,
-          batchId: failedCount > 0 ? batchId : null,
-          skipped,
-          warnings: importWarnings.slice(0, 50),
-          messageAr: msgAr,
-        });
-      } catch (err: any) {
-        return res.status(500).json({ ok: false, error: err?.message || 'Import failed' });
+          [importedCount, failedCount, failedCount > 0 ? 'partial' : 'committed'حدث خطأ. حاول مرة أخرى.'Import failed' });
       }
     }
 
@@ -5385,16 +4530,7 @@ app.post(
       if (!Array.isArray(items) || items.length === 0) {
         return res.status(400).json({
           error:
-            'No items received. If uploading a file, send multipart/form-data without setting Content-Type manually.',
-        });
-      }
-
-      const limitCheck = await enforceProductLimit(shopId, items.length);
-      if (!limitCheck.allowed) {
-        const remaining = limitCheck.remaining ?? 0;
-        return res.status(403).json({
-          message: `أکآ§أ™â€‍أکآ­أکآ¯ أکآ§أ™â€‍أکآ£أ™â€ڑأکآµأ™â€° أ™â€‍أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬أکآ§أکآھ أ™آپأ™إ  أکآ¨أکآ§أ™â€ڑأکآھأ™ئ’ ${limitCheck.maxProducts}. أ™â€‍أکآ¯أ™إ أ™ئ’ ${limitCheck.existingCount} أ™â€¦أ™â€ أکآھأکآ¬ أکآ­أکآ§أ™â€‍أ™إ أکآ§أ™â€¹ أ™ث†أ™إ أ™â€¦أ™ئ’أ™â€ أ™ئ’ أکآ¥أکآ¶أکآ§أ™آپأکآ© ${remaining} أ™â€¦أ™â€ أکآھأکآ¬ أ™آپأ™â€ڑأکآ·. أ™إ أکآ±أکآ¬أ™â€° أکآ§أ™â€‍أکآھأکآ±أ™â€ڑأ™إ أکآ© أ™â€‍أ™â€‍أکآ¨أکآ§أ™â€ڑأکآ© أکآ§أ™â€‍أ™آپأکآ¶أ™إ أکآ© أکآ£أ™ث† أکآ§أ™â€‍أکآ°أ™â€،أکآ¨أ™إ أکآ©.`,
-          code: 'PRODUCT_LIMIT_REACHED',
+            'No items received. If uploading a file, send multipart/form-data without setting Content-Type manually.'حدث خطأ. حاول مرة أخرى.'PRODUCT_LIMIT_REACHED',
         });
       }
 
@@ -5702,29 +4838,7 @@ app.post(
       ) as any;
       await pool.execute(
         'UPDATE import_batches SET imported_count = imported_count + ?, failed_count = ?, status = ? WHERE id = ?',
-        [committed, remaining, remaining === 0 ? 'committed' : 'partial', batchId]
-      );
-      return res.json({
-        ok: true,
-        committed,
-        messageAr: committed > 0 ? `أکآھأ™â€¦ أکآ§أکآ¹أکآھأ™â€¦أکآ§أکآ¯ ${committed} أکآµأ™â€ أ™آپ أکآ¨أ™â€ أکآ¬أکآ§أکآ­` : 'أ™â€‍أکآ§ أکآھأ™ث†أکآ¬أکآ¯ أکآ£أکآµأ™â€ أکآ§أ™آپ أکآµأکآ§أ™â€‍أکآ­أکآ© أ™â€‍أ™â€‍أکآ§أکآ¹أکآھأ™â€¦أکآ§أکآ¯',
-      });
-    } catch (err: any) {
-      return res.status(500).json({ ok: false, error: err?.message || 'Commit failed' });
-    }
-  }
-);
-
-// GET /api/products/import/last â€” last import batch summary for shop
-app.get(
-  '/api/products/import/last',
-  authenticateToken,
-  requireRole('super_admin', 'shop_owner', 'warehouse'),
-  async (req: any, res: Response) => {
-    try {
-      const shopId = resolveShopId(req);
-      if (!shopId) return res.status(400).json({ ok: false, error: 'shopId required' });
-      const [rows] = await pool.execute(
+        [committed, remaining, remaining === 0 ? 'committed' : 'partial', batchId] = await pool.execute(
         'SELECT id, file_name, imported_count, failed_count, created_at FROM import_batches WHERE shop_id = ? AND rolled_back_at IS NULL ORDER BY created_at DESC LIMIT 1',
         [shopId]
       );
@@ -5774,7 +4888,7 @@ app.get(
   }
 );
 
-// POST /api/products/import/rollback â€” undo last import (requires confirm:true)
+// (cleaned)
 app.post(
   '/api/products/import/rollback',
   authenticateToken,
@@ -5784,7 +4898,7 @@ app.post(
       if (req.body?.confirm !== true) {
         return res.status(400).json({
           ok: false,
-          error: 'أ™إ أکآ±أکآ¬أ™â€° أکآ§أ™â€‍أکآھأکآ£أ™ئ’أ™إ أکآ¯: أکآ£أکآ±أکآ³أ™â€‍ { confirm: true } أ™â€‍أکآھأ™â€ أ™آپأ™إ أکآ° أکآ§أ™â€‍أکآھأکآ±أکآ§أکآ¬أکآ¹',
+          error: AR.INVALID_CONFIRM_FORMAT,
         });
       }
       const shopId = resolveShopId(req);
@@ -6097,13 +5211,8 @@ const incrementInvoicePrintCount = async (req: any, saleId: number) => {
        VALUES (?, ?, 'pos', ?, ?)`,
       [shopId, saleId, req.user?.id ?? null, printCount]
     );
-    const titleAr = 'أکآ·أکآ¨أکآ§أکآ¹أکآ© أ™آپأکآ§أکآھأ™ث†أکآ±أکآ© POS';
-    const titleEn = 'POS invoice printed';
-    const bodyAr = `أ™آپأکآ§أکآھأ™ث†أکآ±أکآ© #${invoiceRow?.invoice_number || saleId} â€” أ™â€ أکآ³أکآ®أکآ© ${printCount}`;
-    const bodyEn = `Invoice #${invoiceRow?.invoice_number || saleId} â€” copy ${printCount}`;
-    await connection.execute(
-      `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
-       VALUES (?, 'pos', 'pos_invoice_printed', ?, ?, ?, ?, 0, ?)`,
+    const titleAr = 'عملية بيع جديدة (POS)';
+    const titleEn = 'POS invoice printed'حدث خطأ. حاول مرة أخرى.'pos', 'pos_invoice_printed', ?, ?, ?, ?, 0, ?)`,
       [shopId, titleAr, titleEn, bodyAr, bodyEn, JSON.stringify({ invoiceId: saleId, saleId, printCount, lastPrintedAt: invoiceRow?.last_printed_at })]
     );
 
@@ -6288,7 +5397,7 @@ app.get('/api/sales/:id/items', authenticateToken, async (req: any, res: Respons
   }
 });
 
-// ========== VAULT (أکآ§أ™â€‍أکآ®أکآ²أ™â€ أکآ©) ==========
+// (cleaned)
 app.get('/api/vault/summary', authenticateToken, requireRole('super_admin', 'shop_owner', 'cashier'), async (req: any, res: Response) => {
   try {
     const shopId = resolveShopId(req);
@@ -6390,7 +5499,7 @@ app.post('/api/vault/transactions', authenticateToken, requireRole('super_admin'
   }
 });
 
-// ========== AUDIT LOGS (أکآ§أ™â€‍أ™â€¦أکآ±أکآ§أکآ¬أکآ¹) ==========
+// (cleaned)
 app.get('/api/audit-logs', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
   try {
     const shopId = resolveShopId(req);
@@ -6928,112 +6037,7 @@ app.get('/api/admin/inventory/slow-moving', authenticateToken, requireRole('supe
          WHERE o.created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)${onlineShopFilter}
          GROUP BY oi.product_id
        ) online_sold ON online_sold.product_id = p.id
-       WHERE (p.is_deleted = 0 OR p.is_deleted IS NULL) AND p.shop_id = ?${whereExtra}`,
-      params
-    );
-
-    const items: any[] = [];
-    for (const r of rows as any[]) {
-      const sold = Number(r.soldQtyWindow || 0);
-      const isDead = sold === 0;
-      const isSlow = sold > 0 && sold <= threshold;
-      if (type === 'dead' && !isDead) continue;
-      if (type === 'slow' && !isSlow) continue;
-
-      const stock = Number(r.stock_quantity ?? r.stock ?? 0);
-      const price = Number(r.price ?? 0);
-      const costPrice = r.costPrice != null ? Number(r.costPrice) : null;
-      const tiedValue = stock * (costPrice ?? price);
-      const lastSold = r.lastSoldAt ? new Date(r.lastSoldAt) : null;
-      const daysSince = lastSold ? Math.floor((Date.now() - lastSold.getTime()) / 86400000) : null;
-      const bucket = daysSince === null ? 'never_sold' : daysSince <= 30 ? '0_30' : daysSince <= 90 ? '31_90' : daysSince <= 180 ? '91_180' : '180_plus';
-      if (bucketFilter && bucket !== bucketFilter) continue;
-
-      let suggestedDiscountPct: number | null = null;
-      let recommendationAr = '';
-      let recommendationEn = '';
-      if (isDead) {
-        if (stock >= 10) { suggestedDiscountPct = 20; recommendationAr = 'أکآ§أ™â€ڑأکآھأکآ±أکآ§أکآ­: أکآ®أکآµأ™â€¦ 15-25% أ™â€‍أکآھأکآ³أکآ±أ™إ أکآ¹ أکآ§أ™â€‍أکآ¨أ™إ أکآ¹'; recommendationEn = 'Suggested: 15-25% discount to boost sales'; }
-        else { recommendationAr = 'أکآ§أ™â€ڑأکآھأکآ±أکآ§أکآ­: أکآ¹أکآ±أکآ¶ أکآ­أکآ²أ™â€¦أکآ© أکآ£أ™ث† أکآ¨أ™إ أکآ¹ أکآ¥أکآ¶أکآ§أ™آپأ™إ '; recommendationEn = 'Suggested: Bundle or upsell offer'; }
-      } else {
-        suggestedDiscountPct = 10; recommendationAr = 'أکآ§أ™â€ڑأکآھأکآ±أکآ§أکآ­: أکآ®أکآµأ™â€¦ 5-15%'; recommendationEn = 'Suggested: 5-15% discount';
-      }
-
-      items.push({
-        productId: r.productId, name: r.name, nameAr: r.nameAr, sku: r.sku, category: r.categoryEn || r.categoryAr,
-        stock, price, costPrice, tiedValue,
-        lastSoldAt: r.lastSoldAt ? String(r.lastSoldAt).slice(0, 19) : null,
-        soldQtyWindow: sold, daysSinceLastSale: daysSince,
-        bucket, suggestedDiscountPct, recommendationAr, recommendationEn,
-      });
-    }
-
-    items.sort((a, b) => b.tiedValue - a.tiedValue);
-    const page = items.slice(offset, offset + limit);
-    const nextOffset = offset + limit < items.length ? offset + limit : null;
-
-    res.json({ ok: true, items: page, nextOffset });
-  } catch (error: any) {
-    res.status(500).json({ ok: false, error: error?.message || 'Server error' });
-  }
-});
-
-// Dead-stock alert notification (dedupe 24h per shop)
-async function maybeCreateDeadStockAlert(shopId: number, deadCount: number, slowCount: number): Promise<void> {
-  try {
-    const [recent] = await pool.execute(
-      `SELECT id FROM notifications WHERE shop_id = ? AND source = 'system' AND type = 'dead_stock_alert'
-       AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR) LIMIT 1`,
-      [shopId]
-    );
-    if ((recent as any[]).length > 0) return;
-    if (deadCount === 0 && slowCount === 0) return;
-    const titleAr = `أکآھأ™â€ أکآ¨أ™إ أ™â€، أ™â€¦أکآ®أکآ²أ™ث†أ™â€  أکآ±أکآ§أ™ئ’أکآ¯/أکآ¨أکآ·أ™إ أکآ،: ${deadCount} أکآ±أکآ§أ™ئ’أکآ¯ | ${slowCount} أکآ¨أکآ·أ™إ أکآ،`;
-    const titleEn = `Dead/Slow stock alert: ${deadCount} dead | ${slowCount} slow`;
-    const bodyAr = `أکآ±أکآ§أکآ¬أکآ¹ أکآµأ™آپأکآ­أکآ© أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™ث†أ™â€  أکآ§أ™â€‍أکآ±أکآ§أ™ئ’أکآ¯/أکآ§أ™â€‍أکآ¨أکآ·أ™إ أکآ،`;
-    const bodyEn = `Review the Dead/Slow stock page`;
-    await pool.execute(
-      `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
-       VALUES (?, 'system', 'dead_stock_alert', ?, ?, ?, ?, 0, ?)`,
-      [shopId, titleAr, titleEn, bodyAr, bodyEn, JSON.stringify({ link: '/store-admin/inventory/slow-moving', deadCount, slowCount })]
-    );
-  } catch (_) {}
-}
-
-// ========== UNIFIED REPORTS ==========
-app.get('/api/admin/reports/summary', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager'), async (req: any, res: Response) => {
-  try {
-    const shopId = await resolveShopIdSafe(req);
-    const branchIds = await getBranchManagerBranchIds(req);
-    const isBranchManager = req.user?.role === 'branch_manager';
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[REPORTS] /api/admin/reports/summary', {
-        shopId: shopId ?? 'null',
-        from: req.query.from,
-        to: req.query.to,
-        source: req.query.source,
-        bucket: req.query.bucket,
-        userId: req.user?.id,
-        role: req.user?.role,
-      });
-    }
-    if (!shopId) {
-      return res.json({
-        ok: true, range: { from: req.query.from || new Date().toISOString().slice(0, 10), to: req.query.to || new Date().toISOString().slice(0, 10) },
-        sales: { totalRevenue: 0, ordersCount: 0, avgOrderValue: 0, posRevenue: 0, onlineRevenueConfirmed: 0, onlineOrdersConfirmedCount: 0, statusBreakdown: { pending: 0, confirmed: 0, completed: 0, cancelled: 0 } },
-        profit: { available: false, profitNoteAr: 'أ™â€‍أکآ§ أ™إ أ™ث†أکآ¬أکآ¯ أ™â€¦أکآھأکآ¬أکآ± أ™â€¦أکآ­أکآ¯أکآ¯', profitNoteEn: 'No shop selected' },
-        charts: { dailyRevenue: [], dailyProfit: undefined },
-        topProducts: [],
-      });
-    }
-    const from = String(req.query.from || '').trim() || new Date().toISOString().slice(0, 10);
-    const to = String(req.query.to || '').trim() || from;
-    const source = String(req.query.source || 'all').toLowerCase();
-    const bucket = String(req.query.bucket || 'day').toLowerCase();
-    const dateExprS = bucket === 'month' ? "DATE_FORMAT(s.created_at, '%Y-%m-01')" : bucket === 'week' ? "DATE(DATE_SUB(s.created_at, INTERVAL WEEKDAY(s.created_at) DAY))" : 'DATE(s.created_at)';
-    const dateExprO = bucket === 'month' ? "DATE_FORMAT(o.created_at, '%Y-%m-01')" : bucket === 'week' ? "DATE(DATE_SUB(o.created_at, INTERVAL WEEKDAY(o.created_at) DAY))" : 'DATE(o.created_at)';
-    const posShopFilter = shopId ? ' AND s.shop_id = ?' : '';
-    const posBranchFilter = branchIds?.length ? ` AND s.branch_id IN (${branchIds.map(() => '?').join(',')})` : '';
+       WHERE (p.is_deleted = 0 OR p.is_deleted IS NULL) AND p.shop_id = ?${whereExtra}`حدث خطأ. حاول مرة أخرى.`SELECT id FROM notifications WHERE shop_id = ? AND source = 'system' AND type = 'dead_stock_alert'حدث خطأ. حاول مرة أخرى.'system', 'dead_stock_alert', ?, ?, ?, ?, 0, ?)`حدث خطأ. حاول مرة أخرى.` AND s.branch_id IN (${branchIds.map(() => '?').join(',')})` : '';
     const onlineShopFilter = shopId ? ' AND o.shop_id = ?' : '';
     const onlineBranchFilter = branchIds?.length ? ` AND o.branch_id IN (${branchIds.map(() => '?').join(',')})` : '';
     const baseP = shopId ? [from, to, shopId] : [from, to];
@@ -7121,54 +6125,7 @@ app.get('/api/admin/reports/summary', authenticateToken, requireRole('super_admi
        FROM online_order_items oi JOIN online_orders o ON o.id = oi.order_id AND o.status IN ('confirmed','completed')
        JOIN products p ON p.id = oi.product_id
        WHERE DATE(o.created_at) BETWEEN ? AND ?${onlineShopFilter}${onlineBranchFilter}
-       GROUP BY oi.product_id ORDER BY revenue DESC LIMIT 20`,
-      p
-    );
-    const topMap = new Map<number, { productId: number; name: string; sku: string; qty: number; revenue: number; source: string }>();
-    for (const r of topPos as any[]) {
-      topMap.set(r.productId, { productId: r.productId, name: r.name, sku: r.sku, qty: Number(r.qty), revenue: Number(r.revenue), source: 'pos' });
-    }
-    for (const r of topOnline as any[]) {
-      const existing = topMap.get(r.productId);
-      if (existing) { existing.qty += Number(r.qty); existing.revenue += Number(r.revenue); existing.source = 'mixed'; }
-      else topMap.set(r.productId, { productId: r.productId, name: r.name, sku: r.sku, qty: Number(r.qty), revenue: Number(r.revenue), source: 'online' });
-    }
-    const topProducts = Array.from(topMap.values()).sort((a, b) => b.revenue - a.revenue).slice(0, 20);
-
-    res.json({
-      ok: true, range: { from, to },
-      sales: {
-        totalRevenue, ordersCount: totalCount, avgOrderValue: totalCount ? totalRevenue / totalCount : 0,
-        posRevenue, onlineRevenueConfirmed: onlineRevenue, onlineOrdersConfirmedCount: onlineCount,
-        statusBreakdown,
-      },
-      profit: {
-        available: profitAvailable,
-        totalProfit: profitAvailable ? dailyProfit.reduce((s, d) => s + d.profit, 0) : undefined,
-        profitNoteAr: isBranchManager ? 'ظ…ط¯ظٹط± ط§ظ„ظپط±ط¹ ظ„ط§ ظٹظ…ظƒظ†ظ‡ ط±ط¤ظٹط© ط§ظ„ط£ط±ط¨ط§ط­' : profitAvailable ? undefined : 'ط§ظ„ط£ط±ط¨ط§ط­ ط؛ظٹط± ظ…طھظˆظپط±ط© â€” طھط£ظƒط¯ ظ…ظ† ظˆط¬ظˆط¯ ط³ط¹ط± ط§ظ„ط´ط±ط§ط، ظ„ظ„ظ…ظ†طھط¬ط§طھ',
-        profitNoteEn: isBranchManager ? 'Branch Manager cannot view profits' : profitAvailable ? undefined : 'Gross profit unavailable â€” ensure buy_price is set for products',
-      },
-      charts: { dailyRevenue, dailyProfit: profitAvailable ? dailyProfit : undefined },
-      topProducts,
-    });
-  } catch (error: any) {
-    if (process.env.NODE_ENV !== 'production') console.error('[reports] summary SQL error:', (error as any)?.message);
-    res.status(500).json({ ok: false, error: String((error as any)?.message || 'Server error') });
-  }
-});
-
-app.get('/api/admin/reports/dead-stock', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
-  try {
-    const shopId = await resolveShopIdSafe(req);
-    if (!shopId) return res.json({ ok: true, days: 120, threshold: 2, summary: { deadCount: 0, slowCount: 0, deadValue: 0, slowValue: 0, buckets: {} }, items: [] });
-    const days = clampIntSlow(req.query.days, 7, 365, 120);
-    const threshold = clampIntSlow(req.query.threshold, 0, 20, 2);
-    const posShopFilter = ' AND s.shop_id = ?';
-    const onlineShopFilter = ' AND o.shop_id = ?';
-    const [summaryRes, listRes] = await Promise.all([
-      pool.execute('SELECT 1'), // trigger summary logic inline
-      pool.execute(
-        `SELECT p.id, p.name_en, p.name_ar, p.sku, p.stock_quantity, p.sell_price, p.buy_price,
+       GROUP BY oi.product_id ORDER BY revenue DESC LIMIT 20`حدث خطأ. حاول مرة أخرى.`SELECT p.id, p.name_en, p.name_ar, p.sku, p.stock_quantity, p.sell_price, p.buy_price,
           COALESCE(ps.sold, 0) + COALESCE(os.sold, 0) AS sold,
           GREATEST(ps.last_sold, os.last_sold) AS lastSold
          FROM products p
@@ -7237,7 +6194,7 @@ app.get('/api/shop/public', async (req: Request, res: Response) => {
       shopId: shop.id,
       shopName: shop.business_name || shop.name,
       businessType: shop.activity_type || 'default',
-      currencySymbol: shop.currency_symbol || 'أکآ¬.أ™â€¦',
+      currencySymbol: shop.currency_symbol || 'ج.م',
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -7262,36 +6219,7 @@ app.get('/api/products/public', async (req: Request, res: Response) => {
        FROM products p
        LEFT JOIN categories c ON p.category_id = c.id
        WHERE p.shop_id = ? AND (p.is_deleted = 0 OR p.is_deleted IS NULL)
-       ORDER BY p.created_at DESC`,
-      [shopId]
-    );
-    res.json(products);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Normalize payment method to stable codes (avoid DB truncation)
-function normalizePaymentMethod(value: unknown): string {
-  const s = String(value || '').toLowerCase();
-  if (s.includes('cod') || s.includes('أکآ§أکآ³أکآھأ™â€‍أکآ§أ™â€¦') || s.includes('cash') || s.includes('أ™â€ أ™â€ڑأکآ¯')) return 'COD';
-  if (s.includes('transfer') || s.includes('أکآھأکآ­أ™ث†أ™إ أ™â€‍') || s.includes('bank')) return 'TRANSFER';
-  if (s.includes('card') || s.includes('أکآ¨أکآ·أکآ§أ™â€ڑأکآ©') || s.includes('credit')) return 'CARD';
-  return 'COD';
-}
-
-function generatePublicCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let s = '';
-  for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
-  return s;
-}
-
-const RESERVATION_TIMEOUT_MINUTES = 30;
-
-async function getAvailableStock(conn: any, shopId: number, productId: number): Promise<number> {
-  const [rows] = await conn.execute(
-    `SELECT COALESCE(p.stock_quantity, 0) - COALESCE((
+       ORDER BY p.created_at DESC`حدث خطأ. حاول مرة أخرى.`SELECT COALESCE(p.stock_quantity, 0) - COALESCE((
       SELECT SUM(r.qty) FROM stock_reservations r
       WHERE r.product_id = ? AND r.shop_id = ? AND r.status = 'reserved'
     ), 0) AS available
@@ -7353,148 +6281,13 @@ async function expireOldReservations(shopId?: number): Promise<number> {
       params.push(shopId);
     }
     const [orders] = await conn.execute(
-      `SELECT o.id, o.shop_id FROM online_orders o WHERE ${where}`,
-      params
-    );
-    let expired = 0;
-    for (const o of orders as any[]) {
-      await conn.beginTransaction();
-      try {
-        await conn.execute('UPDATE online_orders SET status = ? WHERE id = ? AND shop_id = ?', ['cancelled', o.id, o.shop_id]);
-        await releaseReservation(conn, o.shop_id, o.id);
-        await conn.commit();
-        expired++;
-      } catch (e) {
-        await conn.rollback();
-      }
-    }
-    return expired;
-  } finally {
-    conn.release();
-  }
-}
-
-// ========== STOREFRONT ORDERS (Public) ==========
-app.post('/api/storefront/orders', async (req: Request, res: Response) => {
-  try {
-    const {
-      shopId: rawShopId,
-      domain,
-      customerName,
-      phone,
-      governorate,
-      city,
-      address,
-      detailedAddress,
-      notes,
-      paymentMethod,
-      items,
-    } = req.body;
-
-    const addr = address || detailedAddress;
-    let shopId = Number(rawShopId || 0);
-    if (!Number.isFinite(shopId) || shopId <= 0) {
-      const dom = String(domain || '').trim().toLowerCase();
-      if (dom) {
-        const [rows] = await pool.execute(
-          'SELECT shop_id FROM domains WHERE domain = ? AND is_active = 1 AND status = ? LIMIT 1',
-          [dom, 'active']
-        );
-        const row = (rows as any[])[0];
-        shopId = row ? Number(row.shop_id) : 0;
-      }
-    }
-    if (!Number.isFinite(shopId) || shopId <= 0) {
-      return res.status(400).json({ error: 'shopId or domain is required', ar: 'أ™â€¦أکآ¹أکآ±أ™آپ أکآ§أ™â€‍أ™â€¦أکآھأکآ¬أکآ± أکآ£أ™ث† أکآ§أ™â€‍أکآ¯أ™ث†أ™â€¦أ™إ أ™â€  أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨' });
-    }
-    if (!customerName || String(customerName).trim().length === 0) {
-      return res.status(400).json({ error: 'Customer name is required', ar: 'أکآ§أ™â€‍أکآ§أکآ³أ™â€¦ أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨' });
-    }
-    const phoneStr = String(phone || '').trim();
-    if (!phoneStr || !/^[\d\s\-\+\(\)]{8,20}$/.test(phoneStr)) {
-      return res.status(400).json({ error: 'Valid phone is required', ar: 'أکآ±أ™â€ڑأ™â€¦ أ™â€،أکآ§أکآھأ™آپ أکآµأکآ­أ™إ أکآ­ أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨' });
-    }
-    if (!governorate || String(governorate).trim().length === 0) {
-      return res.status(400).json({ error: 'Governorate is required', ar: 'أکآ§أ™â€‍أ™â€¦أکآ­أکآ§أ™آپأکآ¸أکآ© أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨أکآ©' });
-    }
-    if (!city || String(city).trim().length === 0) {
-      return res.status(400).json({ error: 'City is required', ar: 'أکآ§أ™â€‍أ™â€¦أکآ¯أ™إ أ™â€ أکآ© أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨أکآ©' });
-    }
-    if (!addr || String(addr).trim().length === 0) {
-      return res.status(400).json({ error: 'Address is required', ar: 'أکآ§أ™â€‍أکآ¹أ™â€ أ™ث†أکآ§أ™â€  أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨' });
-    }
-    if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: 'Cart items required', ar: 'أکآ§أ™â€‍أکآ³أ™â€‍أکآ© أ™آپأکآ§أکآ±أکآ؛أکآ©' });
-    }
-
-    const conn = await pool.getConnection();
-    try {
-      await expireOldReservations(shopId);
-      await conn.beginTransaction();
-      const [shopRows] = await conn.execute('SELECT id FROM shops WHERE id = ?', [shopId]);
-      if ((shopRows as any[]).length === 0) {
-        await conn.rollback();
-        return res.status(404).json({ error: 'Shop not found' });
-      }
-
-      let total = 0;
-      const orderItems: Array<{
-        productId: number;
-        nameSnapshot: string;
-        skuSnapshot: string | null;
-        barcodeSnapshot: string | null;
-        sellPriceSnapshot: number;
-        quantity: number;
-      }> = [];
-
-      for (const it of items) {
-        const productId = Number(it.productId || it.id || 0);
-        const quantity = Math.max(1, Math.floor(Number(it.quantity || 1)));
-        if (!Number.isFinite(productId) || productId <= 0 || quantity <= 0) continue;
-
-        const [prods] = await conn.execute(
-          'SELECT id, name_en, name_ar, sku, barcode, sell_price, stock_quantity FROM products WHERE id = ? AND shop_id = ?',
-          [productId, shopId]
-        );
-        const prod = (prods as any[])[0];
-        if (!prod) continue;
-        const price = Number(prod.sell_price || 0);
-        if (!Number.isFinite(price) || price < 0) continue;
-
-        orderItems.push({
-          productId,
-          nameSnapshot: (it.nameSnapshot || prod.name_ar || prod.name_en || 'Product').substring(0, 255),
-          skuSnapshot: prod.sku ? String(prod.sku).substring(0, 128) : null,
-          barcodeSnapshot: prod.barcode ? String(prod.barcode).substring(0, 128) : null,
-          sellPriceSnapshot: price,
-          quantity,
-        });
-        total += price * quantity;
-      }
-
-      if (orderItems.length === 0) {
-        await conn.rollback();
-        return res.status(400).json({ error: 'No valid items', ar: 'أ™â€‍أکآ§ أکآھأ™ث†أکآ¬أکآ¯ أ™â€¦أ™â€ أکآھأکآ¬أکآ§أکآھ أکآµأکآ§أ™â€‍أکآ­أکآ©' });
-      }
-
-      for (const it of orderItems) {
-        const available = await getAvailableStock(conn, shopId, it.productId);
-        if (available < it.quantity) {
-          await conn.rollback();
-          const titleAr = 'أ™â€¦أکآ­أکآ§أ™ث†أ™â€‍أکآ© أکآ·أ™â€‍أکآ¨ أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€  أ™آپأکآ´أ™â€‍أکآھ أکآ¨أکآ³أکآ¨أکآ¨ أ™â€ أ™آپأکآ§أکآ¯ أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™ث†أ™â€ ';
-          const titleEn = 'Online order failed due to insufficient stock';
-          const bodyAr = `أکآ§أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬ أکآ؛أ™إ أکآ± أ™â€¦أکآھأ™ث†أ™آپأکآ± أکآ¨أکآ§أ™â€‍أ™ئ’أ™â€¦أ™إ أکآ© أکآ§أ™â€‍أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨أکآ©`;
-          const bodyEn = `Product not available in requested quantity`;
-          try {
-            await pool.execute(
-              `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
-               VALUES (?, 'system', 'system_stock_insufficient', ?, ?, ?, ?, 0, ?)`,
+      `SELECT o.id, o.shop_id FROM online_orders o WHERE ${where}`حدث خطأ. حاول مرة أخرى.`,
               [shopId, titleAr, titleEn, bodyAr, bodyEn, JSON.stringify({ productId: it.productId, requested: it.quantity, available })]
             );
           } catch (_) {}
           return res.status(400).json({
             error: 'Insufficient stock. Product not available in requested quantity.',
-            ar: 'أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™ث†أ™â€  أکآ؛أ™إ أکآ± أ™ئ’أکآ§أ™آپأ™آچ. أکآ§أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬ أکآ؛أ™إ أکآ± أ™â€¦أکآھأ™ث†أ™آپأکآ± أکآ¨أکآ§أ™â€‍أ™ئ’أ™â€¦أ™إ أکآ© أکآ§أ™â€‍أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨أکآ©.',
+            ar: 'حدث خطأ. حاول مرة أخرى.',
           });
         }
       }
@@ -7510,41 +6303,7 @@ app.post('/api/storefront/orders', async (req: Request, res: Response) => {
       }
       const [ordResult] = await conn.execute(
         `INSERT INTO online_orders (shop_id, status, order_status, customer_name, phone, governorate, city, address, notes, payment_method, subtotal, total, currency, source, public_code)
-         VALUES (?, 'pending', 'NEW', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'EGP', 'online', ?)`,
-        [
-          shopId,
-          String(customerName).trim(),
-          phoneStr,
-          String(governorate).trim(),
-          String(city).trim(),
-          String(addr).trim(),
-          notes ? String(notes).trim() : null,
-          paymentMethodCode,
-          total,
-          total,
-          publicCode,
-        ]
-      );
-      const orderId = (ordResult as any).insertId;
-
-      for (const it of orderItems) {
-        await conn.execute(
-          `INSERT INTO online_order_items (order_id, product_id, name_snapshot, sku_snapshot, barcode_snapshot, sell_price_snapshot, quantity)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [orderId, it.productId, it.nameSnapshot, it.skuSnapshot, it.barcodeSnapshot, it.sellPriceSnapshot, it.quantity]
-        );
-      }
-
-      await reserveStockForOrder(conn, shopId, orderId, orderItems.map((it) => ({ productId: it.productId, quantity: it.quantity })));
-
-      const itemsCount = orderItems.length;
-      const titleAr = `أکآ·أ™â€‍أکآ¨ أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€  أکآ¬أکآ¯أ™إ أکآ¯ (#${orderId})`;
-      const titleEn = `New online order (#${orderId})`;
-      const bodyAr = `أکآھأ™â€¦ أکآ¥أ™â€ أکآ´أکآ§أکآ، أکآ·أ™â€‍أکآ¨ أکآ¬أکآ¯أ™إ أکآ¯ أکآ¨أ™â€ڑأ™إ أ™â€¦أکآ© ${total.toFixed(2)} أکآ¬أ™â€ أ™إ أ™â€، â€” ${itemsCount} أ™â€¦أ™â€ أکآھأکآ¬`;
-      const bodyEn = `A new order was placed. Total: ${total.toFixed(2)} EGP â€” ${itemsCount} items`;
-      await conn.execute(
-        `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
-         VALUES (?, 'online', 'online_order_created', ?, ?, ?, ?, 0, ?)`,
+         VALUES (?, 'pending', 'NEW', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'EGP', 'online'حدث خطأ. حاول مرة أخرى.'online', 'online_order_created', ?, ?, ?, ?, 0, ?)`,
         [shopId, titleAr, titleEn, bodyAr, bodyEn, JSON.stringify({ orderId, total, itemsCount, publicCode })]
       );
       if (process.env.NODE_ENV !== 'production') console.log('[notifications] INSERT online_order_created shopId=', shopId, 'orderId=', orderId);
@@ -7574,7 +6333,7 @@ app.post('/api/storefront/orders', async (req: Request, res: Response) => {
         total,
         trackingUrl,
         message: 'Order created',
-        ar: 'أکآھأ™â€¦ أکآھأکآ³أکآ¬أ™إ أ™â€‍ أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨',
+        ar: 'حدث خطأ. حاول مرة أخرى.',
       });
     } catch (e) {
       await conn.rollback();
@@ -7593,10 +6352,10 @@ app.get('/api/storefront/orders/track', async (req: Request, res: Response) => {
     const code = String(req.query.code || '').trim().toUpperCase();
     const phone = String(req.query.phone || '').trim().replace(/\D/g, '');
     if (!code || code.length < 4) {
-      return res.status(400).json({ ok: false, error: 'Tracking code required', ar: 'أ™ئ’أ™ث†أکآ¯ أکآ§أ™â€‍أکآھأکآھأکآ¨أکآ¹ أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨' });
+      return res.status(400).json({ ok: false, error: 'Tracking code required', ar: 'حدث خطأ. حاول مرة أخرى.' });
     }
     if (!phone || phone.length < 8) {
-      return res.status(400).json({ ok: false, error: 'Phone required', ar: 'أکآ±أ™â€ڑأ™â€¦ أکآ§أ™â€‍أ™â€،أکآ§أکآھأ™آپ أ™â€¦أکآ·أ™â€‍أ™ث†أکآ¨' });
+      return res.status(400).json({ ok: false, error: 'Phone required', ar: 'حدث خطأ. حاول مرة أخرى.' });
     }
     const phoneNorm = phone.replace(/\D/g, '');
     const [orders] = await pool.execute(
@@ -7611,7 +6370,7 @@ app.get('/api/storefront/orders/track', async (req: Request, res: Response) => {
     );
     const order = (orders as any[])[0];
     if (!order) {
-      return res.status(404).json({ ok: false, error: 'Order not found', ar: 'أ™â€‍أ™â€¦ أ™إ أکآھأ™â€¦ أکآ§أ™â€‍أکآ¹أکآ«أ™ث†أکآ± أکآ¹أ™â€‍أ™â€° أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨' });
+      return res.status(404).json({ ok: false, error: 'Order not found', ar: 'حدث خطأ. حاول مرة أخرى.' });
     }
     const [items] = await pool.execute(
       'SELECT * FROM online_order_items WHERE order_id = ?',
@@ -7737,8 +6496,7 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requireRole('super_
             const [prods] = await conn.execute('SELECT name_en, name_ar FROM products WHERE id = ? AND shop_id = ?', [it.product_id, shopId]);
             const p = (prods as any[])[0];
             await conn.rollback();
-            const msg = `Insufficient stock for ${p?.name_en || p?.name_ar || 'product'}`;
-            const msgAr = `أکآ§أ™â€‍أ™â€¦أکآ®أکآ²أ™ث†أ™â€  أکآ؛أ™إ أکآ± أ™ئ’أکآ§أ™آپأ™آچ أ™â€‍أ™â‚¬ ${p?.name_ar || p?.name_en || 'أکآ§أ™â€‍أ™â€¦أ™â€ أکآھأکآ¬'}`;
+            const msg = `حدث خطأ. حاول مرة أخرى.`;
             return res.status(400).json({ error: msg, ar: msgAr });
           }
         }
@@ -7768,70 +6526,7 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requireRole('super_
 
         await conn.execute(
           'UPDATE online_orders SET status = ?, order_status = ? WHERE id = ? AND shop_id = ?',
-          ['confirmed', 'PROCESSING', orderId, shopId]
-        );
-
-        const publicCode = order.public_code || String(orderId);
-        const total = Number(order.total || 0);
-        const itemsCount = (items as any[]).length;
-        const titleAr = `أکآھأ™â€¦ أکآھأکآ£أ™ئ’أ™إ أکآ¯ أکآ·أ™â€‍أکآ¨ أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€  (#${orderId})`;
-        const titleEn = `Online order confirmed (#${orderId})`;
-        const bodyAr = `أکآھأ™â€¦ أکآھأکآ£أ™ئ’أ™إ أکآ¯ أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨ أکآ¨أ™â€ڑأ™إ أ™â€¦أکآ© ${total.toFixed(2)} أکآ¬أ™â€ أ™إ أ™â€،`;
-        const bodyEn = `Order confirmed. Total: ${total.toFixed(2)} EGP`;
-        await conn.execute(
-          `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
-           VALUES (?, 'online', 'online_order_confirmed', ?, ?, ?, ?, 0, ?)`,
-          [shopId, titleAr, titleEn, bodyAr, bodyEn, JSON.stringify({ orderId, publicCode, total, itemsCount })]
-        );
-
-        await conn.commit();
-        return res.json({ status: 'confirmed', invoiceId, invoiceNumber: nextNum, message: 'Order confirmed and invoice created', ar: 'أکآھأ™â€¦ أکآھأکآ£أ™ئ’أ™إ أکآ¯ أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨ أ™ث†أکآ¥أ™â€ أکآ´أکآ§أکآ، أکآ§أ™â€‍أ™آپأکآ§أکآھأ™ث†أکآ±أکآ©' });
-      } catch (e) {
-        await conn.rollback();
-        throw e;
-      } finally {
-        conn.release();
-      }
-    }
-
-    if (status === 'cancelled') {
-      const conn = await pool.getConnection();
-      try {
-        await conn.beginTransaction();
-        const [ordRow] = await conn.execute('SELECT id, total, public_code FROM online_orders WHERE id = ? AND shop_id = ?', [orderId, shopId]);
-        const ord = (ordRow as any[])[0];
-        if (!ord) {
-          await conn.rollback();
-          return res.status(404).json({ error: 'Order not found' });
-        }
-        await releaseReservation(conn, shopId, orderId);
-        await conn.execute('UPDATE online_orders SET status = ?, order_status = ? WHERE id = ? AND shop_id = ?', ['cancelled', 'CANCELLED', orderId, shopId]);
-        await conn.commit();
-      } finally {
-        conn.release();
-      }
-      return res.json({ status: 'cancelled', message: 'Order cancelled', ar: 'أکآھأ™â€¦ أکآ¥أ™â€‍أکآ؛أکآ§أکآ، أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨' });
-    }
-
-    if (status === 'completed') {
-      const [ordRow] = await pool.execute('SELECT id, total, public_code FROM online_orders WHERE id = ? AND shop_id = ?', [orderId, shopId]);
-      const ord = (ordRow as any[])[0];
-      if (!ord) return res.status(404).json({ error: 'Order not found' });
-      const [existingInv] = await pool.execute('SELECT id FROM online_invoices WHERE order_id = ? AND shop_id = ?', [orderId, shopId]);
-      if ((existingInv as any[]).length === 0) {
-        return res.status(400).json({
-          error: 'Cannot complete: invoice not created. Confirm the order first.',
-          ar: 'أ™â€‍أکآ§ أ™إ أ™â€¦أ™ئ’أ™â€  أکآ¥أ™ئ’أ™â€¦أکآ§أ™â€‍ أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨: أکآ§أ™â€‍أ™آپأکآ§أکآھأ™ث†أکآ±أکآ© أکآ؛أ™إ أکآ± أ™â€¦أ™ث†أکآ¬أ™ث†أکآ¯أکآ©. أ™â€ڑأ™â€¦ أکآ¨أکآھأکآ£أ™ئ’أ™إ أکآ¯ أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨ أکآ£أ™ث†أ™â€‍أکآ§أ™â€¹.',
-        });
-      }
-      const total = Number(ord.total || 0);
-      const titleAr = `أکآھأ™â€¦ أکآ¥أ™ئ’أ™â€¦أکآ§أ™â€‍ أکآ·أ™â€‍أکآ¨ أکآ£أ™ث†أ™â€ أ™â€‍أکآ§أ™إ أ™â€  (#${orderId})`;
-      const titleEn = `Online order completed (#${orderId})`;
-      const bodyAr = `أکآھأ™â€¦ أکآ¥أ™ئ’أ™â€¦أکآ§أ™â€‍ أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨ أکآ¨أ™â€ڑأ™إ أ™â€¦أکآ© ${total.toFixed(2)} أکآ¬أ™â€ أ™إ أ™â€،`;
-      const bodyEn = `Order completed. Total: ${total.toFixed(2)} EGP`;
-      await pool.execute(
-        `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
-         VALUES (?, 'online', 'online_order_completed', ?, ?, ?, ?, 0, ?)`,
+          ['confirmed', 'PROCESSING'حدث خطأ. حاول مرة أخرى.'online', 'online_order_confirmed', ?, ?, ?, ?, 0, ?)`حدث خطأ. حاول مرة أخرى.`,
         [shopId, titleAr, titleEn, bodyAr, bodyEn, JSON.stringify({ orderId, invoiceId: (existingInv as any[])[0]?.id, total })]
       );
     }
@@ -7845,51 +6540,10 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requireRole('super_
       [status, orderStatus, orderId, shopId]
     );
     if ((result as any).affectedRows === 0) {
-      return res.status(404).json({ error: 'Order not found' });
-    }
-    const titleAr = `أکآھأکآ­أکآ¯أ™إ أکآ« أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨ #${orderId}: ${status}`;
-    const titleEn = `Order #${orderId} status: ${status}`;
-    // Update payment_status when confirming order
-    if (status === 'confirmed') {
+      return res.status(404).json({ error: 'Order not found'حدث خطأ. حاول مرة أخرى.'confirmed') {
       try {
         await pool.execute('UPDATE payments SET status = ? WHERE order_id = ? AND shop_id = ?', ['confirmed', orderId, shopId]);
-        await pool.execute('UPDATE online_orders SET payment_status = ? WHERE id = ? AND shop_id = ?', ['confirmed', orderId, shopId]);
-      } catch (_) {}
-    }
-    const bodyAr = `أکآھأ™â€¦ أکآھأکآ؛أ™إ أ™إ أکآ± أکآ­أکآ§أ™â€‍أکآ© أکآ§أ™â€‍أکآ·أ™â€‍أکآ¨ أکآ¥أ™â€‍أ™â€° ${status}`;
-    const bodyEn = `Order status changed to ${status}`;
-    await pool.execute(
-      `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
-       VALUES (?, 'online', 'online_order_status_changed', ?, ?, ?, ?, 0, ?)`,
-      [shopId, titleAr, titleEn, bodyAr, bodyEn, JSON.stringify({ orderId, fromStatus, toStatus: status })]
-    );
-    res.json({ status, message: 'Updated' });
-  } catch (error: any) {
-    res.status(500).json({ ok: false, error: String((error as any)?.message || 'Server error') });
-  }
-});
-
-// ========== PAYMENTS / ORDERS (Owner, Branch Manager, Multi-Branch Manager - NO Cashier, Warehouse) ==========
-const canAccessPaymentsOrders = (req: any) =>
-  ['super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'].includes(req.user?.role);
-
-app.get('/api/admin/payments-orders/orders', authenticateToken, async (req: any, res: Response) => {
-  try {
-    if (!canAccessPaymentsOrders(req)) return res.status(403).json({ error: 'Forbidden', ar: 'أکآ؛أ™إ أکآ± أ™â€¦أکآµأکآ±أکآ­' });
-    let shopId = resolveShopId(req);
-    if (!shopId && req.user?.role === 'super_admin') {
-      const [shops] = await pool.execute('SELECT id FROM shops ORDER BY id ASC LIMIT 1');
-      shopId = (shops as any[])[0]?.id ?? null;
-    }
-    if (!shopId) return res.status(400).json({ error: 'shopId is required' });
-    const branchIds = await getBranchManagerBranchIds(req);
-    const status = String(req.query.status || '').trim();
-    const paymentStatus = String(req.query.paymentStatus || '').trim();
-    const branchId = resolveBranchId(req);
-    const search = String(req.query.search || '').trim();
-    const dateFrom = String(req.query.dateFrom || req.query.from || '').trim();
-    const dateTo = String(req.query.dateTo || req.query.to || '').trim();
-    let query = `
+        await pool.execute('UPDATE online_orders SET payment_status = ? WHERE id = ? AND shop_id = ?', ['confirmed'حدث خطأ. حاول مرة أخرى.'online', 'online_order_status_changed', ?, ?, ?, ?, 0, ?)`حدث خطأ. حاول مرة أخرى.`
       SELECT o.*, b.name as branch_name, b.name_ar as branch_name_ar, b.name_en as branch_name_en
       FROM online_orders o
       LEFT JOIN branches b ON b.id = o.branch_id
@@ -7913,49 +6567,7 @@ app.get('/api/admin/payments-orders/orders', authenticateToken, async (req: any,
       params.push(paymentStatus, paymentStatus, 'pending');
     }
     if (search) {
-      const like = `%${search}%`;
-      const num = parseInt(search, 10);
-      if (Number.isFinite(num) && num > 0) {
-        query += ' AND (o.id = ? OR o.customer_name LIKE ? OR o.phone LIKE ?)';
-        params.push(num, like, like);
-      } else {
-        query += ' AND (o.customer_name LIKE ? OR o.phone LIKE ?)';
-        params.push(like, like);
-      }
-    }
-    if (dateFrom) {
-      query += ' AND DATE(o.created_at) >= ?';
-      params.push(dateFrom);
-    }
-    if (dateTo) {
-      query += ' AND DATE(o.created_at) <= ?';
-      params.push(dateTo);
-    }
-    query += ' ORDER BY o.created_at DESC LIMIT 300';
-    const [rows] = await pool.execute(query, params);
-    res.json(rows || []);
-  } catch (error: any) {
-    res.status(500).json({ error: String(error?.message || 'Server error') });
-  }
-});
-
-app.get('/api/admin/payments-orders/payments', authenticateToken, async (req: any, res: Response) => {
-  try {
-    if (!canAccessPaymentsOrders(req)) return res.status(403).json({ error: 'Forbidden', ar: 'أکآ؛أ™إ أکآ± أ™â€¦أکآµأکآ±أکآ­' });
-    let shopId = resolveShopId(req);
-    if (!shopId && req.user?.role === 'super_admin') {
-      const [shops] = await pool.execute('SELECT id FROM shops ORDER BY id ASC LIMIT 1');
-      shopId = (shops as any[])[0]?.id ?? null;
-    }
-    if (!shopId) return res.status(400).json({ error: 'shopId is required' });
-    const branchIds = await getBranchManagerBranchIds(req);
-    const status = String(req.query.status || '').trim();
-    const method = String(req.query.method || '').trim();
-    const branchId = resolveBranchId(req);
-    const search = String(req.query.search || '').trim();
-    const dateFrom = String(req.query.dateFrom || req.query.from || '').trim();
-    const dateTo = String(req.query.dateTo || req.query.to || '').trim();
-    let query = `
+      const like = `%${search}%`حدث خطأ. حاول مرة أخرى.`
       SELECT p.*, o.customer_name, o.phone, o.public_code, b.name as branch_name, b.name_ar as branch_name_ar, b.name_en as branch_name_en
       FROM payments p
       LEFT JOIN online_orders o ON o.id = p.order_id
@@ -7988,139 +6600,12 @@ app.get('/api/admin/payments-orders/payments', authenticateToken, async (req: an
       params.push(dateTo);
     }
     if (search) {
-      const like = `%${search}%`;
-      const num = parseInt(search, 10);
-      if (Number.isFinite(num) && num > 0) {
-        query += ' AND (p.order_id = ? OR p.reference LIKE ? OR o.phone LIKE ?)';
-        params.push(num, like, like);
-      } else {
-        query += ' AND (p.reference LIKE ? OR o.phone LIKE ?)';
-        params.push(like, like);
-      }
-    }
-    query += ' ORDER BY p.created_at DESC LIMIT 300';
-    const [rows] = await pool.execute(query, params);
-    res.json(rows || []);
-  } catch (error: any) {
-    res.status(500).json({ error: String(error?.message || 'Server error') });
-  }
-});
-
-app.post('/api/admin/payments/:id/confirm', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'), async (req: any, res: Response) => {
-  try {
-    const paymentId = parseInt(req.params.id, 10);
-    if (!Number.isFinite(paymentId)) return res.status(400).json({ error: 'Invalid payment id' });
-    let shopId = resolveShopId(req);
-    if (!shopId && req.user?.role === 'super_admin') {
-      const [shops] = await pool.execute('SELECT id FROM shops ORDER BY id ASC LIMIT 1');
-      shopId = (shops as any[])[0]?.id ?? null;
-    }
-    if (!shopId) return res.status(400).json({ error: 'shopId is required' });
-    const [rows] = await pool.execute('SELECT id, order_id FROM payments WHERE id = ? AND shop_id = ?', [paymentId, shopId]);
-    const pay = (rows as any[])[0];
-    if (!pay) return res.status(404).json({ error: 'Payment not found' });
-    await pool.execute('UPDATE payments SET status = ? WHERE id = ? AND shop_id = ?', ['confirmed', paymentId, shopId]);
-    await pool.execute('UPDATE online_orders SET payment_status = ?, status = ?, order_status = ? WHERE id = ? AND shop_id = ?', ['confirmed', 'confirmed', 'PROCESSING', pay.order_id, shopId]);
-    res.json({ success: true, message: 'Payment confirmed', ar: 'أکآھأ™â€¦ أکآھأکآ£أ™ئ’أ™إ أکآ¯ أکآ§أ™â€‍أکآ¯أ™آپأکآ¹' });
-  } catch (error: any) {
-    res.status(500).json({ error: String(error?.message || 'Server error') });
-  }
-});
-
-app.post('/api/admin/payments/:id/reject', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'), async (req: any, res: Response) => {
-  try {
-    const paymentId = parseInt(req.params.id, 10);
-    if (!Number.isFinite(paymentId)) return res.status(400).json({ error: 'Invalid payment id' });
-    const shopId = resolveShopId(req);
-    if (!shopId) return res.status(400).json({ error: 'shopId is required' });
-    const { reason, rejectReason } = req.body || {};
-    const [rows] = await pool.execute('SELECT id, order_id FROM payments WHERE id = ? AND shop_id = ?', [paymentId, shopId]);
-    const pay = (rows as any[])[0];
-    if (!pay) return res.status(404).json({ error: 'Payment not found' });
-    await pool.execute('UPDATE payments SET status = ?, reject_reason = ? WHERE id = ? AND shop_id = ?', ['rejected', reason || rejectReason || null, paymentId, shopId]);
-    await pool.execute('UPDATE online_orders SET payment_status = ? WHERE id = ? AND shop_id = ?', ['rejected', pay.order_id, shopId]);
-    res.json({ success: true, message: 'Payment rejected', ar: 'أکآھأ™â€¦ أکآ±أ™آپأکآ¶ أکآ§أ™â€‍أکآ¯أ™آپأکآ¹' });
-  } catch (error: any) {
-    res.status(500).json({ error: String(error?.message || 'Server error') });
-  }
-});
-
-// ========== CROSS-BRANCH INVENTORY AVAILABILITY (Read-only) ==========
-app.get('/api/admin/inventory/availability', authenticateToken, requireRole('super_admin', 'shop_owner', 'cashier', 'branch_manager', 'multi_branch_manager', 'warehouse'), async (req: any, res: Response) => {
-  try {
-    const productId = parseInt(req.query.productId as string, 10);
-    if (!Number.isFinite(productId) || productId <= 0) return res.status(400).json({ error: 'productId is required' });
-    let shopId = resolveShopId(req);
-    if (!shopId && req.user?.role === 'super_admin') {
-      const [sh] = await pool.execute('SELECT id FROM shops ORDER BY id ASC LIMIT 1');
-      shopId = (sh as any[])[0]?.id ?? null;
-    }
-    if (!shopId) return res.status(400).json({ error: 'shopId is required' });
-    const [shopRows] = await pool.execute('SELECT package FROM shops WHERE id = ?', [shopId]);
-    const plan = String(((shopRows as any[])[0]?.package || 'bronze')).toLowerCase();
-    const planConfig = getPlanFeatures(plan);
-    const hasBranches = !!(planConfig as any).branches;
-    if (!hasBranches) {
-      return res.status(403).json({
-        error: 'FORBIDDEN',
-        message_ar: 'أ™â€¦أ™إ أکآ²أکآ© أکآ§أ™â€‍أ™آپأکآ±أ™ث†أکآ¹ أکآ؛أ™إ أکآ± أ™â€¦أکآھأ™ث†أ™آپأکآ±أکآ© أ™آپأ™إ  أکآ¨أکآ§أ™â€ڑأکآھأ™ئ’ أکآ§أ™â€‍أکآ­أکآ§أ™â€‍أ™إ أکآ©',
-        message_en: 'Branches feature is not available in your current plan',
-      });
-    }
-    const branchIds = await getBranchManagerBranchIds(req);
-    const params: any[] = [productId, shopId, shopId];
-    const branchFilter = branchIds && branchIds.length > 0 ? ' AND b.id IN (' + branchIds.map(() => '?').join(',') + ')' : '';
-    if (branchIds && branchIds.length > 0) params.push(...branchIds);
-    const [safeRows] = await pool.execute(
-      `SELECT b.id, b.name, b.name_ar, b.name_en, b.code,
+      const like = `%${search}%`حدث خطأ. حاول مرة أخرى.`SELECT b.id, b.name, b.name_ar, b.name_en, b.code,
               COALESCE(bi.qty, 0) as qty
        FROM branches b
        LEFT JOIN branch_inventory bi ON bi.branch_id = b.id AND bi.product_id = ? AND bi.shop_id = ?
        WHERE b.shop_id = ? ${branchFilter}
-       ORDER BY COALESCE(bi.qty, 0) DESC`,
-      params
-    );
-    const list = (safeRows as any[]).map((r) => ({
-      branchId: r.id,
-      branchName: r.name,
-      branchNameAr: r.name_ar || r.name,
-      branchNameEn: r.name_en || r.name,
-      qty: Number(r.qty || 0),
-    }));
-    res.json({ productId, branches: list });
-  } catch (error: any) {
-    res.status(500).json({ error: String(error?.message || 'Server error') });
-  }
-});
-
-// Alias: GET /api/inventory/availability (same as /api/admin/inventory/availability)
-app.get('/api/inventory/availability', authenticateToken, requireRole('super_admin', 'shop_owner', 'cashier', 'branch_manager', 'multi_branch_manager', 'warehouse'), async (req: any, res: Response) => {
-  try {
-    const productId = parseInt(req.query.productId as string, 10);
-    if (!Number.isFinite(productId) || productId <= 0) return res.status(400).json({ error: 'productId is required' });
-    let shopId = resolveShopId(req);
-    if (!shopId && req.user?.role === 'super_admin') {
-      const [sh] = await pool.execute('SELECT id FROM shops ORDER BY id ASC LIMIT 1');
-      shopId = (sh as any[])[0]?.id ?? null;
-    }
-    if (!shopId) return res.status(400).json({ error: 'shopId is required' });
-    const [shopRows] = await pool.execute('SELECT package FROM shops WHERE id = ?', [shopId]);
-    const plan = String(((shopRows as any[])[0]?.package || 'bronze')).toLowerCase();
-    const planConfig = getPlanFeatures(plan);
-    const hasBranches = !!(planConfig as any).branches;
-    if (!hasBranches) {
-      return res.status(403).json({
-        error: 'FORBIDDEN',
-        message_ar: 'أ™â€¦أ™إ أکآ²أکآ© أکآ§أ™â€‍أ™آپأکآ±أ™ث†أکآ¹ أکآ؛أ™إ أکآ± أ™â€¦أکآھأ™ث†أ™آپأکآ±أکآ© أ™آپأ™إ  أکآ¨أکآ§أ™â€ڑأکآھأ™ئ’ أکآ§أ™â€‍أکآ­أکآ§أ™â€‍أ™إ أکآ©',
-        message_en: 'Branches feature is not available in your current plan',
-      });
-    }
-    const branchIds = await getBranchManagerBranchIds(req);
-    const params: any[] = [productId, shopId, shopId];
-    const branchFilter = branchIds && branchIds.length > 0 ? ' AND b.id IN (' + branchIds.map(() => '?').join(',') + ')' : '';
-    if (branchIds && branchIds.length > 0) params.push(...branchIds);
-    const [safeRows] = await pool.execute(
-      `SELECT b.id, b.name, b.name_ar, b.name_en, b.code,
+       ORDER BY COALESCE(bi.qty, 0) DESC`حدث خطأ. حاول مرة أخرى.`SELECT b.id, b.name, b.name_ar, b.name_en, b.code,
               COALESCE(bi.qty, 0) as qty
        FROM branches b
        LEFT JOIN branch_inventory bi ON bi.branch_id = b.id AND bi.product_id = ? AND bi.shop_id = ?
@@ -8561,7 +7046,7 @@ app.use((_req: Request, res: Response) => {
 const server = app.listen(PORT, '0.0.0.0', () => console.log('listening', PORT));
 
 server.on('error', (error) => {
-  console.error('أ¢آ‌إ’ Server error:', error);
+  console.error('ERROR: Server error:', error);
 });
 
 app.use((err: any, _req: Request, res: Response, _next: any) => {
@@ -8569,16 +7054,16 @@ app.use((err: any, _req: Request, res: Response, _next: any) => {
     return res.status(400).json({ error: 'Invalid JSON body' });
   }
 
-  console.error('أ¢آ‌إ’ Unhandled API error:', err?.message || err);
-  console.error('أ¢آ‌إ’ Unhandled API error stack:', err?.stack || '(no stack)');
+  console.error('ERROR: Unhandled API error:', err?.message || err);
+  console.error('ERROR: Unhandled API error stack:', err?.stack || '(no stack)');
 
   res.status(500).json({ error: 'Internal server error' });
 });
 
 process.on('unhandledRejection', (reason) => {
-  console.error('أ¢آ‌إ’ Unhandled rejection:', reason);
+  console.error('ERROR: Unhandled rejection:', reason);
 });
 
 process.on('uncaughtException', (error) => {
-  console.error('أ¢آ‌إ’ Uncaught exception:', error);
+  console.error('ERROR: Uncaught exception:', error);
 });

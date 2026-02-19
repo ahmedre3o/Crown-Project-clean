@@ -24,26 +24,28 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-            try {
-        setError('');
-        // If server asked for Shop ID, require it before retry
-        if (needsShopId && !shopId.trim()) {
-          setError('SHOP_ID_REQUIRED');
-          return;
-        }
-        await login(username, password, needsShopId ? shopId : undefined);
-      } catch (e: any) {
-        if (e?.code === 'SHOP_ID_REQUIRED') {
-          setNeedsShopId(true);
-          setError(e?.message_ar || e?.message_en || 'SHOP_ID_REQUIRED');
-          return;
-        }
-        setError(e?.message || 'Login failed');
+      setError(null);
+      // If server asked for Shop ID, require it before retry
+      if (needsShopId && !shopId.trim()) {
+        setError('SHOP_ID_REQUIRED');
         return;
       }
-
+      await login(username, password, needsShopId ? shopId : undefined);
       router.push('/dashboard');
     } catch (err: any) {
+      if (err?.code === 'SHOP_ID_REQUIRED') {
+        setNeedsShopId(true);
+        setError(err?.message_ar || err?.message_en || 'SHOP_ID_REQUIRED');
+        return;
+      }
+      const msg = err?.message || 'Login failed';
+      setError(msg);
+    }
+  }
+
+  // ---
+
+  try (err: any) {
       const msg = err?.message || 'Login failed';
       let friendly = msg;
       if (msg === 'Invalid credentials') {

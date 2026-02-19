@@ -120,18 +120,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshUser();
   }, []);
 
-  const login = async (username: string, password: string) => {
+  const login = async (username: string, password: string, shopId?: string) => {
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier: username, username, password }),
+      headers: {
+        'Content-Type': 'application/json',
+        ...(shopId ? { 'X-Shop-Id': String(shopId).trim() } : {}),
+      },
+      body: JSON.stringify({ identifier: username, password }),
     });
 
     const raw = await response.text();
     if (!response.ok) {
       try {
         const error = JSON.parse(raw);
+        if (error?.error === 'SHOP_ID_REQUIRED') {
+          const e: any = new Error(error?.message_en || error?.error || 'SHOP_ID_REQUIRED');
+          e.code = 'SHOP_ID_REQUIRED';
+          e.message_ar = error?.message_ar;
+          e.message_en = error?.message_en;
+          throw e;
+        }
+
         throw new Error(error.error || 'Login failed');
       } catch {
         throw new Error(raw || 'Login failed');

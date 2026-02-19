@@ -180,7 +180,17 @@ export const useAuth = () => {
   return context;
 };
 
-export const apiRequest = async (url: string, options: RequestInit = {}) => {
+export function getStoredToken() {
+  if (typeof window === "undefined") return null;
+  return (
+    window.localStorage.getItem("token") ||
+    window.localStorage.getItem("access_token") ||
+    window.sessionStorage.getItem("token") ||
+    window.sessionStorage.getItem("access_token")
+  );
+}
+
+const apiRequest = async (url: string, options: RequestInit = {}) => {
   const token = localStorage.getItem('token');
   const storedUser = localStorage.getItem('user');
   const userObj = storedUser ? JSON.parse(storedUser) : null;

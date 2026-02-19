@@ -128,7 +128,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         'Content-Type': 'application/json',
         ...(shopId ? { 'X-Shop-Id': String(shopId).trim() } : {}),
       },
-      body: JSON.stringify({ identifier: username, password }),
+      body: JSON.stringify({ username: username.trim(), password, identifier: username.trim() }),
     });
 
     const raw = await response.text();

@@ -1,0 +1,8 @@
+# ignore big / irrelevant
+node_modules
+**/node_modules
+dist
+**/*.log
+.env
+.env.*
+.DS_Store

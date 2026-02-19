@@ -12,6 +12,8 @@ export default function LoginPage() {
   const { login } = useAuth();
   const { language, setLanguage } = useLanguage();
   const [username, setUsername] = useState('');
+  const [shopId, setShopId] = useState('');
+  const [needsShopId, setNeedsShopId] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -22,7 +24,24 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await login(username, password);
+            try {
+        setError('');
+        // If server asked for Shop ID, require it before retry
+        if (needsShopId && !shopId.trim()) {
+          setError('SHOP_ID_REQUIRED');
+          return;
+        }
+        await login(username, password, needsShopId ? shopId : undefined);
+      } catch (e: any) {
+        if (e?.code === 'SHOP_ID_REQUIRED') {
+          setNeedsShopId(true);
+          setError(e?.message_ar || e?.message_en || 'SHOP_ID_REQUIRED');
+          return;
+        }
+        setError(e?.message || 'Login failed');
+        return;
+      }
+
       router.push('/dashboard');
     } catch (err: any) {
       const msg = err?.message || 'Login failed';
@@ -112,7 +131,21 @@ export default function LoginPage() {
                 type="password"
                 className="w-full rounded bg-[#0f172a] border border-cyan-500/20 px-3 py-2 text-sm focus:outline-none focus:border-cyan-400"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) =>
+      {needsShopId && (
+        <div className="mt-3">
+          <label className="block text-sm mb-1">Shop ID</label>
+          <input
+            name="shopId"
+            value={shopId}
+            onChange={(e) => setShopId(e.target.value)}
+            className="w-full border rounded p-2"
+            placeholder="مثال: 1"
+          />
+          <p className="text-xs opacity-70 mt-1">لو بتسجّل بـ Username/ID لموظف، ممكن تحتاج Shop ID لتحديد المحل.</p>
+        </div>
+      )}
+ setPassword(e.target.value)}
               />
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">

@@ -160,19 +160,22 @@ export default function RegisterPage() {
           />
         
       {needsShopId && (
-        <div className="mt-3">
-          <label className="block text-sm mb-1">Shop ID</label>
-          <input
-            name="shopId"
-            value={shopId}
-            onChange={(e) => setShopId(e.target.value)}
-            className="w-full rounded border px-3 py-2"
-            placeholder="مثال: 1"
-          />
-        </div>
-      )}
+            <>
+              <div className="text-xs text-slate-400 md:col-span-2">
+                لو بتسجّل بـ Username/ID لموظف، ممكن تحتاج Shop ID لتحديد المحل.
+              </div>
+              <input
+                type="text"
+                className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                placeholder="Shop ID (مثال: 1)"
+                value={shopId}
+                onChange={(e) => setShopId(e.target.value)}
+              />
+            </>
+          )}
+          </div>
 
-        <div className="flex items-center justify-between text-xs text-slate-400">
+          <div className="flex items-center justify-between text-xs text-slate-400">
           <Link href="/login" className="hover:text-cyan-300">
             {LABELS.already}
           </Link>

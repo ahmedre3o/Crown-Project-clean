@@ -21,7 +21,7 @@ interface AuthContextType {
   effectiveRole: string | null;
   /** Current role override (non-null only when user is super_admin and testing) */
   roleOverride: string | null;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string, shopId?: string) => Promise<void>;
   logout: () => void;
   hasRole: (roles: string[]) => boolean;
   hasPackage: (packages: string[]) => boolean;

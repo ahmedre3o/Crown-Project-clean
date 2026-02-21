@@ -98,10 +98,10 @@ gcloud run services update crown-api \
 | # | الخطوة | الأمر / الإجراء |
 |---|--------|------------------|
 | 1 | **Health** | `curl -s BASE_URL/api/health` → يتوقع `{"status":"ok"}` |
-| 2 | **Login** | `curl -s -X POST BASE_URL/api/auth/login -H "Content-Type: application/json" -d '{"identifier":"EMAIL","password":"PASS"}'` → يتوقع `token` و `user` |
+| 2 | **Login** | `curl -s -X POST BASE_URL/api/auth/login -H "Content-Type: application/json" -d '{"username":"EMAIL","password":"PASS"}'` → يتوقع `token` و `user` |
 | 3 | **Invite** | مع توكن owner: `curl -s -X POST BASE_URL/api/users/invite -H "Authorization: Bearer TOKEN" -H "Content-Type: application/json" -H "x-shop-id: SHOP_ID" -d '{"role":"cashier","email":"invited@test.com","expiresHours":24}'` → يتوقع `invite_code` و `expires_at` |
 | 4 | **Accept-invite** | `curl -s -X POST BASE_URL/api/auth/accept-invite -H "Content-Type: application/json" -d '{"shopId":SHOP_ID,"inviteCode":"CODE","password":"NewPass1!"}'` → يتوقع `token` و `user` |
-| 5 | **Login بالمستخدم المقبول** | استخدام التوكن أو تسجيل الدخول بـ identifier/كلمة المرور الجديدة ثم `GET /api/auth/me` للتأكد من الجلسة |
+| 5 | **Login بالمستخدم المقبول** | استخدام التوكن أو تسجيل الدخول بـ username/كلمة المرور الجديدة ثم `GET /api/auth/me` للتأكد من الجلسة |
 
 ---
 

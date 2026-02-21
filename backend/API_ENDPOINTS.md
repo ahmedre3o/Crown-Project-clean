@@ -31,11 +31,11 @@ curl -s -X POST http://localhost:8080/api/auth/signup \
 تسجيل الدخول. يقرأ `shopId` من: `body.shopId` أو `query.shopId` أو هيدر `x-shop-id`.
 
 **Body (JSON):**
-- `identifier` (مطلوب): بريد إلكتروني، أو رقم موظف (employee_id)، أو username
+- `username` (مطلوب): بريد إلكتروني، أو رقم موظف (employee_id)، أو username
 - `password` (مطلوب)
 
 **قواعد:**
-- إذا `identifier` ليس بريداً (لا يحتوي `@`) ولا يوجد `shopId` → **400** `SHOP_ID_REQUIRED` (رسائل عربي/إنجليزي).
+- إذا `username` ليس بريداً (لا يحتوي `@`) ولا يوجد `shopId` → **400** `SHOP_ID_REQUIRED` (رسائل عربي/إنجليزي).
 - إذا المستخدم غير موجود → **404** `USER_NOT_FOUND` (رسائل عربي/إنجليزي).
 - super_admin يجب أن يسجل دخوله بالبريد فقط → **401** `SUPER_ADMIN_EMAIL_ONLY` (رسائل عربي/إنجليزي).
 
@@ -44,12 +44,12 @@ curl -s -X POST http://localhost:8080/api/auth/signup \
 # تسجيل دخول بـ email
 curl -s -X POST http://localhost:8080/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"identifier":"owner@example.com","password":"SecurePass123!"}'
+  -d '{"username":"owner@example.com","password":"SecurePass123!"}'
 
 # تسجيل دخول بـ employee_id مع تحديد المتجر
 curl -s -X POST http://localhost:8080/api/auth/login \
   -H "Content-Type: application/json" -H "x-shop-id: 1" \
-  -d '{"identifier":"42","password":"Pass123!"}'
+  -d '{"username":"42","password":"Pass123!"}'
 ```
 
 **Response 200:** `{ "token", "user": { "id", "email", "username", "role", "package", "shopId" } }`
@@ -75,7 +75,7 @@ curl -s -X GET http://localhost:8080/api/auth/me \
 - `shopId` (مطلوب)
 - `inviteCode` (مطلوب)
 - `password` (مطلوب)
-- `identifier` (اختياري) – إن لم يُرسل يُستخدم email أو employee_id من الدعوة
+- `username` (اختياري) – إن لم يُرسل يُستخدم email أو employee_id من الدعوة
 
 ```bash
 curl -s -X POST http://localhost:8080/api/auth/accept-invite \
@@ -104,10 +104,10 @@ curl -s -X GET http://localhost:8080/api/users -H "x-shop-id: 1" \
 ---
 
 ### POST /api/users
-إنشاء مستخدم. يدعم `identifier` (email أو رقم employee_id أو username). يطبق CREATABLE_ROLES ويعيّن الفرع الافتراضي للكاشير/المخزن/مدير الفرع عند الإمكان.
+إنشاء مستخدم. الحقل الرئيسي هو `username` ويمكن أن يكون: email أو رقم employee_id أو username. يطبق CREATABLE_ROLES ويعيّن الفرع الافتراضي للكاشير/المخزن/مدير الفرع عند الإمكان.
 
 **Body (JSON):**
-- `identifier` أو `username` (مطلوب)
+- `username` (مطلوب)
 - `password` (مطلوب)
 - `role` (مطلوب)
 - `branchId` (اختياري)
@@ -115,7 +115,7 @@ curl -s -X GET http://localhost:8080/api/users -H "x-shop-id: 1" \
 ```bash
 curl -s -X POST http://localhost:8080/api/users \
   -H "Authorization: Bearer OWNER_TOKEN" -H "Content-Type: application/json" -H "x-shop-id: 1" \
-  -d '{"identifier":"99","password":"Pass123!","role":"cashier"}'
+  -d '{"username":"99","password":"Pass123!","role":"cashier"}'
 ```
 
 **Response 201:** `{ "id", "username", "email", "employee_id", "role" }`

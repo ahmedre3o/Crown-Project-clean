@@ -204,6 +204,9 @@ const authenticateToken = async (req: any, res: Response, next: any) => {
     }
 
     req.user = user;
+    // Ensure both snake and camel for consumers (JWT has shopId; DB has shop_id)
+    if (req.user.shop_id != null) (req.user as any).shopId = req.user.shop_id;
+    if (req.user.shopId != null && req.user.shop_id == null) req.user.shop_id = req.user.shopId;
     next();
   } catch (error) {
     return res.status(403).json({ error: 'Invalid or expired token' });
@@ -215,10 +218,41 @@ const resolveShopId = (req: any) => {
   const headerShopId = Array.isArray(headerShop) ? headerShop[0] : headerShop;
   const headerParsed = headerShopId ? Number(headerShopId) : null;
   if (req.user?.role === 'super_admin') {
-    return req.query.shopId || req.body?.shopId || headerParsed || null;
+    return req.query.shopId || req.body?.shopId || headerParsed || req.user?.shop_id || req.user?.shopId || null;
   }
   return req.user?.shop_id || req.user?.shopId || headerParsed || null;
 };
+
+/** Resolve shopId from query/body/header or JWT. If query shopId is provided and user is not super_admin, it must match token's shopId. */
+function getShopId(req: any): { shopId: number | null; forbidden?: boolean } {
+  const fromQuery = req.query?.shopId != null && req.query.shopId !== '' ? Number(req.query.shopId) : 0;
+  const fromBody = req.body?.shopId != null ? Number(req.body.shopId) : 0;
+  const headerShop = req.headers['x-shop-id'];
+  const fromHeader = headerShop ? Number(Array.isArray(headerShop) ? headerShop[0] : headerShop) : 0;
+  const fromRequest = (Number.isFinite(fromQuery) && fromQuery > 0 ? fromQuery : 0) || (Number.isFinite(fromBody) && fromBody > 0 ? fromBody : 0) || (Number.isFinite(fromHeader) && fromHeader > 0 ? fromHeader : 0) || 0;
+  const tokenShop = Number(req.user?.shop_id) || Number(req.user?.shopId) || 0;
+  if (fromRequest > 0) {
+    if (req.user?.role !== 'super_admin' && tokenShop > 0 && fromRequest !== tokenShop) {
+      return { shopId: null, forbidden: true };
+    }
+    return { shopId: fromRequest };
+  }
+  return { shopId: tokenShop > 0 ? tokenShop : null };
+}
+
+/** Resolve shopId and send 403/400 if forbidden or missing. Returns resolved shopId or null if response was sent. */
+function getShopIdOrFail(req: any, res: Response): number | null {
+  const r = getShopId(req);
+  if (r.forbidden) {
+    res.status(403).json({ error: 'shopId must match your shop' });
+    return null;
+  }
+  if (r.shopId == null) {
+    res.status(400).json({ error: 'shopId is required' });
+    return null;
+  }
+  return r.shopId;
+}
 
 // ========== DOMAIN RESOLUTION + VERIFICATION ==========
 const ALLOWED_DOMAIN_TLDS = new Set(['com', 'net', 'org', 'shop', 'store']);
@@ -367,10 +401,8 @@ app.post('/api/products/bulk-delete', authenticateToken, requireRole('super_admi
     if (!ids.length) {
       return res.status(400).json({ ok: false, error: 'Invalid product id(s)' });
     }
-    const shopId = req.user?.shopId ?? req.user?.shop_id ?? resolveShopId(req);
-    if (!shopId) {
-      return res.status(400).json({ ok: false, error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
     const placeholders = ids.map(() => '?').join(',');
     const [result] = await pool.execute(
       `UPDATE products SET is_deleted = 1 WHERE id IN (${placeholders}) AND shop_id = ?`,
@@ -790,9 +822,9 @@ const generateInvoiceNumber = async (shopId?: number) => {
   return `${prefix}${next}`;
 };
 
-const createSaleAndItems = async (req: any, paymentMethodOverride?: string) => {
+const createSaleAndItems = async (req: any, paymentMethodOverride?: string, shopIdOverride?: number) => {
   const { items, paymentMethod, customerName, customerPhone, customerAddress } = req.body;
-  const shopId = resolveShopId(req);
+  const shopId = shopIdOverride ?? getShopId(req).shopId ?? (resolveShopId(req) ? Number(resolveShopId(req)) : null);
   if (!shopId) {
     throw new Error('shopId is required');
   }
@@ -1177,12 +1209,8 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
     const ttsLang = getTtsLocaleForLang(detectedLang);
     console.log('📩 Chat message:', { detectedLang, preview: String(message).slice(0, 120) });
 
-    const resolvedShopId =
-      resolveShopId(req) || (req as any).user?.shop_id || (req as any).user?.shopId || 1;
-    const shopId = Number(resolvedShopId);
-    if (!Number.isFinite(shopId) || shopId <= 0) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
 
     const [inventoryRows] = await pool.execute(
       `
@@ -1439,15 +1467,10 @@ app.post('/api/ai/data-chat', authenticateToken, requirePackageFeature('ai'), as
       return res.status(400).json({ error: 'question is required' });
     }
 
-    const shopId = resolveShopId(req);
-    const params: any[] = [];
-    let whereClause = 'WHERE 1=1';
-    if (shopId) {
-      whereClause += ' AND s.shop_id = ?';
-      params.push(shopId);
-    } else if (req.user.role !== 'super_admin') {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const params: any[] = [shopId];
+    const whereClause = 'WHERE 1=1 AND s.shop_id = ?';
 
     const [stats] = await pool.execute(
       `
@@ -1466,12 +1489,11 @@ app.post('/api/ai/data-chat', authenticateToken, requirePackageFeature('ai'), as
       `
       SELECT p.name_en, p.name_ar, p.stock_quantity, p.min_stock_level
       FROM products p
-      WHERE p.stock_quantity <= p.min_stock_level
-      ${shopId ? 'AND p.shop_id = ?' : ''}
+      WHERE p.stock_quantity <= p.min_stock_level AND p.shop_id = ?
       ORDER BY p.stock_quantity ASC
       LIMIT 10
       `,
-      shopId ? [shopId] : []
+      [shopId]
     );
 
     const [inventorySummary] = await pool.execute(
@@ -1480,9 +1502,9 @@ app.post('/api/ai/data-chat', authenticateToken, requirePackageFeature('ai'), as
              COALESCE(SUM(p.stock_quantity), 0) as total_units,
              COALESCE(SUM(p.buy_price * p.stock_quantity), 0) as inventory_cost
       FROM products p
-      ${shopId ? 'WHERE p.shop_id = ?' : ''}
+      WHERE p.shop_id = ?
       `,
-      shopId ? [shopId] : []
+      [shopId]
     );
 
     const [recentSales] = await pool.execute(
@@ -1601,13 +1623,39 @@ app.post('/api/shops', authenticateToken, requireRole('super_admin'), async (req
   }
 });
 
+// Alias for frontend ShopSwitcher (expects /admin/shops)
+app.get('/api/admin/shops', authenticateToken, requireRole('super_admin'), async (req: Request, res: Response) => {
+  try {
+    const [shops] = await pool.execute(`
+      SELECT s.id, s.name, s.business_name, s.business_name_ar, s.business_name_en, s.domain
+      FROM shops s
+      ORDER BY s.id ASC
+    `);
+    res.json(shops);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Notifications unread count (frontend NotificationsBell). Returns 0 if notifications table missing.
+app.get('/api/notifications/unread-count', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const [rows] = await pool.execute(
+      'SELECT COUNT(*) as cnt FROM notifications WHERE user_id = ? AND (is_read = 0 OR is_read IS NULL)',
+      [req.user?.id ?? 0]
+    );
+    const cnt = (rows as any[])[0]?.cnt ?? 0;
+    return res.json({ count: Number(cnt) });
+  } catch {
+    return res.json({ count: 0 });
+  }
+});
+
 // ========== SHOP PROFILE ==========
 app.get('/api/shops/profile', authenticateToken, async (req: any, res: Response) => {
   try {
-    const shopId = resolveShopId(req);
-    if (!shopId) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
 
     const [shops] = await pool.execute('SELECT * FROM shops WHERE id = ?', [shopId]);
     const shopArray = shops as any[];
@@ -1635,10 +1683,8 @@ app.put('/api/shops/profile', authenticateToken, requireRole('super_admin', 'sho
       currencySymbol,
     } = req.body;
 
-    const shopId = resolveShopId(req);
-    if (!shopId) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
 
     await pool.execute(
       `UPDATE shops 
@@ -1670,10 +1716,8 @@ app.put('/api/shops/profile', authenticateToken, requireRole('super_admin', 'sho
 // ========== STORE DOMAINS (Store Admin - shop_owner) ==========
 app.post('/api/domains/add', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
   try {
-    const shopId = Number(resolveShopId(req) || 0);
-    if (!Number.isFinite(shopId) || shopId <= 0) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
 
     const domain = normalizeDomainInput(req.body?.domain);
     validateDomainOrThrow(domain);
@@ -1718,10 +1762,8 @@ app.post('/api/domains/add', authenticateToken, requireRole('super_admin', 'shop
 
 app.post('/api/domains/verify', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
   try {
-    const shopId = Number(resolveShopId(req) || 0);
-    if (!Number.isFinite(shopId) || shopId <= 0) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
 
     const domain = normalizeDomainInput(req.body?.domain);
     validateDomainOrThrow(domain);
@@ -1767,10 +1809,8 @@ app.post('/api/domains/verify', authenticateToken, requireRole('super_admin', 's
 
 app.post('/api/domains/activate', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
   try {
-    const shopId = Number(resolveShopId(req) || 0);
-    if (!Number.isFinite(shopId) || shopId <= 0) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
 
     const domain = normalizeDomainInput(req.body?.domain);
     validateDomainOrThrow(domain);
@@ -1819,10 +1859,8 @@ app.post('/api/domains/activate', authenticateToken, requireRole('super_admin', 
 
 app.post('/api/domains/deactivate', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
   try {
-    const shopId = Number(resolveShopId(req) || 0);
-    if (!Number.isFinite(shopId) || shopId <= 0) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
 
     const domain = normalizeDomainInput(req.body?.domain);
     validateDomainOrThrow(domain);
@@ -1851,10 +1889,8 @@ app.post('/api/domains/deactivate', authenticateToken, requireRole('super_admin'
 
 app.get('/api/domains', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
   try {
-    const shopId = Number(resolveShopId(req) || 0);
-    if (!Number.isFinite(shopId) || shopId <= 0) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
 
     const [rows] = await pool.execute(
       `SELECT id, domain, status, is_active, verification_method, verification_token,
@@ -1880,10 +1916,8 @@ app.get('/api/domains', authenticateToken, requireRole('super_admin', 'shop_owne
 // ========== USERS MANAGEMENT ==========
 app.get('/api/users', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
   try {
-    const shopId = resolveShopId(req);
-    if (!shopId) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
 
     const [users] = await pool.execute(
       'SELECT id, username, role, package, shop_id, created_at FROM users WHERE shop_id = ? ORDER BY created_at DESC',
@@ -2015,10 +2049,8 @@ app.post('/api/licenses/activate', authenticateToken, async (req: any, res: Resp
       return res.status(400).json({ error: 'Activation code required' });
     }
 
-    const shopId = resolveShopId(req);
-    if (!shopId) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
 
     const [licenses] = await pool.execute('SELECT * FROM licenses WHERE license_key = ? AND status = "unused"', [code]);
     const licenseArray = licenses as any[];
@@ -2060,10 +2092,8 @@ app.post('/api/activate', authenticateToken, async (req: any, res: Response) => 
       return res.status(400).json({ error: 'Activation code required' });
     }
 
-    const shopId = resolveShopId(req);
-    if (!shopId) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
 
     const [licenses] = await pool.execute('SELECT * FROM licenses WHERE license_key = ? AND status = "unused"', [code]);
     const licenseArray = licenses as any[];
@@ -2101,10 +2131,8 @@ app.post('/api/activate', authenticateToken, async (req: any, res: Response) => 
 // ========== PRODUCTS/INVENTORY ==========
 app.get('/api/products/lookup', authenticateToken, async (req: any, res: Response) => {
   try {
-    const shopId = Number(resolveShopId(req) || 0);
-    if (!Number.isFinite(shopId) || shopId <= 0) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
 
     const rawCode = Array.isArray(req.query.code) ? req.query.code[0] : req.query.code;
     const code = String(rawCode || '').trim();
@@ -2133,10 +2161,8 @@ app.get('/api/products/lookup', authenticateToken, async (req: any, res: Respons
 
 app.get('/api/products', authenticateToken, async (req: any, res: Response) => {
   try {
-    const shopId = Number(resolveShopId(req) || 0);
-    if (!Number.isFinite(shopId) || shopId <= 0) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
     
     let query = `
       SELECT p.*, c.name_en as category_name_en, c.name_ar as category_name_ar 
@@ -2174,10 +2200,8 @@ app.post('/api/products', authenticateToken, requireRole('super_admin', 'shop_ow
       barcode,
       qrCode,
     } = req.body;
-    const shopId = resolveShopId(req);
-    if (!shopId) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
 
     const limitCheck = await enforceProductLimit(shopId, 1);
     if (!limitCheck.allowed) {
@@ -2244,11 +2268,8 @@ app.put('/api/products/:id', authenticateToken, requireRole('super_admin', 'shop
     if (!productId) {
       return res.status(400).json({ error: 'Invalid product id' });
     }
-
-    const shopId = resolveShopId(req);
-    if (!shopId) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
 
     const {
       nameEn,
@@ -2319,10 +2340,8 @@ app.delete('/api/products/:id', authenticateToken, requireRole('super_admin', 's
     if (!productId) {
       return res.status(400).json({ error: 'Invalid product id' });
     }
-    const shopId = resolveShopId(req);
-    if (!shopId) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
     const [result] = await pool.execute(
       'UPDATE products SET is_deleted = 1 WHERE id = ? AND shop_id = ?',
       [productId, shopId]
@@ -2343,10 +2362,8 @@ const handleProductsImportUpload = async (
   opts?: { forceImportMode?: boolean }
 ) => {
   try {
-    const shopId = Number(resolveShopId(req) || 0);
-    if (!Number.isFinite(shopId) || shopId <= 0) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
 
     // Supports a PowerQuery-like flow:
     // - GET/POST ?mode=analyze : read headers + guess mapping + validate (no DB writes)
@@ -3045,10 +3062,8 @@ app.post(
     try {
       const body = req.body || {};
       const items = Array.isArray(body.items) ? body.items : [];
-      const shopId = resolveShopId(req);
-      if (!shopId) {
-        return res.status(400).json({ error: 'shopId is required' });
-      }
+      const shopId = getShopIdOrFail(req, res);
+      if (shopId === null) return;
 
       if (!Array.isArray(items) || items.length === 0) {
         return res.status(400).json({
@@ -3203,8 +3218,9 @@ app.post(
 
 app.get('/api/products/low-stock', authenticateToken, async (req: any, res: Response) => {
   try {
-    const shopId = resolveShopId(req);
-    
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+
     let query = `
       SELECT p.*, c.name_en as category_name_en, c.name_ar as category_name_ar 
       FROM products p 
@@ -3212,13 +3228,8 @@ app.get('/api/products/low-stock', authenticateToken, async (req: any, res: Resp
       WHERE p.stock_quantity <= p.min_stock_level
     `;
     const params: any[] = [];
-    
-    if (shopId) {
-      query += ' AND p.shop_id = ?';
-      params.push(shopId);
-    } else if (req.user.role !== 'super_admin') {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    query += ' AND p.shop_id = ?';
+    params.push(shopId);
     
     query += ' ORDER BY p.stock_quantity ASC';
     
@@ -3232,14 +3243,14 @@ app.get('/api/products/low-stock', authenticateToken, async (req: any, res: Resp
 // ========== CATEGORIES ==========
 app.get('/api/categories', authenticateToken, async (req: any, res: Response) => {
   try {
-    const shopId = Number(resolveShopId(req) || 0);
-    if (!shopId) {
-      if (req.user?.role === 'super_admin') {
-        const [categories] = await pool.execute('SELECT * FROM categories');
-        return res.json(categories);
-      }
-      return res.status(400).json({ error: 'shopId is required' });
+    const r = getShopId(req);
+    if (r.forbidden) return res.status(403).json({ error: 'shopId must match your shop' });
+    if (r.shopId == null && req.user?.role === 'super_admin') {
+      const [categories] = await pool.execute('SELECT * FROM categories');
+      return res.json(categories);
     }
+    if (r.shopId == null) return res.status(400).json({ error: 'shopId is required' });
+    const shopId = r.shopId;
 
     const [categories] = await pool.execute(
       'SELECT * FROM categories WHERE shop_id = ? OR shop_id IS NULL ORDER BY id ASC',
@@ -3259,7 +3270,9 @@ app.post(
   requireRole('super_admin', 'shop_owner', 'cashier'),
   async (req: any, res: Response) => {
   try {
-    const result = await createSaleAndItems(req);
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const result = await createSaleAndItems(req, undefined, shopId);
     res.status(201).json(result);
   } catch (error: any) {
     if (error?.message === 'shopId is required') {
@@ -3280,7 +3293,9 @@ app.post(
   requireRole('super_admin', 'shop_owner', 'cashier'),
   async (req: any, res: Response) => {
   try {
-    const result = await createSaleAndItems(req);
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const result = await createSaleAndItems(req, undefined, shopId);
     res.status(201).json(result);
   } catch (error: any) {
     if (error?.message === 'shopId is required') {
@@ -3296,8 +3311,10 @@ app.post(
 
 // Increment invoice print counter (sales row)
 const incrementInvoicePrintCount = async (req: any, saleId: number) => {
-  const shopId = Number(resolveShopId(req) || 0);
-  if (!Number.isFinite(shopId) || shopId <= 0) {
+  const r = getShopId(req);
+  if (r.forbidden) throw new Error('shopId must match your shop');
+  const shopId = r.shopId;
+  if (!shopId) {
     throw new Error('shopId is required');
   }
 
@@ -3357,6 +3374,9 @@ app.post('/api/invoices/:id/print', authenticateToken, requireRole('super_admin'
     const result = await incrementInvoicePrintCount(req, saleId);
     res.json(result);
   } catch (error: any) {
+    if (error?.message === 'shopId must match your shop') {
+      return res.status(403).json({ error: 'shopId must match your shop' });
+    }
     if (error?.message === 'shopId is required') {
       return res.status(400).json({ error: 'shopId is required' });
     }
@@ -3377,6 +3397,9 @@ app.post('/api/sales/:id/print', authenticateToken, requireRole('super_admin', '
     const result = await incrementInvoicePrintCount(req, saleId);
     res.json(result);
   } catch (error: any) {
+    if (error?.message === 'shopId must match your shop') {
+      return res.status(403).json({ error: 'shopId must match your shop' });
+    }
     if (error?.message === 'shopId is required') {
       return res.status(400).json({ error: 'shopId is required' });
     }
@@ -3389,7 +3412,8 @@ app.post('/api/sales/:id/print', authenticateToken, requireRole('super_admin', '
 
 app.get('/api/sales', authenticateToken, async (req: any, res: Response) => {
   try {
-    const shopId = Number(resolveShopId(req) || 0);
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
     const limitRaw = Number(req.query.limit);
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 500) : 50;
     
@@ -3402,10 +3426,6 @@ app.get('/api/sales', authenticateToken, async (req: any, res: Response) => {
       WHERE 1=1
     `;
     const params: any[] = [];
-    
-    if (!shopId) {
-      return res.json([]);
-    }
     query += ' AND s.shop_id = ?';
     params.push(shopId);
     
@@ -3422,9 +3442,8 @@ app.get('/api/sales', authenticateToken, async (req: any, res: Response) => {
 
 app.get('/api/invoices', authenticateToken, async (req: any, res: Response) => {
   try {
-    const fallbackShopId = Number(req.user?.shop_id || req.user?.shopId || 1);
-    const resolvedShopId = Number(resolveShopId(req) || fallbackShopId);
-    const shopId = Number.isFinite(resolvedShopId) && resolvedShopId > 0 ? resolvedShopId : 1;
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
 
     const limitRaw = Number(req.query.limit);
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 500) : 50;
@@ -3453,11 +3472,8 @@ app.get('/api/sales/:id/items', authenticateToken, async (req: any, res: Respons
     if (!saleId) {
       return res.status(400).json({ error: 'Invalid sale id' });
     }
-
-    const shopId = Number(resolveShopId(req) || 1);
-    if (!shopId) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
     const [sales] = await pool.execute('SELECT * FROM sales WHERE id = ? AND shop_id = ?', [saleId, shopId]);
     const saleArray = sales as any[];
     if (saleArray.length === 0) {
@@ -3480,10 +3496,8 @@ app.get('/api/sales/:id/items', authenticateToken, async (req: any, res: Respons
 // ========== VAULT (الخزنة) ==========
 app.get('/api/vault/summary', authenticateToken, requireRole('super_admin', 'shop_owner', 'cashier'), async (req: any, res: Response) => {
   try {
-    const shopId = resolveShopId(req);
-    if (!shopId) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
 
     const [rows] = await pool.execute(
       `
@@ -3509,10 +3523,8 @@ app.get('/api/vault/summary', authenticateToken, requireRole('super_admin', 'sho
 
 app.get('/api/vault/transactions', authenticateToken, requireRole('super_admin', 'shop_owner', 'cashier'), async (req: any, res: Response) => {
   try {
-    const shopId = resolveShopId(req);
-    if (!shopId) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
     const limit = Math.min(parseInt(req.query.limit as string, 10) || 100, 500);
 
     const [rows] = await pool.execute(
@@ -3534,10 +3546,8 @@ app.get('/api/vault/transactions', authenticateToken, requireRole('super_admin',
 
 app.post('/api/vault/transactions', authenticateToken, requireRole('super_admin', 'shop_owner', 'cashier'), async (req: any, res: Response) => {
   try {
-    const shopId = resolveShopId(req);
-    if (!shopId) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
 
     const { type, amount, reason, notes, relatedSaleId } = req.body;
     if (!['in', 'out'].includes(type)) {
@@ -3582,10 +3592,8 @@ app.post('/api/vault/transactions', authenticateToken, requireRole('super_admin'
 // ========== AUDIT LOGS (المراجع) ==========
 app.get('/api/audit-logs', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
   try {
-    const shopId = resolveShopId(req);
-    if (!shopId) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
     const limit = Math.min(parseInt(req.query.limit as string, 10) || 100, 500);
 
     const [rows] = await pool.execute(
@@ -3607,10 +3615,8 @@ app.get('/api/audit-logs', authenticateToken, requireRole('super_admin', 'shop_o
 
 app.post('/api/audit-logs', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
   try {
-    const shopId = resolveShopId(req);
-    if (!shopId) {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
 
     const { action, entityType, entityId, details } = req.body;
     if (!action || !entityType) {
@@ -3641,17 +3647,13 @@ app.post('/api/audit-logs', authenticateToken, requireRole('super_admin', 'shop_
 // ========== DASHBOARD STATISTICS ==========
 app.get('/api/dashboard/stats', authenticateToken, requirePackageFeature('dashboard'), async (req: any, res: Response) => {
   try {
-    const shopId = resolveShopId(req);
-    
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+
     let whereClause = 'WHERE 1=1';
     const params: any[] = [];
-    
-    if (shopId) {
-      whereClause += ' AND s.shop_id = ?';
-      params.push(shopId);
-    } else if (req.user.role !== 'super_admin') {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    whereClause += ' AND s.shop_id = ?';
+    params.push(shopId);
     
     // Monthly revenue
     const [revenue] = await pool.execute(`
@@ -3692,18 +3694,12 @@ app.get('/api/dashboard/stats', authenticateToken, requirePackageFeature('dashbo
 
 app.get('/api/dashboard/sales-chart', authenticateToken, requirePackageFeature('dashboard'), async (req: any, res: Response) => {
   try {
-    const shopId = resolveShopId(req);
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
     const days = parseInt(req.query.days as string) || 30;
     
-    let whereClause = '';
-    const params: any[] = [days];
-    
-    if (shopId) {
-      whereClause = 'AND s.shop_id = ?';
-      params.push(shopId);
-    } else if (req.user.role !== 'super_admin') {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    let whereClause = 'AND s.shop_id = ?';
+    const params: any[] = [days, shopId];
     
     const [chartData] = await pool.execute(`
       SELECT 
@@ -3725,18 +3721,12 @@ app.get('/api/dashboard/sales-chart', authenticateToken, requirePackageFeature('
 
 app.get('/api/dashboard/profit-chart', authenticateToken, requirePackageFeature('dashboard'), async (req: any, res: Response) => {
   try {
-    const shopId = resolveShopId(req);
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
     const days = parseInt(req.query.days as string) || 30;
     
-    let whereClause = '';
-    const params: any[] = [days];
-    
-    if (shopId) {
-      whereClause = 'AND s.shop_id = ?';
-      params.push(shopId);
-    } else if (req.user.role !== 'super_admin') {
-      return res.status(400).json({ error: 'shopId is required' });
-    }
+    let whereClause = 'AND s.shop_id = ?';
+    const params: any[] = [days, shopId];
     
     const [profitData] = await pool.execute(`
       SELECT 

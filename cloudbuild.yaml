@@ -1,61 +1,45 @@
-steps:
-  - name: gcr.io/k8s-skaffold/pack
-    entrypoint: pack
-    args:
-      - build
-      - $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
-      - --builder=gcr.io/buildpacks/builder:latest
-      - --network=cloudbuild
-      - --path=backend
-      - --env=NPM_CONFIG_PRODUCTION=false
-    id: Buildpack
-
-  - name: gcr.io/cloud-builders/docker
-    args:
-      - push
-      - $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
-    id: Push
-
-  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
-    entrypoint: gcloud
-    args:
-      - run
-      - services
-      - update
-      - $_SERVICE_NAME
-      - --platform=managed
-      - --image=$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
-      - --add-cloudsql-instances=$_CLOUDSQL_INSTANCE
-      - --env-vars-file=backend/cloudrun.env.yaml
-      - --set-secrets=DB_USER=$_SECRET_DB_USER,DB_PASSWORD=$_SECRET_DB_PASSWORD,JWT_SECRET=$_SECRET_JWT_SECRET,GEMINI_API_KEY=$_SECRET_GEMINI_API_KEY
-      - --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID
-      - --region=$_DEPLOY_REGION
-      - --quiet
-    id: Deploy
-
-images:
-  - $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
-
-options:
-  substitutionOption: ALLOW_LOOSE
-  logging: CLOUD_LOGGING_ONLY
+# Build Next.js frontend for crown-web with NEXT_PUBLIC_API_URL at build time.
+# Usage: gcloud builds submit --config=cloudbuild.yaml --substitutions=_NEXT_PUBLIC_API_URL=https://api.crowncs.org
 
 substitutions:
-  _SERVICE_NAME: crown-api
-  REPO_NAME: crown-project-clean
-  _DEPLOY_REGION: us-central1
-  _AR_HOSTNAME: us-central1-docker.pkg.dev
-  _TRIGGER_ID: 3dd34c3e-1908-4f4f-9841-0c4d66c212ea
-  _AR_REPOSITORY: cloud-run-source-deploy
-  _AR_PROJECT_ID: gen-lang-client-0711622878
-  _PLATFORM: managed
-  _CLOUDSQL_INSTANCE: gen-lang-client-0711622878:us-central1:crown-services-last-project-db
-  _SECRET_DB_USER: crown_db_user:latest
-  _SECRET_DB_PASSWORD: crown_db_password:latest
-  _SECRET_JWT_SECRET: jwt-secret:latest
-  _SECRET_GEMINI_API_KEY: gemini-api-key:latest
+  _REGION: us-central1
+  _PROJECT_ID: gen-lang-client-0711622878
+  _SERVICE: crown-web
+  _NEXT_PUBLIC_API_URL: https://api.crowncs.org
+  _IMAGE_TAG: latest
 
-tags:
-  - gcp-cloud-build-deploy-cloud-run
-  - gcp-cloud-build-deploy-cloud-run-managed
-  - crown-api
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build
+    args:
+      - 'build'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_API_URL=${_NEXT_PUBLIC_API_URL}'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${_PROJECT_ID}/cloud-run-source-deploy/${_SERVICE}:${_IMAGE_TAG}'
+      - '.'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/${_PROJECT_ID}/cloud-run-source-deploy/${_SERVICE}:${_IMAGE_TAG}'
+    waitFor: [build]
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: deploy
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - '${_SERVICE}'
+      - '--image=${_REGION}-docker.pkg.dev/${_PROJECT_ID}/cloud-run-source-deploy/${_SERVICE}:${_IMAGE_TAG}'
+      - '--region=${_REGION}'
+      - '--project=${_PROJECT_ID}'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+    waitFor: [push]
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'

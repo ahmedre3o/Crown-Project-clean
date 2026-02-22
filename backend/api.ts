@@ -1623,13 +1623,13 @@ app.post('/api/shops', authenticateToken, requireRole('super_admin'), async (req
   }
 });
 
-// Alias for frontend ShopSwitcher (expects /admin/shops)
+// Production compatibility: same data as /api/shops for frontend ShopSwitcher (expects /admin/shops)
 app.get('/api/admin/shops', authenticateToken, requireRole('super_admin'), async (req: Request, res: Response) => {
   try {
     const [shops] = await pool.execute(`
-      SELECT s.id, s.name, s.business_name, s.business_name_ar, s.business_name_en, s.domain
-      FROM shops s
-      ORDER BY s.id ASC
+      SELECT s.*, u.username as owner_name 
+      FROM shops s 
+      LEFT JOIN users u ON s.owner_id = u.id
     `);
     res.json(shops);
   } catch (error: any) {

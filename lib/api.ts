@@ -6,7 +6,7 @@
 const isProduction = process.env.NODE_ENV === "production";
 
 /** Fallback when NEXT_PUBLIC_API_URL is not set (e.g. build without env). Production Crown API on Cloud Run. */
-export const FALLBACK_API_URL = "https://crown-api-av27y5zkga-uc.a.run.app";
+export const FALLBACK_API_URL = "https://crown-api-756273570281.us-central1.run.app";
 
 if (isProduction && !process.env.NEXT_PUBLIC_API_URL) {
   // eslint-disable-next-line no-console

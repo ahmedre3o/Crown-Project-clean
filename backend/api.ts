@@ -1,4 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
+import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { Readable } from 'stream';
@@ -31,29 +32,34 @@ const app = express();
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Dynamic CORS handling based on process.env.CORS_ORIGIN (comma separated)
-const allowedOrigins = (process.env.CORS_ORIGIN || '')
+// CORS: allow only specific origins (required when using credentials: true — no wildcard).
+// Defaults: crowncs.org, www, localhost:3000. Add crown-web Cloud Run URL via CORS_ORIGIN or CORS_FRONTEND_URL.
+const defaultOrigins = [
+  'https://crowncs.org',
+  'https://www.crowncs.org',
+  'http://localhost:3000',
+];
+const fromEnv = (process.env.CORS_ORIGIN || '')
   .split(',')
-  .map((origin) => origin.trim())
+  .map((o: string) => o.trim())
   .filter(Boolean);
+const frontendUrl = (process.env.CORS_FRONTEND_URL || process.env.FRONTEND_URL || '').trim();
+const allowedOrigins = [...new Set([...defaultOrigins, ...fromEnv, frontendUrl].filter(Boolean))];
 
-app.use((req: Request, res: Response, next: NextFunction) => {
-  const origin = req.headers.origin as string | undefined;
+const corsOptions: cors.CorsOptions = {
+  origin(origin, callback) {
+    if (!origin) return callback(null, false);
+    if (allowedOrigins.includes(origin)) return callback(null, origin);
+    return callback(null, false);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 204,
+};
 
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Vary', 'Origin');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-  }
-
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(204);
-  }
-
-  next();
-});
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 app.get('/api/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok' });

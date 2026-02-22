@@ -5,7 +5,7 @@ substitutions:
   _REGION: us-central1
   _PROJECT_ID: gen-lang-client-0711622878
   _SERVICE: crown-web
-  _NEXT_PUBLIC_API_URL: https://crown-api-av27y5zkga-uc.a.run.app
+  _NEXT_PUBLIC_API_URL: https://crown-api-756273570281.us-central1.run.app
   _IMAGE_TAG: latest
 
 steps:

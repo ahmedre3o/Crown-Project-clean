@@ -65,3 +65,11 @@ backend/*.bak_before_*
 # backups
 *.bak
 *.bak2
+
+# local backups
+backend/*.bak.*
+cloud-sql-proxy
+
+# local backups
+backend/*.bak.*
+cloud-sql-proxy

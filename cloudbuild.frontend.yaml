@@ -1,33 +1,50 @@
-# Frontend build for crown-web (Artifact Registry). Branch: master.
-# NEXT_PUBLIC_API_URL baked into Next.js bundle at build time.
+# Build + Deploy Frontend (crown-web) with NEXT_PUBLIC_API_URL baked at build time.
+
+substitutions:
+  _PROJECT: ""
+  _REGION: ""
+  _SERVICE: ""
+  _NEXT_PUBLIC_API_URL: ""
+  _GIT_SHA: ""
+
 steps:
   - name: gcr.io/cloud-builders/docker
+    id: Build
     args:
       - build
-      - --build-arg=NEXT_PUBLIC_API_URL=https://api.crowncs.org/api
+      - --build-arg
+      - NEXT_PUBLIC_API_URL=${_NEXT_PUBLIC_API_URL}
       - -t
-      - $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/crown-web:$COMMIT_SHA
+      - ${_REGION}-docker.pkg.dev/${_PROJECT}/cloud-run-source-deploy/${_SERVICE}:${_GIT_SHA}
+      - -t
+      - ${_REGION}-docker.pkg.dev/${_PROJECT}/cloud-run-source-deploy/${_SERVICE}:latest
       - .
-    id: Build
 
   - name: gcr.io/cloud-builders/docker
+    id: Push
     args:
       - push
-      - $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/crown-web:$COMMIT_SHA
-    id: Push
+      - ${_REGION}-docker.pkg.dev/${_PROJECT}/cloud-run-source-deploy/${_SERVICE}:${_GIT_SHA}
+
+  - name: gcr.io/cloud-builders/docker
+    id: PushLatest
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/${_PROJECT}/cloud-run-source-deploy/${_SERVICE}:latest
 
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: Deploy
     entrypoint: gcloud
     args:
       - run
       - deploy
-      - crown-web
-      - --image=$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/crown-web:$COMMIT_SHA
-      - --region=us-central1
-      - --platform=managed
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/${_PROJECT}/cloud-run-source-deploy/${_SERVICE}:${_GIT_SHA}
+      - --project=${_PROJECT}
+      - --region=${_REGION}
       - --allow-unauthenticated
+      - --labels=git_sha=${_GIT_SHA},commit-sha=${_GIT_SHA},git_branch=master
       - --quiet
-    id: Deploy
 
 images:
-  - $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/crown-web:$COMMIT_SHA
+  - ${_REGION}-docker.pkg.dev/${_PROJECT}/cloud-run-source-deploy/${_SERVICE}:${_GIT_SHA}

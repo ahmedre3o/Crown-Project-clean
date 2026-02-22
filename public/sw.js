@@ -25,7 +25,7 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-  // Do NOT cache API: same-origin /api/* or any cross-origin (e.g. https://api.crowncs.org/api/*)
+  // Do NOT cache API: same-origin /api/* or cross-origin API (e.g. Crown API on Cloud Run)
   if (url.pathname.startsWith('/api/') || url.origin !== self.location.origin) return;
   if (event.request.method !== 'GET') return;
   event.respondWith(

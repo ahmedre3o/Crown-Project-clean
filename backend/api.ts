@@ -108,7 +108,7 @@ app.get('/api/setup-admin', async (_req: Request, res: Response) => {
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const JWT_SECRET = process.env.JWT_SECRET || 'crown-services-secret-key-2026';
-const PORT = parseInt(process.env.PORT || '5001', 10);
+const port = Number(process.env.PORT || 8080);
 
 console.log('AI API KEY:', GEMINI_API_KEY ? 'LOADED' : 'MISSING');
 const genAI = (() => {
@@ -4373,8 +4373,8 @@ app.get('/api/public/storefront/:shopId', async (req: Request, res: Response) =>
   }
 });
 
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+const server = app.listen(port, '0.0.0.0', () => {
+  console.log(`listening ${port}`);
 });
 
 server.on('error', (error) => {

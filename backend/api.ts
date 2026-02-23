@@ -54,7 +54,7 @@ const corsOptions: cors.CorsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Shop-Id', 'X-Requested-With', 'Accept'],
   optionsSuccessStatus: 204,
 };
 
@@ -987,13 +987,27 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
 
 app.post('/api/auth/login', async (req: Request, res: Response) => {
   try {
-    const { username, password } = req.body;
-    
-    if (!username || !password) {
+    const usernameInput = String(req.body?.username || '').trim();
+    const emailInput = String(req.body?.email || '').trim();
+    const password = req.body?.password;
+    const identifier = usernameInput || emailInput;
+
+    if (!identifier || !password) {
       return res.status(400).json({ error: 'Username and password required' });
     }
 
-    const [users] = await pool.execute('SELECT * FROM users WHERE username = ?', [username]);
+    let users: any[] = [];
+    try {
+      const [rows] = await pool.execute('SELECT * FROM users WHERE username = ? OR email = ?', [identifier, identifier]);
+      users = rows as any[];
+    } catch (err: any) {
+      if (err?.code === 'ER_BAD_FIELD_ERROR') {
+        const [rows] = await pool.execute('SELECT * FROM users WHERE username = ?', [identifier]);
+        users = rows as any[];
+      } else {
+        throw err;
+      }
+    }
     const userArray = users as any[];
     
     if (userArray.length === 0) {

@@ -50,7 +50,7 @@ export default function ManualEntryPage() {
   const loadProducts = async () => {
     try {
       const data = await apiRequest('/products');
-      setProducts(data);
+      setProducts(Array.isArray(data) ? data : []);
     } catch (err) {
       // ignore
     }
@@ -124,6 +124,20 @@ export default function ManualEntryPage() {
   };
 
   if (authLoading || !allowed) return null;
+
+  if (!user?.package) {
+    return (
+      <div className="min-h-screen bg-black text-white flex" dir={direction}>
+        <Sidebar />
+        <div className="flex-1 p-8 pt-20 md:pt-8 overflow-y-auto">
+          <h1 className="text-2xl font-bold text-cyan-200 mb-6">{t('manual.title')}</h1>
+          <div className="neon-card rounded-xl p-6 border border-amber-500/30">
+            <p className="text-amber-200">{language === 'ar' ? 'بيانات الباقة غير متوفرة. يرجى تسجيل الدخول مرة أخرى.' : 'Package data unavailable. Please log in again.'}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-white flex" dir={direction}>

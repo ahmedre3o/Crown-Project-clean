@@ -56,7 +56,8 @@ export default function NotificationsPage() {
       setNextOffset(res?.nextOffset ?? null);
       setUnreadCount(Number(res?.unreadCount ?? 0));
     } catch (err: any) {
-      setError(err?.message || (language === 'ar' ? 'فشل التحميل' : 'Failed to load'));
+      const msg = err?.message || '';
+      setError(msg === 'SHOP_ID_REQUIRED' ? (language === 'ar' ? 'لا توجد بيانات — اختر المتجر أولاً' : 'No data — shop not selected') : (msg || (language === 'ar' ? 'فشل التحميل' : 'Failed to load')));
     } finally {
       setLoading(false);
       setLoadingMore(false);

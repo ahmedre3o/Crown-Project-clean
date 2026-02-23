@@ -48,7 +48,7 @@ export default function UsersPage() {
     planName?: string;
   } | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [form, setForm] = useState({ identifier: '', password: '', role: 'cashier' as string, branchId: '' });
+  const [form, setForm] = useState({ username: '', password: '', role: 'cashier' as string, branchId: '' });
 
   const loadUsers = async () => {
     try {
@@ -71,7 +71,8 @@ export default function UsersPage() {
       });
       setBranches(Array.isArray(branchesData) ? branchesData : []);
     } catch (err: any) {
-      setError(err.message || 'Failed to load');
+      const msg = err?.message || '';
+      setError(msg === 'SHOP_ID_REQUIRED' ? (language === 'ar' ? 'لا توجد بيانات — اختر المتجر أولاً' : 'No data — shop not selected') : (msg || 'Failed to load'));
     } finally {
       setLoading(false);
     }
@@ -97,15 +98,16 @@ export default function UsersPage() {
       setError(language === 'ar' ? 'اختر المتجر أولاً' : 'Please select a shop first');
       return;
     }
-    const payload: Record<string, unknown> = { identifier: form.identifier.trim(), password: form.password, role: validRole };
+    const payload: Record<string, unknown> = { username: form.username.trim(), password: form.password, role: validRole };
     if (showBranchSelector && form.branchId) payload.branchId = Number(form.branchId);
+    if (isSuperAdmin && getActiveShopId()) payload.shopId = Number(getActiveShopId());
     setCreatingUser(true);
     try {
       await apiRequest('/users', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
-      setForm({ identifier: '', password: '', role: creatableRoles[0] || 'cashier', branchId: '' });
+      setForm({ username: '', password: '', role: creatableRoles[0] || 'cashier', branchId: '' });
       await loadUsers();
     } catch (err: any) {
       const msg = err?.message || '';
@@ -154,7 +156,7 @@ export default function UsersPage() {
     }
   };
 
-  const canAdd = subscription?.canAddUser !== false && !needsShop && !!form.identifier.trim() && !!form.password;
+  const canAdd = subscription?.canAddUser !== false && !needsShop && !!form.username.trim() && !!form.password;
   const planFeats = getPlanFeatures(user?.package);
   const role = (effectiveRole ?? user?.role) as string;
 
@@ -217,8 +219,8 @@ export default function UsersPage() {
           <input
             className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
             placeholder={language === 'ar' ? 'اسم المستخدم أو البريد أو رقم الموظف' : 'Username, Email, or Employee ID'}
-            value={form.identifier}
-            onChange={(e) => setForm((p) => ({ ...p, identifier: e.target.value }))}
+            value={form.username}
+            onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))}
           />
           <input
             type="password"

@@ -101,9 +101,10 @@ export default function InventoryPage() {
       setLoading(true);
       setError(null);
       const data = await apiRequest('/products');
-      setProducts(data);
+      setProducts(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      setError(err.message || 'Failed to load products');
+      const msg = err?.message || '';
+      setError(msg === 'SHOP_ID_REQUIRED' ? (language === 'ar' ? 'لا توجد بيانات — اختر المتجر أولاً' : 'No data — shop not selected') : (msg || 'Failed to load products'));
     } finally {
       setLoading(false);
     }

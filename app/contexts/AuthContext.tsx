@@ -143,6 +143,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(data.user);
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
+    // Persist activeShopId for API requests (use crown-active-shop-id for consistency with ShopSwitcher)
+    try {
+      const u = data?.user || JSON.parse(localStorage.getItem('user') || 'null');
+      const sid = Number(u?.shopId ?? u?.shop_id ?? NaN);
+      if (Number.isFinite(sid) && sid > 0) {
+        localStorage.setItem('activeShopId', String(sid));
+        localStorage.setItem('crown-active-shop-id', String(sid));
+      }
+    } catch {}
   };
 
   const logout = () => {
@@ -193,16 +202,34 @@ export const apiRequest = async (url: string, options: RequestInit = {}) => {
       ? localStorage.getItem(`crown-active-branch-${shopId}`)
       : null;
 
+  // Auto attach shopId header (unified: activeShopId, crown-active-shop-id)
+  let activeShopId: number | null = null;
+  try {
+    if (typeof window !== 'undefined') {
+      const user = JSON.parse(localStorage.getItem('user') || 'null');
+      const fromUser = Number(user?.shopId ?? user?.shop_id ?? NaN);
+      const fromStorage = Number(localStorage.getItem('activeShopId') ?? NaN);
+      const fromCrown = Number(localStorage.getItem('crown-active-shop-id') ?? NaN);
+      if (Number.isFinite(fromStorage) && fromStorage > 0) activeShopId = fromStorage;
+      else if (Number.isFinite(fromCrown) && fromCrown > 0) activeShopId = fromCrown;
+      else if (Number.isFinite(fromUser) && fromUser > 0) activeShopId = fromUser;
+    }
+  } catch {}
+
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...(branchId && { 'x-branch-id': String(branchId) }),
+    ...(options.headers || {}),
+  };
+  if (activeShopId && activeShopId > 0) {
+    (headers as any)['X-Shop-Id'] = String(activeShopId);
+  }
+
   const response = await fetch(`${API_BASE_URL}${url}`, {
     ...options,
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-      ...(shopId && { 'x-shop-id': String(shopId) }),
-      ...(branchId && { 'x-branch-id': String(branchId) }),
-      ...options.headers,
-    },
+    headers,
   });
 
   const raw = await response.text();
@@ -222,7 +249,10 @@ export const apiRequest = async (url: string, options: RequestInit = {}) => {
     let errorMessage = 'Request failed';
     try {
       const error = raw ? JSON.parse(raw) : {};
-      if (error.error === 'SHOP_ID_REQUIRED') {
+      const errStr = String(error?.error || error?.message || '').toLowerCase();
+      if (errStr.includes('shop') && (errStr.includes('required') || errStr.includes('shop_id'))) {
+        errorMessage = 'SHOP_ID_REQUIRED';
+      } else if (error.error === 'SHOP_ID_REQUIRED') {
         errorMessage = 'SHOP_ID_REQUIRED';
       } else {
         errorMessage = error.error || error.message || errorMessage;

@@ -126,7 +126,8 @@ function PaymentsPageContent() {
       const data = await apiRequest(`/admin/payments-orders/orders?${q.toString()}`);
       setOrders(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      setError(err.message || t('فشل تحميل الطلبات', 'Failed to load orders'));
+      const msg = err?.message || '';
+      setError(msg === 'SHOP_ID_REQUIRED' ? t('لا توجد بيانات — اختر المتجر أولاً', 'No data — shop not selected') : (msg || t('فشل تحميل الطلبات', 'Failed to load orders')));
     } finally {
       setLoading(false);
     }
@@ -146,7 +147,8 @@ function PaymentsPageContent() {
       const data = await apiRequest(`/admin/payments-orders/payments?${q.toString()}`);
       setPayments(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      setError(err.message || t('فشل تحميل المدفوعات', 'Failed to load payments'));
+      const msg = err?.message || '';
+      setError(msg === 'SHOP_ID_REQUIRED' ? t('لا توجد بيانات — اختر المتجر أولاً', 'No data — shop not selected') : (msg || t('فشل تحميل المدفوعات', 'Failed to load payments')));
     } finally {
       setLoading(false);
     }

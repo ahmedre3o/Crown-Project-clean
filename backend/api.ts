@@ -407,6 +407,17 @@ const resolveOrCreateShopForUser = async (user: any): Promise<number> => {
   }
 };
 
+/** Resolve shopId and send 400 if missing. Returns resolved shopId or null if response was sent. */
+function getShopIdOrFail(req: any, res: Response): number | null {
+  const shopId = resolveShopId(req) ?? (req.user?.shop_id ?? req.user?.shopId ?? null);
+  const num = shopId != null ? Number(shopId) : null;
+  if (num == null || !Number.isFinite(num) || num <= 0) {
+    res.status(400).json({ error: 'SHOP_ID_REQUIRED', message: 'Shop not selected. Please select a shop first.' });
+    return null;
+  }
+  return num;
+}
+
 /** For branch_manager: return assigned branch ids. For multi_branch_manager: null (all branches). Others: null. */
 const getBranchManagerBranchIds = async (req: any): Promise<number[] | null> => {
   if (req.user?.role !== 'branch_manager' || !req.user?.id) return null;
@@ -2811,6 +2822,528 @@ app.post('/api/shops', authenticateToken, requireRole('super_admin'), async (req
   }
 });
 
+// ========== ADMIN BRANCHES (X-Shop-Id or token shopId; 400 if missing) ==========
+app.get('/api/admin/branches', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'), async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const [rows] = await pool.execute(
+      'SELECT id, shop_id, name, name_ar, name_en, code, created_at FROM branches WHERE shop_id = ? ORDER BY id ASC',
+      [shopId]
+    );
+    res.json(rows || []);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/branches', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'), async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const name = String(req.body?.name || 'Branch').trim() || 'Branch';
+    const code = String(req.body?.code || 'branch').trim().toLowerCase().replace(/\s+/g, '_') || 'branch';
+    const [result] = await pool.execute(
+      'INSERT INTO branches (shop_id, name, name_ar, name_en, code) VALUES (?, ?, ?, ?, ?)',
+      [shopId, name, name, name, code]
+    );
+    const insertResult = result as any;
+    res.status(201).json({ id: insertResult.insertId, shop_id: shopId, name, code });
+  } catch (error: any) {
+    if (error?.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Branch code already exists' });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/branches/:id', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'), async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Invalid branch id' });
+    const [rows] = await pool.execute('SELECT id, shop_id, name, name_ar, name_en, code, created_at FROM branches WHERE id = ? AND shop_id = ?', [id, shopId]);
+    const list = rows as any[];
+    if (list.length === 0) return res.status(404).json({ error: 'Branch not found' });
+    res.json(list[0]);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/admin/branches/:id', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'), async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Invalid branch id' });
+    const name = String(req.body?.name || '').trim();
+    const code = String(req.body?.code || '').trim().toLowerCase().replace(/\s+/g, '_');
+    if (!name && !code) return res.status(400).json({ error: 'name or code required' });
+    const updates: string[] = [];
+    const params: any[] = [];
+    if (name) { updates.push('name = ?, name_ar = ?, name_en = ?'); params.push(name, name, name); }
+    if (code) { updates.push('code = ?'); params.push(code); }
+    params.push(id, shopId);
+    const [result] = await pool.execute(
+      `UPDATE branches SET ${updates.join(', ')} WHERE id = ? AND shop_id = ?`,
+      params
+    );
+    const affected = (result as any).affectedRows;
+    if (affected === 0) return res.status(404).json({ error: 'Branch not found' });
+    res.json({ ok: true });
+  } catch (error: any) {
+    if (error?.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Branch code already exists' });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/admin/branches/:id', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'), async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Invalid branch id' });
+    const [result] = await pool.execute('DELETE FROM branches WHERE id = ? AND shop_id = ?', [id, shopId]);
+    const affected = (result as any).affectedRows;
+    if (affected === 0) return res.status(404).json({ error: 'Branch not found' });
+    res.json({ ok: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== ADMIN STATS / PRODUCTS / INVENTORY (dashboard and store-admin) ==========
+app.get('/api/admin/stats', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const [revenue] = await pool.execute(
+      'SELECT COALESCE(SUM(total_amount), 0) as monthly_revenue FROM sales WHERE shop_id = ? AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())',
+      [shopId]
+    );
+    const [products] = await pool.execute('SELECT COUNT(*) as total_products FROM products WHERE shop_id = ? AND (is_deleted = 0 OR is_deleted IS NULL)', [shopId]);
+    const [lowStock] = await pool.execute('SELECT COUNT(*) as low_stock_count FROM products WHERE shop_id = ? AND (stock_quantity <= min_stock_level OR (min_stock_level IS NULL AND stock_quantity = 0))', [shopId]);
+    res.json({
+      monthlyRevenue: (revenue as any[])[0]?.monthly_revenue || 0,
+      totalProducts: (products as any[])[0]?.total_products || 0,
+      lowStockCount: (lowStock as any[])[0]?.low_stock_count || 0,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/products', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const [products] = await pool.execute(
+      `SELECT p.*, c.name_en as category_name_en, c.name_ar as category_name_ar FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.shop_id = ? AND (p.is_deleted = 0 OR p.is_deleted IS NULL) ORDER BY p.created_at DESC`,
+      [shopId]
+    );
+    res.json(products || []);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/inventory/low-stock', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const [products] = await pool.execute(
+      `SELECT p.*, c.name_en as category_name_en, c.name_ar as category_name_ar FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.shop_id = ? AND (p.stock_quantity <= p.min_stock_level OR (p.min_stock_level IS NULL AND p.stock_quantity = 0)) ORDER BY p.stock_quantity ASC`,
+      [shopId]
+    );
+    res.json(products || []);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/inventory/availability', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const productId = parseInt(req.query.productId as string, 10);
+    if (!productId) return res.status(400).json({ error: 'productId required' });
+    const [rows] = await pool.execute(
+      'SELECT COALESCE(SUM(qty), 0) as available FROM branch_inventory WHERE shop_id = ? AND product_id = ?',
+      [shopId, productId]
+    );
+    const total = (rows as any[])[0]?.available ?? 0;
+    const [product] = await pool.execute('SELECT stock_quantity FROM products WHERE id = ? AND shop_id = ?', [productId, shopId]);
+    const fallback = (product as any[])[0]?.stock_quantity ?? 0;
+    res.json({ available: Number(total) || Number(fallback), productId, shopId });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/inventory/slow-moving/summary', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const days = Math.min(365, Math.max(1, parseInt(req.query.days as string, 10) || 120));
+    const threshold = Math.min(100, Math.max(0, parseInt(req.query.threshold as string, 10) || 2));
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    const sinceStr = since.toISOString().slice(0, 10);
+    const [dead] = await pool.execute(
+      `SELECT COUNT(*) as c, COALESCE(SUM(p.sell_price * p.stock_quantity), 0) as v FROM products p
+       WHERE p.shop_id = ? AND (p.is_deleted = 0 OR p.is_deleted IS NULL)
+       AND NOT EXISTS (SELECT 1 FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE si.product_id = p.id AND s.created_at >= ?)`,
+      [shopId, sinceStr]
+    ).catch(() => [[{ c: 0, v: 0 }]]);
+    const [slow] = await pool.execute(
+      `SELECT COUNT(*) as c, COALESCE(SUM(p.sell_price * p.stock_quantity), 0) as v FROM products p
+       WHERE p.shop_id = ? AND (p.is_deleted = 0 OR p.is_deleted IS NULL)
+       AND EXISTS (SELECT 1 FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE si.product_id = p.id AND s.created_at >= ?)
+       AND (SELECT COALESCE(SUM(si.quantity), 0) FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE si.product_id = p.id AND s.created_at >= ?) <= ?`,
+      [shopId, sinceStr, sinceStr, threshold]
+    ).catch(() => [[{ c: 0, v: 0 }]]);
+    const deadRow = (dead as any[])[0] || {};
+    const slowRow = (slow as any[])[0] || {};
+    res.json({
+      ok: true,
+      deadCount: Number(deadRow.c ?? 0),
+      deadValue: Number(deadRow.v ?? 0),
+      slowCount: Number(slowRow.c ?? 0),
+      slowValue: Number(slowRow.v ?? 0),
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/inventory/slow-moving', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const days = Math.min(365, Math.max(1, parseInt(String(req.query.days || 120), 10) || 120));
+    const threshold = Math.min(100, Math.max(0, parseInt(String(req.query.threshold || 2), 10) || 2));
+    const limit = Math.min(500, Math.max(1, parseInt(String(req.query.limit || 100), 10) || 100));
+    const offset = Math.max(0, parseInt(String(req.query.offset || 0), 10) || 0);
+    const q = String(req.query.q || '').trim();
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    const sinceStr = since.toISOString().slice(0, 10);
+    const params: any[] = [sinceStr, sinceStr, shopId, sinceStr, threshold];
+    let sql = `
+      SELECT p.id, p.name_en as nameEn, p.name_ar as nameAr, p.sku, p.stock_quantity as stock, (p.sell_price * p.stock_quantity) as tiedValue,
+             (SELECT MAX(s.created_at) FROM sales s JOIN sale_items si ON si.sale_id = s.id WHERE si.product_id = p.id AND s.shop_id = p.shop_id AND s.created_at >= ?) as lastSoldAt,
+             (SELECT COALESCE(SUM(si.quantity), 0) FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE si.product_id = p.id AND s.created_at >= ?) as soldQtyWindow,
+             'Reduce stock' as recommendationEn, 'تقليل الكمية' as recommendationAr
+      FROM products p
+      WHERE p.shop_id = ? AND (p.is_deleted = 0 OR p.is_deleted IS NULL)
+      AND (SELECT COALESCE(SUM(si.quantity), 0) FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE si.product_id = p.id AND s.created_at >= ?) <= ?
+    `;
+    if (q) {
+      sql += ' AND (p.name_en LIKE ? OR p.name_ar LIKE ? OR p.sku LIKE ?)';
+      params.push(`%${q}%`, `%${q}%`, `%${q}%`);
+    }
+    sql += ' ORDER BY (p.sell_price * p.stock_quantity) DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+    const [rows] = await pool.execute(sql, params);
+    const items = rows || [];
+    if (Array.isArray(items) && items.length === 0) {
+      console.log('[slow-moving] Empty result', { shopId, days, threshold, q: q || null });
+    }
+    res.json({ items });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== ADMIN ANALYTICS (dashboard summary/timeseries) ==========
+app.get('/api/admin/analytics/summary', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const from = String(req.query.from || '').trim();
+    const to = String(req.query.to || '').trim();
+    const [pos] = await pool.execute(
+      'SELECT COALESCE(SUM(total_amount), 0) as amount, COUNT(*) as count FROM sales WHERE shop_id = ? AND source = ? AND created_at >= ? AND created_at <= ?',
+      [shopId, 'pos', from || '1970-01-01', to || '9999-12-31']
+    ).catch(() => [[{ amount: 0, count: 0 }]]);
+    const [online] = await pool.execute(
+      'SELECT COALESCE(SUM(total), 0) as amount, COUNT(*) as count FROM online_orders WHERE shop_id = ? AND created_at >= ? AND created_at <= ?',
+      [shopId, from || '1970-01-01', to || '9999-12-31']
+    ).catch(() => [[{ amount: 0, count: 0 }]]);
+    const posRow = (pos as any[])[0] || {};
+    const onlineRow = (online as any[])[0] || {};
+    res.json({
+      ok: true,
+      pos: { total: Number(posRow.amount ?? 0), count: Number(posRow.count ?? 0) },
+      online: { total: Number(onlineRow.amount ?? 0), count: Number(onlineRow.count ?? 0) },
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/analytics/timeseries', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const from = String(req.query.from || '').trim();
+    const to = String(req.query.to || '').trim();
+    const source = String(req.query.source || 'all').toLowerCase();
+    const bucket = String(req.query.bucket || 'day').toLowerCase();
+    if (source === 'online') {
+      const [rows] = await pool.execute(
+        `SELECT DATE(created_at) as date, COALESCE(SUM(total), 0) as onlineAmount, COUNT(*) as onlineCount FROM online_orders WHERE shop_id = ? AND created_at >= ? AND created_at <= ? GROUP BY DATE(created_at) ORDER BY date ASC`,
+        [shopId, from || '1970-01-01', to || '9999-12-31']
+      ).catch(() => [[]]);
+      res.json({ ok: true, points: (rows as any[]).map((r: any) => ({ date: r.date, onlineAmount: r.onlineAmount, onlineCount: r.onlineCount, totalAmount: r.onlineAmount, totalCount: r.onlineCount })) });
+      return;
+    }
+    if (source === 'pos') {
+      const [rows] = await pool.execute(
+        `SELECT DATE(created_at) as date, COALESCE(SUM(total_amount), 0) as posAmount, COUNT(*) as posCount FROM sales WHERE shop_id = ? AND (source = 'pos' OR source IS NULL) AND created_at >= ? AND created_at <= ? GROUP BY DATE(created_at) ORDER BY date ASC`,
+        [shopId, from || '1970-01-01', to || '9999-12-31']
+      ).catch(() => [[]]);
+      res.json({ ok: true, points: (rows as any[]).map((r: any) => ({ date: r.date, posAmount: r.posAmount, posCount: r.posCount, totalAmount: r.posAmount, totalCount: r.posCount })) });
+      return;
+    }
+    const [salesRows] = await pool.execute(
+      `SELECT DATE(created_at) as date, COALESCE(SUM(total_amount), 0) as posAmount, COUNT(*) as posCount FROM sales WHERE shop_id = ? AND created_at >= ? AND created_at <= ? GROUP BY DATE(created_at)`,
+      [shopId, from || '1970-01-01', to || '9999-12-31']
+    ).catch(() => [[]]);
+    const [onlineRows] = await pool.execute(
+      `SELECT DATE(created_at) as date, COALESCE(SUM(total), 0) as onlineAmount, COUNT(*) as onlineCount FROM online_orders WHERE shop_id = ? AND created_at >= ? AND created_at <= ? GROUP BY DATE(created_at)`,
+      [shopId, from || '1970-01-01', to || '9999-12-31']
+    ).catch(() => [[]]);
+    const points: Record<string, any> = {};
+    for (const r of salesRows as any[]) {
+      points[r.date] = { ...(points[r.date] || {}), date: r.date, posAmount: r.posAmount, posCount: r.posCount };
+    }
+    for (const r of onlineRows as any[]) {
+      const p = points[r.date] || { date: r.date };
+      p.onlineAmount = r.onlineAmount;
+      p.onlineCount = r.onlineCount;
+      p.totalAmount = (Number(p.posAmount) || 0) + Number(r.onlineAmount);
+      p.totalCount = (Number(p.posCount) || 0) + Number(r.onlineCount);
+      points[r.date] = p;
+    }
+    res.json({ ok: true, points: Object.values(points).sort((a: any, b: any) => (a.date > b.date ? 1 : -1)) });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== SYSTEM (super_admin dashboard) ==========
+app.get('/api/system/stats', authenticateToken, requireRole('super_admin'), async (_req: any, res: Response) => {
+  try {
+    const [users] = await pool.execute('SELECT COUNT(*) as c FROM users').catch(() => [[{ c: 0 }]]);
+    const [shops] = await pool.execute('SELECT COUNT(*) as c FROM shops').catch(() => [[{ c: 0 }]]);
+    res.json({
+      ok: true,
+      totalUsers: (users as any[])[0]?.c ?? 0,
+      totalShops: (shops as any[])[0]?.c ?? 0,
+      onlineUsers: 0,
+      active15m: 0,
+      active60m: 0,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== SUBSCRIPTION (per-shop plan) ==========
+app.get('/api/subscription', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const [rows] = await pool.execute(
+      'SELECT plan, status, started_at, expires_at FROM shop_subscriptions WHERE shop_id = ?',
+      [shopId]
+    ).catch(() => [[]]);
+    const row = (rows as any[])[0];
+    if (!row) {
+      const [shop] = await pool.execute('SELECT package FROM shops WHERE id = ?', [shopId]);
+      const pkg = (shop as any[])[0]?.package || 'bronze';
+      return res.json({ plan: pkg, status: 'active', started_at: null, expires_at: null });
+    }
+    res.json(row);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== ADMIN ONLINE INVOICES / ORDERS (invoices page) ==========
+app.get('/api/admin/online-invoices', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const limit = Math.min(500, parseInt(req.query.limit as string, 10) || 200);
+    const [rows] = await pool.execute(
+      `SELECT o.id, o.shop_id, o.customer_name, o.phone, o.total as total, o.created_at as order_created_at, o.public_code, o.status,
+              oi.id as invoice_id, oi.invoice_number, oi.printed_count as printed_count
+       FROM online_orders o
+       LEFT JOIN online_invoices oi ON oi.order_id = o.id
+       WHERE o.shop_id = ? ORDER BY o.created_at DESC LIMIT ?`,
+      [shopId, limit]
+    ).catch(() => [[]]);
+    res.json(rows || []);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/online-invoices/:id', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Invalid id' });
+    const [orders] = await pool.execute('SELECT * FROM online_orders WHERE id = ? AND shop_id = ?', [id, shopId]);
+    if ((orders as any[]).length === 0) return res.status(404).json({ error: 'Not found' });
+    const [items] = await pool.execute(
+      'SELECT id, product_id, name_snapshot, sku_snapshot, quantity, sell_price_snapshot as unit_price FROM online_order_items WHERE order_id = ?',
+      [id]
+    ).catch(() => [[]]);
+    res.json({ id, items: items || [] });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/online-invoices/:id/print', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Invalid id' });
+    const [inv] = await pool.execute('SELECT id, printed_count FROM online_invoices WHERE order_id = ? AND shop_id = ?', [id, shopId]);
+    let printCount = 0;
+    if ((inv as any[]).length > 0) {
+      const invId = (inv as any[])[0].id;
+      await pool.execute('UPDATE online_invoices SET printed_count = printed_count + 1, last_printed_at = CURRENT_TIMESTAMP WHERE id = ?', [invId]);
+      const [updated] = await pool.execute('SELECT printed_count FROM online_invoices WHERE id = ?', [invId]);
+      printCount = (updated as any[])[0]?.printed_count ?? 0;
+    }
+    res.json({ printCount, lastPrintedAt: new Date().toISOString() });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== ADMIN REPORTS (reports page) ==========
+app.get('/api/admin/reports/summary', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const from = String(req.query.from || '').trim();
+    const to = String(req.query.to || '').trim();
+    const source = String(req.query.source || 'all').toLowerCase();
+    const bucket = String(req.query.bucket || 'day').toLowerCase();
+    const [pos] = await pool.execute(
+      'SELECT COALESCE(SUM(total_amount), 0) as amount, COUNT(*) as count FROM sales WHERE shop_id = ? AND created_at >= ? AND created_at <= ?',
+      [shopId, from || '1970-01-01', to || '9999-12-31']
+    ).catch(() => [[{ amount: 0, count: 0 }]]);
+    const [online] = await pool.execute(
+      'SELECT COALESCE(SUM(total), 0) as amount, COUNT(*) as count FROM online_orders WHERE shop_id = ? AND created_at >= ? AND created_at <= ?',
+      [shopId, from || '1970-01-01', to || '9999-12-31']
+    ).catch(() => [[{ amount: 0, count: 0 }]]);
+    const posRow = (pos as any[])[0] || {};
+    const onlineRow = (online as any[])[0] || {};
+    res.json({
+      ok: true,
+      pos: { total: Number(posRow.amount), count: Number(posRow.count) },
+      online: { total: Number(onlineRow.amount), count: Number(onlineRow.count) },
+      bucket,
+      source,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/reports/transactions', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const from = String(req.query.from || '').trim();
+    const to = String(req.query.to || '').trim();
+    const limit = Math.min(500, parseInt(req.query.limit as string, 10) || 100);
+    const [salesRows] = await pool.execute(
+      'SELECT id, total_amount as amount, created_at, "pos" as source FROM sales WHERE shop_id = ? AND created_at >= ? AND created_at <= ? ORDER BY created_at DESC LIMIT ?',
+      [shopId, from || '1970-01-01', to || '9999-12-31', limit]
+    ).catch(() => [[]]);
+    const [onlineRows] = await pool.execute(
+      'SELECT id, total as amount, created_at, "online" as source FROM online_orders WHERE shop_id = ? AND created_at >= ? AND created_at <= ? ORDER BY created_at DESC LIMIT ?',
+      [shopId, from || '1970-01-01', to || '9999-12-31', limit]
+    ).catch(() => [[]]);
+    const items = [...(salesRows as any[]).map((r) => ({ ...r, id: r.id })), ...(onlineRows as any[]).map((r) => ({ ...r, id: r.id }))];
+    items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    res.json({ ok: true, items: items.slice(0, limit) });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/reports/dead-stock', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const days = Math.min(365, Math.max(1, parseInt(req.query.days as string, 10) || 120));
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    const sinceStr = since.toISOString().slice(0, 10);
+    const [rows] = await pool.execute(
+      `SELECT p.id, p.name_en, p.name_ar, p.sku, p.stock_quantity, p.sell_price FROM products p
+       WHERE p.shop_id = ? AND (p.is_deleted = 0 OR p.is_deleted IS NULL)
+       AND NOT EXISTS (SELECT 1 FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE si.product_id = p.id AND s.created_at >= ?)`,
+      [shopId, sinceStr]
+    ).catch(() => [[]]);
+    res.json({ ok: true, items: rows || [] });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/reports/day-details', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const date = String(req.query.date || '').trim();
+    const source = String(req.query.source || 'all').toLowerCase();
+    if (!date) return res.status(400).json({ error: 'date required' });
+    const [sales] = await pool.execute(
+      'SELECT id, total_amount as amount, created_at, "pos" as source FROM sales WHERE shop_id = ? AND DATE(created_at) = ?',
+      [shopId, date]
+    ).catch(() => [[]]);
+    const [online] = await pool.execute(
+      'SELECT id, total as amount, created_at, "online" as source FROM online_orders WHERE shop_id = ? AND DATE(created_at) = ?',
+      [shopId, date]
+    ).catch(() => [[]]);
+    let items = [...(sales as any[]), ...(online as any[])];
+    if (source === 'pos') items = items.filter((i: any) => i.source === 'pos');
+    if (source === 'online') items = items.filter((i: any) => i.source === 'online');
+    items.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    res.json({ ok: true, items });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Notifications unread count (frontend NotificationsBell). Returns 0 if notifications table missing. Uses shop_id (schema has shop_id, not user_id).
+app.get('/api/notifications/unread-count', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopId(req).shopId;
+    if (shopId == null) return res.json({ count: 0 });
+    const [rows] = await pool.execute(
+      'SELECT COUNT(*) as cnt FROM notifications WHERE shop_id = ? AND (is_read = 0 OR is_read IS NULL)',
+      [shopId]
+    );
+    const cnt = (rows as any[])[0]?.cnt ?? 0;
+    return res.json({ count: Number(cnt) });
+  } catch {
+    return res.json({ count: 0 });
+  }
+});
+
 // ========== SHOP PROFILE ==========
 app.get('/api/shops/profile', authenticateToken, async (req: any, res: Response) => {
   try {
@@ -3198,7 +3731,7 @@ app.post('/api/users', authenticateToken, requireRole('super_admin', 'shop_owner
     const { username: rawUsername, identifier, password, role, branchId } = req.body;
     const idInput = String(identifier ?? rawUsername ?? '').trim();
     if (!idInput || !password || !role) {
-      return res.status(400).json({ error: 'identifier (or username), password, and role are required' });
+      return res.status(400).json({ error: 'username, password, and role are required' });
     }
 
     const { username, email, employee_id } = parseUserIdentifier(idInput);

@@ -75,9 +75,10 @@ function OnlineOrdersPageContent() {
       setError(null);
       const url = statusFilter ? `/admin/orders?status=${statusFilter}` : '/admin/orders';
       const data = await apiRequest(url);
-      setOrders(data);
+      setOrders(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      setError(err.message || (language === 'ar' ? 'فشل تحميل الطلبات' : 'Failed to load orders'));
+      const msg = err?.message || '';
+      setError(msg === 'SHOP_ID_REQUIRED' ? (language === 'ar' ? 'لا توجد بيانات — اختر المتجر أولاً' : 'No data — shop not selected') : (msg || (language === 'ar' ? 'فشل تحميل الطلبات' : 'Failed to load orders')));
     } finally {
       setLoading(false);
     }

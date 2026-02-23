@@ -189,7 +189,13 @@ function StorefrontPageContent() {
         throw new Error('Invalid storefront response');
       }
 
-      setData(payload as StorefrontData);
+      const safePayload: StorefrontData = {
+        ...payload,
+        shop: payload?.shop ?? null,
+        categories: Array.isArray(payload?.categories) ? payload.categories : [],
+        products: Array.isArray(payload?.products) ? payload.products : [],
+      };
+      setData(safePayload);
       setLastUpdatedAt(Date.now());
     } catch (e: any) {
       setData(null);
@@ -223,7 +229,7 @@ function StorefrontPageContent() {
   const currency = data?.shop?.currency_symbol || (language === 'ar' ? 'ج.م' : 'EGP');
 
   const filteredProducts = useMemo(() => {
-    const list = data?.products || [];
+    const list = Array.isArray(data?.products) ? data.products : [];
     const q = query.trim().toLowerCase();
     if (!q) return list;
     return list.filter((p) => {
@@ -243,7 +249,8 @@ function StorefrontPageContent() {
 
   const cartItems = useMemo(() => {
     const ids = Object.keys(cart).map((k) => Number(k));
-    return (data?.products || []).filter((p) => ids.includes(p.id));
+    const prods = Array.isArray(data?.products) ? data.products : [];
+    return prods.filter((p) => ids.includes(p.id));
   }, [cart, data?.products]);
 
   const cartCount = useMemo(() => Object.values(cart).reduce((s, n) => s + Number(n || 0), 0), [cart]);

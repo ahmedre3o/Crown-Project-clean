@@ -59,7 +59,7 @@ const corsOptions: cors.CorsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+app.options(/(.*)/, cors(corsOptions));
 
 app.get('/api/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok' });

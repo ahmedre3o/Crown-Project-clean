@@ -5,9 +5,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/Sidebar';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { apiRequest, getNoShopMessage, isShopMissingError, useAuth } from '../../contexts/AuthContext';
+import { apiRequest, useAuth } from '../../contexts/AuthContext';
 import { useRouteGuard } from '../../guards/useRouteGuard';
 import { Bell, Search, ShoppingCart, Globe, FileText, ChevronDown, ChevronUp, CheckCheck } from 'lucide-react';
+import { getStoredShopId } from '@/lib/shop';
 
 interface Notification {
   id: number;
@@ -36,12 +37,15 @@ export default function NotificationsPage() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [needsShop, setNeedsShop] = useState(false);
+  const needsShopSelection = user?.role === 'super_admin' && !getStoredShopId();
 
   const load = useCallback(async (offset = 0, append = false) => {
     try {
       if (offset === 0) setLoading(true);
       else setLoadingMore(true);
       setError(null);
+      setNeedsShop(false);
       const params = new URLSearchParams({ limit: '20', offset: String(offset) });
       if (sourceFilter && ['online', 'pos', 'system'].includes(sourceFilter)) params.set('source', sourceFilter);
       if (search.trim()) params.set('q', search.trim());
@@ -56,14 +60,14 @@ export default function NotificationsPage() {
       setNextOffset(res?.nextOffset ?? null);
       setUnreadCount(Number(res?.unreadCount ?? 0));
     } catch (err: any) {
-      if (isShopMissingError(err)) {
+      if (err?.message === 'SHOP_ID_REQUIRED') {
+        setNeedsShop(true);
         setItems([]);
         setUnreadCount(0);
         setNextOffset(null);
-        setError(getNoShopMessage(language));
-      } else {
-        setError(err?.message || (language === 'ar' ? 'فشل التحميل' : 'Failed to load'));
+        return;
       }
+      setError(err?.message || (language === 'ar' ? 'فشل التحميل' : 'Failed to load'));
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -76,6 +80,15 @@ export default function NotificationsPage() {
       return () => clearTimeout(t);
     }
   }, [authLoading, allowed, sourceFilter, search, load]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = () => {
+      if (!authLoading && allowed) void load(0, false);
+    };
+    window.addEventListener('crown-shop-changed', handler);
+    return () => window.removeEventListener('crown-shop-changed', handler);
+  }, [authLoading, allowed, load]);
 
   const markRead = async (id: number) => {
     try {
@@ -136,6 +149,11 @@ export default function NotificationsPage() {
             <Bell className="h-6 w-6" />
             {language === 'ar' ? 'النشاط والإشعارات' : 'Activity & Notifications'}
           </h1>
+          {needsShop || needsShopSelection ? (
+            <div className="mb-6 rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-4 text-sm text-cyan-100">
+              {language === 'ar' ? 'لا توجد بيانات — لم يتم اختيار متجر.' : 'No data / shop not selected.'}
+            </div>
+          ) : null}
 
           <div className="flex flex-wrap gap-3 mb-6">
             <div className="flex-1 min-w-[200px] relative">

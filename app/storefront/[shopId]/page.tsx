@@ -77,9 +77,9 @@ export default function StorefrontPage() {
     );
   }
 
+  const safeProducts = Array.isArray(data?.products) ? data.products : [];
   const cartCount = cart.length;
-  const products = Array.isArray(data?.products) ? data.products : [];
-  const cartItems = products.filter((p) => cart.includes(p.id));
+  const cartItems = safeProducts.filter((p) => cart.includes(p.id));
 
   return (
     <div className="min-h-screen bg-black text-white" dir={language === 'ar' ? 'rtl' : 'ltr'}>
@@ -131,12 +131,12 @@ export default function StorefrontPage() {
           </h3>
           <div className="flex items-center gap-2 text-cyan-400">
             <Package className="w-5 h-5" />
-            <span>{products.length} {language === 'ar' ? 'منتج' : 'products'}</span>
+            <span>{safeProducts.length} {language === 'ar' ? 'منتج' : 'products'}</span>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {products.map((product) => {
+          {safeProducts.map((product) => {
             const inCart = cart.includes(product.id);
             return (
               <div key={product.id} className="neon-box rounded-xl p-6 hover:scale-105 transition-transform">

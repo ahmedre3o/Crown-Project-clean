@@ -25,7 +25,11 @@ export default function ManualEntryPage() {
   const { t, direction, language } = useLanguage();
   const { user, loading: authLoading, effectiveRole } = useAuth();
   const { allowed } = useRouteGuard(user, authLoading, { feature: 'manual_entry', effectiveRole });
-  const packageMissing = !user?.package;
+  const rawPackage = (user as any)?.package;
+  const hasPackageString = typeof rawPackage === 'string' && rawPackage.trim().length > 0;
+  const hasPackageObject = rawPackage && typeof rawPackage === 'object';
+  const maxProducts = hasPackageObject ? ((rawPackage as any)?.maxProducts ?? 500) : 500;
+  const showPackageUnavailable = !hasPackageString && !hasPackageObject;
   const [form, setForm] = useState({
     nameEn: '',
     nameAr: '',
@@ -132,12 +136,17 @@ export default function ManualEntryPage() {
       <div className="flex-1 p-8 pt-20 md:pt-8 overflow-y-auto">
         <h1 className="text-2xl font-bold text-cyan-200 mb-6">{t('manual.title')}</h1>
         <div className="neon-card rounded-xl p-6">
-        {packageMissing && (
-          <div className="mb-4 rounded-lg border border-amber-400/40 bg-amber-400/10 p-3 text-sm text-amber-200">
-            {language === 'ar' ? 'بيانات الباقة غير متاحة حالياً' : 'Package data unavailable'}
-          </div>
-        )}
-        {error && (
+          {showPackageUnavailable && (
+            <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">
+              {language === 'ar' ? 'بيانات الباقة غير متاحة حالياً.' : 'Package data unavailable.'}
+            </div>
+          )}
+          {hasPackageObject && (
+            <div className="mb-4 text-xs text-slate-400">
+              {language === 'ar' ? `حد المنتجات: ${maxProducts}` : `Max products: ${maxProducts}`}
+            </div>
+          )}
+          {error && (
             <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
               {error}
             </div>

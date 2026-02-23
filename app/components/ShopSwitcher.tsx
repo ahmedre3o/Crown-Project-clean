@@ -4,8 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { ShoppingBag, ChevronDown } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { apiRequest } from '../contexts/AuthContext';
-
-const STORAGE_KEY = 'crown-active-shop-id';
+import { getStoredShopId, setStoredShopId } from '@/lib/shop';
 
 interface Shop {
   id: number;
@@ -19,14 +18,14 @@ interface Shop {
 export function ShopSwitcher() {
   const { language } = useLanguage();
   const [shops, setShops] = useState<Shop[]>([]);
-  const [activeShopId, setActiveShopId] = useState<string | null>(null);
+  const [activeShopId, setActiveShopId] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    setActiveShopId(localStorage.getItem(STORAGE_KEY));
-    const handler = () => setActiveShopId(localStorage.getItem(STORAGE_KEY));
+    setActiveShopId(getStoredShopId());
+    const handler = () => setActiveShopId(getStoredShopId());
     window.addEventListener('crown-shop-changed', handler);
     return () => window.removeEventListener('crown-shop-changed', handler);
   }, []);
@@ -47,22 +46,15 @@ export function ShopSwitcher() {
   }, []);
 
   const selectShop = (id: number) => {
-    const idStr = String(id);
-    setActiveShopId(idStr);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, idStr);
-    }
+    setActiveShopId(id);
+    setStoredShopId(id);
     setOpen(false);
-    window.dispatchEvent(new Event('crown-shop-changed'));
   };
 
   const clearShop = () => {
     setActiveShopId(null);
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(STORAGE_KEY);
-    }
+    setStoredShopId(null);
     setOpen(false);
-    window.dispatchEvent(new Event('crown-shop-changed'));
   };
 
   const displayName = (s: Shop) => {
@@ -72,7 +64,7 @@ export function ShopSwitcher() {
     return s.business_name_en || s.business_name || s.business_name_ar || s.name || s.domain || `#${s.id}`;
   };
 
-  const activeShop = shops.find((s) => String(s.id) === activeShopId);
+  const activeShop = shops.find((s) => s.id === activeShopId);
 
   if (loading || shops.length === 0) return null;
 
@@ -100,7 +92,7 @@ export function ShopSwitcher() {
             <button
               type="button"
               onClick={clearShop}
-              className={`w-full text-left px-3 py-2 text-xs ${!activeShopId ? 'bg-cyan-500/20 text-cyan-200' : 'text-slate-300 hover:bg-cyan-500/10'}`}
+                className={`w-full text-left px-3 py-2 text-xs ${activeShopId == null ? 'bg-cyan-500/20 text-cyan-200' : 'text-slate-300 hover:bg-cyan-500/10'}`}
             >
               {language === 'ar' ? '— بدون متجر —' : '— No shop —'}
             </button>
@@ -109,7 +101,7 @@ export function ShopSwitcher() {
                 key={s.id}
                 type="button"
                 onClick={() => selectShop(s.id)}
-                className={`w-full text-left px-3 py-2 text-xs ${activeShopId === String(s.id) ? 'bg-cyan-500/20 text-cyan-200' : 'text-slate-300 hover:bg-cyan-500/10'}`}
+                className={`w-full text-left px-3 py-2 text-xs ${activeShopId === s.id ? 'bg-cyan-500/20 text-cyan-200' : 'text-slate-300 hover:bg-cyan-500/10'}`}
               >
                 {displayName(s)}
               </button>
@@ -121,7 +113,6 @@ export function ShopSwitcher() {
   );
 }
 
-export function getActiveShopId(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(STORAGE_KEY);
+export function getActiveShopId(): number | null {
+  return getStoredShopId();
 }

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { apiRequest } from '../../../contexts/AuthContext';
+import { apiFetch } from '../../../contexts/AuthContext';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 
@@ -62,9 +62,10 @@ export default function ImportFixesPage() {
     try {
       setLoading(true);
       setError(null);
-      const data = await apiRequest(`/products/import/batch/${batchId}`);
-      if (!data?.ok) {
-        setError(data?.error || 'Failed to load batch');
+      const res = await apiFetch(`/products/import/batch/${batchId}`);
+      const data = await res.json().catch(() => ({}));
+      if (!data.ok || !res.ok) {
+        setError(data.error || 'Failed to load batch');
         return;
       }
       setBatch(data.batch);
@@ -100,10 +101,11 @@ export default function ImportFixesPage() {
     if (!edits || Object.keys(edits).length === 0) return;
     setCommitting(String(rowIndex));
     try {
-      const data = await apiRequest(`/products/import/batch/${batchId}/row/${rowIndex}`, {
+      const res = await apiFetch(`/products/import/batch/${batchId}/row/${rowIndex}`, {
         method: 'PATCH',
         body: JSON.stringify(edits),
       });
+      const data = await res.json().catch(() => ({}));
       if (data.ok) {
         setEditing((prev) => {
           const next = { ...prev };
@@ -124,7 +126,8 @@ export default function ImportFixesPage() {
   const commitAll = async () => {
     setCommitAllLoading(true);
     try {
-      const data = await apiRequest(`/products/import/batch/${batchId}/commit`, { method: 'POST' });
+      const res = await apiFetch(`/products/import/batch/${batchId}/commit`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
       if (data.ok) {
         const msg = data.messageAr || (language === 'ar' ? `تم اعتماد ${data.committed ?? 0} صنف` : `${data.committed ?? 0} items committed`);
         alert(msg);

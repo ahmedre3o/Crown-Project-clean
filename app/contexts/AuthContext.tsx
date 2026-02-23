@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { API_BASE_URL } from '../api-config';
+import { getStoredShopId, setStoredShopId } from '@/lib/shop';
 
 const ROLE_OVERRIDE_KEY = 'crown-role-override';
 
@@ -73,7 +74,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(savedToken);
       setUser(JSON.parse(savedUser));
     }
-  const refreshUser = async () => {
+
+    const refreshUser = async () => {
       if (!savedToken) {
         setLoading(false);
         return;
@@ -81,14 +83,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const response = await apiFetch('/auth/me', {
           method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          skipShopId: true,
         });
         if (response.ok) {
           const data = await response.json();
           if (data?.user) {
             setUser(data.user);
             localStorage.setItem('user', JSON.stringify(data.user));
+            const sid = Number(data.user?.shopId ?? data.user?.shop_id ?? NaN);
+            if (Number.isFinite(sid) && sid > 0) {
+              setStoredShopId(sid);
+            }
           }
         } else {
           // stale/invalid token: clear and redirect to login
@@ -97,6 +101,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           sessionStorage.removeItem(ROLE_OVERRIDE_KEY);
+          setStoredShopId(null);
           if (typeof window !== 'undefined') {
             window.location.href = '/login';
           }
@@ -108,6 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         sessionStorage.removeItem(ROLE_OVERRIDE_KEY);
+        setStoredShopId(null);
         if (typeof window !== 'undefined') {
           window.location.href = '/login';
         }
@@ -122,12 +128,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const response = await apiFetch('/auth/login', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
         ...(shopId ? { 'X-Shop-Id': String(shopId).trim() } : {}),
       },
       body: JSON.stringify({ username: username.trim(), password }),
-      skipAuth: true,
-      skipShopId: true,
     });
 
     const raw = await response.text();
@@ -153,7 +156,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(data.user);
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
-    // ---- Persist activeShopId for API requests ----     try {       const u = JSON.parse(localStorage.getItem('user') || 'null');       const sid = Number(u?.shopId ?? u?.shop_id ?? NaN);       if (Number.isFinite(sid) && sid > 0) localStorage.setItem('activeShopId', String(sid));     } catch {}
+    // ---- Persist active shop id for API requests ----
+    try {
+      const u = JSON.parse(localStorage.getItem('user') || 'null');
+      const sid = Number(u?.shopId ?? u?.shop_id ?? NaN);
+      if (Number.isFinite(sid) && sid > 0) {
+        setStoredShopId(sid);
+      }
+    } catch {}
   };
 
   const logout = () => {
@@ -162,6 +172,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     sessionStorage.removeItem(ROLE_OVERRIDE_KEY);
+    setStoredShopId(null);
     if (typeof window !== 'undefined') {
       window.location.href = '/login';
     }
@@ -191,38 +202,25 @@ export const useAuth = () => {
 };
 
 export function getStoredToken() {
-  if (typeof window === "undefined") return null;
+  if (typeof window === 'undefined') return null;
   return (
-    window.localStorage.getItem("token") ||
-    window.localStorage.getItem("access_token") ||
-    window.sessionStorage.getItem("token") ||
-    window.sessionStorage.getItem("access_token")
+    window.localStorage.getItem('token') ||
+    window.localStorage.getItem('access_token') ||
+    window.sessionStorage.getItem('token') ||
+    window.sessionStorage.getItem('access_token')
   );
 }
 
 export function getActiveShopId(): number | null {
   if (typeof window === 'undefined') return null;
   try {
+    const stored = getStoredShopId();
+    if (stored && stored > 0) return stored;
     const user = JSON.parse(localStorage.getItem('user') || 'null');
     const fromUser = Number(user?.shopId ?? user?.shop_id ?? NaN);
-    const fromStorage = Number(localStorage.getItem('activeShopId') ?? NaN);
-    if (Number.isFinite(fromStorage) && fromStorage > 0) return fromStorage;
     if (Number.isFinite(fromUser) && fromUser > 0) return fromUser;
   } catch {}
   return null;
-}
-
-function isShopRequiredPath(url: string): boolean {
-  try {
-    const path = url.startsWith('http') ? new URL(url).pathname : url;
-    const safe = path.startsWith('/') ? path : `/${path}`;
-    if (safe.startsWith('/auth') || safe.startsWith('/public') || safe.startsWith('/health') || safe.startsWith('/setup-admin')) {
-      return false;
-    }
-    return true;
-  } catch {
-    return true;
-  }
 }
 
 export function isShopMissingError(err: any): boolean {
@@ -233,51 +231,65 @@ export function getNoShopMessage(language: string): string {
   return language === 'ar' ? 'لا توجد بيانات / لم يتم اختيار متجر' : 'No data / shop not selected';
 }
 
-export type ApiFetchOptions = RequestInit & { skipAuth?: boolean; skipShopId?: boolean };
+const SHOP_OPTIONAL_PREFIXES = [
+  '/auth',
+  '/public',
+  '/health',
+  '/setup-admin',
+  '/admin/shops',
+  '/system',
+  '/licenses',
+  '/models',
+];
 
-export const apiFetch = async (url: string, options: ApiFetchOptions = {}) => {
+const isShopOptional = (url: string): boolean => {
+  const path = String(url || '').split('?')[0];
+  return SHOP_OPTIONAL_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+};
+
+const resolveActiveShopId = (userObj?: any): number | null => {
+  const stored = getStoredShopId();
+  if (stored && stored > 0) return stored;
+  const fromUser = Number(userObj?.shopId ?? userObj?.shop_id ?? NaN);
+  if (Number.isFinite(fromUser) && fromUser > 0) return fromUser;
+  return null;
+};
+
+export const apiFetch = async (url: string, options: RequestInit = {}) => {
   const token = getStoredToken();
-  const activeShopId = getActiveShopId();
-  const { skipAuth, skipShopId, ...fetchOptions } = options;
-  if (!skipShopId && token && isShopRequiredPath(url) && !activeShopId) {
+  const storedUser = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
+  const userObj = storedUser ? JSON.parse(storedUser) : null;
+  const shopId = resolveActiveShopId(userObj);
+  const branchId =
+    typeof window !== 'undefined' && shopId
+      ? localStorage.getItem(`crown-active-branch-${shopId}`)
+      : null;
+
+  if (!shopId && !isShopOptional(url)) {
     const err: any = new Error('SHOP_ID_REQUIRED');
     err.code = 'SHOP_ID_REQUIRED';
     throw err;
   }
 
-  const headers: HeadersInit = {
-    ...(fetchOptions.headers || {}),
-  };
-  if (!skipAuth && token) (headers as any).Authorization = `Bearer ${token}`;
-  if (!skipShopId && activeShopId) (headers as any)['X-Shop-Id'] = String(activeShopId);
+  const headers = new Headers(options.headers || {});
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  if (shopId) headers.set('X-Shop-Id', String(shopId));
+  if (branchId) headers.set('X-Branch-Id', String(branchId));
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+  if (!isFormData && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
 
   const target = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
   return fetch(target, {
-    ...fetchOptions,
+    ...options,
     credentials: 'include',
     headers,
   });
 };
 
 export const apiRequest = async (url: string, options: RequestInit = {}) => {
-  const storedUser = localStorage.getItem('user');
-  const userObj = storedUser ? JSON.parse(storedUser) : null;
-  const isSuperAdmin = userObj?.role === 'super_admin';
-  const shopId =
-    userObj?.shopId ?? userObj?.shop_id ??
-    (isSuperAdmin && typeof window !== 'undefined' ? localStorage.getItem('crown-active-shop-id') : null);
-  const branchId =
-    typeof window !== 'undefined' && shopId
-      ? localStorage.getItem(`crown-active-branch-${shopId}`)
-      : null;
-  const response = await apiFetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(branchId && { 'X-Branch-Id': String(branchId) }),
-      ...(options.headers || {}),
-    },
-  });
+  const response = await apiFetch(url, options);
 
   const raw = await response.text();
 
@@ -286,6 +298,7 @@ export const apiRequest = async (url: string, options: RequestInit = {}) => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     sessionStorage.removeItem(ROLE_OVERRIDE_KEY);
+    setStoredShopId(null);
     if (typeof window !== 'undefined') {
       window.location.href = '/login';
     }
@@ -296,7 +309,7 @@ export const apiRequest = async (url: string, options: RequestInit = {}) => {
     let errorMessage = 'Request failed';
     try {
       const error = raw ? JSON.parse(raw) : {};
-      if (error.error === 'SHOP_ID_REQUIRED') {
+      if (error.error === 'SHOP_ID_REQUIRED' || error.error === 'shopId is required') {
         errorMessage = 'SHOP_ID_REQUIRED';
       } else {
         errorMessage = error.error || error.message || errorMessage;

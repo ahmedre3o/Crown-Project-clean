@@ -4,7 +4,7 @@ import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { Sidebar } from '@/components/Sidebar';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useAuth, apiFetch } from '../contexts/AuthContext';
+import { apiFetch, useAuth } from '../contexts/AuthContext';
 import { useRouteGuard } from '../guards/useRouteGuard';
 
 type AnalyzeResponse = {

@@ -3,6 +3,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { apiRequest } from './AuthContext';
+import { getStoredShopId } from '@/lib/shop';
 
 export interface Branch {
   id: number;
@@ -33,7 +34,8 @@ const BranchContext = createContext<BranchContextType | undefined>(undefined);
 
 export function BranchProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const shopId = (user as any)?.shopId ?? (user as any)?.shop_id ?? null;
+  const [activeShopId, setActiveShopId] = useState<number | null>(() => getStoredShopId());
+  const shopId = activeShopId ?? (user as any)?.shopId ?? (user as any)?.shop_id ?? null;
   const [branches, setBranches] = useState<Branch[]>([]);
   const [activeBranchId, setActiveBranchIdState] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -66,6 +68,13 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     }
   }, [shopId, user?.role]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = () => setActiveShopId(getStoredShopId());
+    window.addEventListener('crown-shop-changed', handler);
+    return () => window.removeEventListener('crown-shop-changed', handler);
+  }, []);
 
   useEffect(() => {
     if (shopId) loadBranches();

@@ -1,8 +1,8 @@
 'use client';
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { apiFetch } from '../contexts/AuthContext';
 import { getQueue, getQueueCount, removeFromQueue, type QueuedItem } from '../../lib/offline-queue';
+import { apiFetch } from './AuthContext';
 
 interface OfflineContextType {
   isOnline: boolean;
@@ -49,21 +49,12 @@ export const OfflineProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const syncNow = useCallback(async () => {
     if (!navigator.onLine) return;
-    const storedUser = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
-    const userObj = storedUser ? JSON.parse(storedUser) : null;
-    const shopId = userObj?.shopId ?? userObj?.shop_id ?? (userObj?.role === 'super_admin' ? localStorage.getItem('crown-active-shop-id') : null);
-    const branchId = shopId ? localStorage.getItem(`crown-active-branch-${shopId}`) : null;
-
     const items = await getQueue();
     for (const item of items) {
       try {
         const res = await apiFetch(item.endpoint, {
           method: item.method,
-          headers: {
-            'Content-Type': 'application/json',
-            ...(branchId && { 'X-Branch-Id': String(branchId) }),
-          },
-          body: JSON.stringify(item.payload),
+          body: item.payload != null ? JSON.stringify(item.payload) : undefined,
         });
         if (res.ok) {
           await removeFromQueue(item.id);

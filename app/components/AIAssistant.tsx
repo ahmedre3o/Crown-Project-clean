@@ -3,11 +3,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Mic, Send, MessageCircle, X, Copy, Volume2, VolumeX, Square } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { apiRequest } from '../contexts/AuthContext';
 import { usePathname } from 'next/navigation';
-import { useAuth } from '../contexts/AuthContext';
+import { apiFetch, useAuth } from '../contexts/AuthContext';
 import { useBranch } from '../contexts/BranchContext';
 import { getPlanFeatures } from '../permissions';
+import { getStoredShopId } from '@/lib/shop';
 
 const VOICE_STORAGE_KEY = 'crown-ai-voice-enabled';
 
@@ -111,7 +111,8 @@ export function AIAssistant() {
     if (!open) return;
     (async () => {
       try {
-        const json = await apiRequest('/ai/status');
+        const resp = await apiFetch('/ai/status', { method: 'GET' });
+        const json = await resp.json().catch(() => ({}));
         if (json && (json.mode === 'cloud' || json.mode === 'offline')) {
           setAiMode(json.mode);
         } else {
@@ -137,8 +138,7 @@ export function AIAssistant() {
         const history = messages.slice(-16).map((m) => ({ role: m.role, content: m.content }));
         const u = user as { id?: number; userId?: number; shop_id?: number; shopId?: number } | null;
         const shopId =
-          u?.shop_id ?? u?.shopId ??
-          (typeof window !== 'undefined' ? localStorage.getItem('crown-active-shop-id') : null);
+          u?.shop_id ?? u?.shopId ?? (typeof window !== 'undefined' ? getStoredShopId() : null);
         const branchId =
           typeof window !== 'undefined' && shopId
             ? localStorage.getItem(`crown-active-branch-${shopId}`)
@@ -153,10 +153,11 @@ export function AIAssistant() {
           lang,
         };
 
-        const data = await apiRequest('/chat', {
+        const response = await apiFetch('/chat', {
           method: 'POST',
           body: JSON.stringify({ message: trimmed, lang, context, history }),
         });
+        const data = await response.json().catch(() => ({}));
 
         const isAiUnavailable = data && data.ok === false && data.error === 'AI_UNAVAILABLE';
         const preferredMessage =

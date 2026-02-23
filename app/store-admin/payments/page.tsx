@@ -3,11 +3,12 @@
 import React, { Suspense, useEffect, useState, useCallback } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiRequest, getNoShopMessage, isShopMissingError, useAuth } from '@/contexts/AuthContext';
+import { apiRequest, useAuth } from '@/contexts/AuthContext';
 import { useRouteGuard } from '@/guards/useRouteGuard';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useBranch, getBranchDisplayName } from '@/contexts/BranchContext';
 import { ChevronDown, ChevronUp, Package, CreditCard, Search, X } from 'lucide-react';
+import { getStoredShopId } from '@/lib/shop';
 
 interface Order {
   id: number;
@@ -72,6 +73,8 @@ function PaymentsPageContent() {
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [drawerOrder, setDrawerOrder] = useState<Order | null>(null);
   const [drawerItems, setDrawerItems] = useState<OrderItem[]>([]);
+  const [needsShop, setNeedsShop] = useState(false);
+  const needsShopSelection = user?.role === 'super_admin' && !getStoredShopId();
   const [filters, setFilters] = useState({
     status: '',
     paymentStatus: '',
@@ -116,6 +119,7 @@ function PaymentsPageContent() {
     try {
       setLoading(true);
       setError(null);
+      setNeedsShop(false);
       const q = new URLSearchParams();
       if (filters.status) q.set('status', filters.status);
       if (filters.paymentStatus) q.set('paymentStatus', filters.paymentStatus);
@@ -126,12 +130,12 @@ function PaymentsPageContent() {
       const data = await apiRequest(`/admin/payments-orders/orders?${q.toString()}`);
       setOrders(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      if (isShopMissingError(err)) {
+      if (err?.message === 'SHOP_ID_REQUIRED') {
+        setNeedsShop(true);
         setOrders([]);
-        setError(getNoShopMessage(language));
-      } else {
-        setError(err.message || t('فشل تحميل الطلبات', 'Failed to load orders'));
+        return;
       }
+      setError(err.message || t('فشل تحميل الطلبات', 'Failed to load orders'));
     } finally {
       setLoading(false);
     }
@@ -141,6 +145,7 @@ function PaymentsPageContent() {
     try {
       setLoading(true);
       setError(null);
+      setNeedsShop(false);
       const q = new URLSearchParams();
       if (filters.status) q.set('status', filters.status);
       if (filters.method) q.set('method', filters.method);
@@ -151,12 +156,12 @@ function PaymentsPageContent() {
       const data = await apiRequest(`/admin/payments-orders/payments?${q.toString()}`);
       setPayments(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      if (isShopMissingError(err)) {
+      if (err?.message === 'SHOP_ID_REQUIRED') {
+        setNeedsShop(true);
         setPayments([]);
-        setError(getNoShopMessage(language));
-      } else {
-        setError(err.message || t('فشل تحميل المدفوعات', 'Failed to load payments'));
+        return;
       }
+      setError(err.message || t('فشل تحميل المدفوعات', 'Failed to load payments'));
     } finally {
       setLoading(false);
     }
@@ -169,6 +174,18 @@ function PaymentsPageContent() {
     }
   }, [authLoading, allowed, tab, loadOrders, loadPayments]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = () => {
+      if (!authLoading && allowed) {
+        if (tab === 'orders') loadOrders();
+        else loadPayments();
+      }
+    };
+    window.addEventListener('crown-shop-changed', handler);
+    return () => window.removeEventListener('crown-shop-changed', handler);
+  }, [authLoading, allowed, tab, loadOrders, loadPayments]);
+
   const loadOrderDetail = async (orderId: number) => {
     if (orderDetails[orderId]) {
       setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
@@ -176,7 +193,8 @@ function PaymentsPageContent() {
     }
     try {
       const order = await apiRequest(`/admin/orders/${orderId}`);
-      setOrderDetails((prev) => ({ ...prev, [orderId]: order.items || [] }));
+      const items = Array.isArray(order?.items) ? order.items : [];
+      setOrderDetails((prev) => ({ ...prev, [orderId]: items }));
       setExpandedOrderId(orderId);
     } catch {
       setOrderDetails((prev) => ({ ...prev, [orderId]: [] }));
@@ -188,7 +206,7 @@ function PaymentsPageContent() {
     setDrawerOrder(order);
     try {
       const detail = await apiRequest(`/admin/orders/${order.id}`);
-      setDrawerItems(detail.items || []);
+      setDrawerItems(Array.isArray(detail?.items) ? detail.items : []);
     } catch {
       setDrawerItems([]);
     }
@@ -249,6 +267,11 @@ function PaymentsPageContent() {
           <h1 className="text-2xl font-bold text-cyan-200 mb-6">
             {t('المدفوعات/الطلبات', 'Payments / Orders')}
           </h1>
+          {needsShop || needsShopSelection ? (
+            <div className="mb-6 rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-4 text-sm text-cyan-100">
+              {t('لا توجد بيانات — لم يتم اختيار متجر.', 'No data / shop not selected.')}
+            </div>
+          ) : null}
 
           {/* Tabs */}
           <div className="flex gap-2 mb-6">

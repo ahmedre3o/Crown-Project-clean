@@ -4,8 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { ShopSwitcher, getActiveShopId } from '@/components/ShopSwitcher';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiRequest, getNoShopMessage, isShopMissingError } from '@/contexts/AuthContext';
-import { useAuth } from '@/contexts/AuthContext';
+import { apiRequest, useAuth } from '@/contexts/AuthContext';
 import { getPlanFeatures } from '@/permissions';
 import { useRouteGuard } from '@/guards/useRouteGuard';
 
@@ -71,11 +70,11 @@ export default function UsersPage() {
       });
       setBranches(Array.isArray(branchesData) ? branchesData : []);
     } catch (err: any) {
-      if (isShopMissingError(err)) {
+      if (err?.message === 'SHOP_ID_REQUIRED') {
         setUsers([]);
         setBranches([]);
         setSubscription(null);
-        setError(getNoShopMessage(language));
+        setError(language === 'ar' ? 'اختر المتجر أولاً' : 'Please select a shop first');
         return;
       }
       setError(err.message || 'Failed to load');
@@ -116,8 +115,8 @@ export default function UsersPage() {
       await loadUsers();
     } catch (err: any) {
       const msg = err?.message || '';
-      if (msg === 'SHOP_ID_REQUIRED' || isShopMissingError(err)) {
-        setError(getNoShopMessage(language));
+      if (msg === 'SHOP_ID_REQUIRED') {
+        setError(language === 'ar' ? 'اختر المتجر أولاً' : 'Please select a shop first');
         return;
       }
       setError(msg === 'PLAN_USER_LIMIT_REACHED' ? (language === 'ar' ? LIMIT_MSG_AR : LIMIT_MSG_EN) : msg);

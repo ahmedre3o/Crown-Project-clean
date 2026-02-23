@@ -1,14 +1,15 @@
 'use client';
 
-import React, { Suspense, useEffect, useState, useRef } from 'react';
+import React, { Suspense, useEffect, useState, useRef, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Sidebar } from '@/components/Sidebar';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiRequest, getNoShopMessage, isShopMissingError, useAuth } from '@/contexts/AuthContext';
+import { apiRequest, useAuth } from '@/contexts/AuthContext';
 import { useRouteGuard } from '@/guards/useRouteGuard';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { formatCurrency } from '@/lib/formatters';
 import { Package, ChevronDown, ChevronUp } from 'lucide-react';
+import { getStoredShopId } from '@/lib/shop';
 
 interface Order {
   id: number;
@@ -50,10 +51,41 @@ function OnlineOrdersPageContent() {
   const [itemsMap, setItemsMap] = useState<Record<number, OrderItem[]>>({});
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const orderRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const [needsShop, setNeedsShop] = useState(false);
+  const needsShopSelection = user?.role === 'super_admin' && !getStoredShopId();
+
+  const loadOrders = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      setNeedsShop(false);
+      const url = statusFilter ? `/admin/orders?status=${statusFilter}` : '/admin/orders';
+      const data = await apiRequest(url);
+      setOrders(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      if (err?.message === 'SHOP_ID_REQUIRED') {
+        setNeedsShop(true);
+        setOrders([]);
+        return;
+      }
+      setError(err.message || (language === 'ar' ? 'فشل تحميل الطلبات' : 'Failed to load orders'));
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter, language]);
 
   useEffect(() => {
     if (!authLoading && allowed) loadOrders();
-  }, [authLoading, allowed, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authLoading, allowed, loadOrders]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = () => {
+      if (!authLoading && allowed) loadOrders();
+    };
+    window.addEventListener('crown-shop-changed', handler);
+    return () => window.removeEventListener('crown-shop-changed', handler);
+  }, [authLoading, allowed, loadOrders]);
 
   useEffect(() => {
     if (focusOrderId && orders.length > 0) {
@@ -68,25 +100,6 @@ function OnlineOrdersPageContent() {
       }
     }
   }, [focusOrderId, orders]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const loadOrders = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const url = statusFilter ? `/admin/orders?status=${statusFilter}` : '/admin/orders';
-      const data = await apiRequest(url);
-      setOrders(Array.isArray(data) ? data : []);
-    } catch (err: any) {
-      if (isShopMissingError(err)) {
-        setOrders([]);
-        setError(getNoShopMessage(language));
-      } else {
-        setError(err.message || (language === 'ar' ? 'فشل تحميل الطلبات' : 'Failed to load orders'));
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const loadOrderDetails = async (orderId: number) => {
     if (itemsMap[orderId]) {
@@ -139,6 +152,11 @@ function OnlineOrdersPageContent() {
           <h1 className="text-2xl font-bold text-cyan-200 mb-6">
             {t('nav.onlineOrders')}
           </h1>
+          {needsShop || needsShopSelection ? (
+            <div className="mb-6 rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-4 text-sm text-cyan-100">
+              {language === 'ar' ? 'لا توجد بيانات — لم يتم اختيار متجر.' : 'No data / shop not selected.'}
+            </div>
+          ) : null}
 
           {/* Status filter */}
           <div className="flex flex-wrap gap-2 mb-6">

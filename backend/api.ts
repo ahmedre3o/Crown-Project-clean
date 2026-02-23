@@ -259,6 +259,10 @@ function getShopIdOrFail(req: any, res: Response): number | null {
   return r.shopId;
 }
 
+const logEmptyResult = (label: string, context: Record<string, unknown>) => {
+  console.warn(`[EMPTY] ${label}`, context);
+};
+
 // ========== DOMAIN RESOLUTION + VERIFICATION ==========
 const ALLOWED_DOMAIN_TLDS = new Set(['com', 'net', 'org', 'shop', 'store']);
 const DOMAIN_VERIFY_RECORD_PREFIX = '_crown-verify';
@@ -1868,10 +1872,11 @@ app.get('/api/admin/inventory/slow-moving', authenticateToken, async (req: any, 
     sql += ' ORDER BY (p.sell_price * p.stock_quantity) DESC LIMIT ? OFFSET ?';
     params.push(limit, offset);
     const [rows] = await pool.execute(sql, params);
-    if ((rows as any[]).length === 0) {
-      console.log('[admin/inventory/slow-moving] empty result', { shopId, days, threshold, q, limit, offset });
+    const items = rows as any[];
+    if (items.length === 0) {
+      logEmptyResult('inventory_slow_moving', { shopId, days, threshold, q, limit, offset });
     }
-    res.json({ items: rows || [] });
+    res.json({ items: items || [] });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -1972,6 +1977,76 @@ app.get('/api/system/stats', authenticateToken, requireRole('super_admin'), asyn
   }
 });
 
+app.get('/api/system/users', authenticateToken, requireRole('super_admin'), async (req: any, res: Response) => {
+  try {
+    const limitRaw = Number(req.query.limit);
+    const offsetRaw = Number(req.query.offset);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 100) : 20;
+    const offset = Number.isFinite(offsetRaw) && offsetRaw >= 0 ? Math.floor(offsetRaw) : 0;
+    const q = String(req.query.q || '').trim();
+
+    const conditions: string[] = [];
+    const params: any[] = [];
+    if (q) {
+      conditions.push('(u.username LIKE ? OR u.email LIKE ? OR s.name LIKE ? OR s.business_name LIKE ?)');
+      params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
+    }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const sql = `
+      SELECT u.id, u.username, u.email, u.role, u.shop_id, u.created_at, u.is_active,
+             s.id as shop_id, s.name as shop_name, s.business_name as shop_business_name
+      FROM users u
+      LEFT JOIN shops s ON s.id = u.shop_id
+      ${where}
+      ORDER BY u.created_at DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+    const [rows] = await pool.execute(sql, params).catch(() => [[]]);
+    const items = (rows as any[]).map((r: any) => ({
+      id: r.id,
+      username: r.username,
+      email: r.email ?? null,
+      role: r.role,
+      shop: r.shop_id
+        ? { id: r.shop_id, name: r.shop_name || r.shop_business_name || null, slug: null }
+        : null,
+      branch: null,
+      last_seen_at: null,
+      created_at: r.created_at,
+      is_active: r.is_active ?? null,
+    }));
+    if (items.length === 0) {
+      logEmptyResult('system_users', { q, limit, offset });
+    }
+    const nextOffset = items.length >= limit ? offset + limit : null;
+    res.json({ ok: true, items, nextOffset });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/system/users/:id/reset-password', authenticateToken, requireRole('super_admin'), async (req: any, res: Response) => {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    if (!userId) return res.status(400).json({ error: 'Invalid user id' });
+    const incoming = String(req.body?.newPassword || '').trim();
+    let tempPassword: string | null = null;
+    let finalPassword = incoming;
+    if (!finalPassword) {
+      tempPassword = crypto.randomBytes(6).toString('hex');
+      finalPassword = tempPassword;
+    }
+    if (finalPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+    const hashedPassword = await bcrypt.hash(finalPassword, 10);
+    await pool.execute('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, userId]);
+    res.json({ ok: true, tempPassword: tempPassword || undefined });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ========== SUBSCRIPTION (per-shop plan) ==========
 app.get('/api/subscription', authenticateToken, async (req: any, res: Response) => {
   try {
@@ -2046,6 +2121,276 @@ app.post('/api/admin/online-invoices/:id/print', authenticateToken, async (req: 
       printCount = (updated as any[])[0]?.printed_count ?? 0;
     }
     res.json({ printCount, lastPrintedAt: new Date().toISOString() });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== ADMIN ONLINE ORDERS (online orders page) ==========
+app.get('/api/admin/orders', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const status = String(req.query.status || '').trim();
+    const limitRaw = Number(req.query.limit);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 500) : 200;
+
+    const conditions: string[] = ['o.shop_id = ?'];
+    const params: any[] = [shopId];
+    if (status) {
+      conditions.push('o.status = ?');
+      params.push(status);
+    }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const sql = `
+      SELECT o.id, o.shop_id, o.status, o.customer_name, o.phone, o.governorate, o.city, o.address, o.notes,
+             o.total, o.payment_method, o.payment_status, o.order_status, o.branch_id,
+             b.name as branch_name, b.name_ar as branch_name_ar, b.name_en as branch_name_en,
+             o.created_at
+      FROM online_orders o
+      LEFT JOIN branches b ON b.id = o.branch_id
+      ${where}
+      ORDER BY o.created_at DESC
+      LIMIT ${limit}
+    `;
+    const [rows] = await pool.execute(sql, params).catch(() => [[]]);
+    const list = rows as any[];
+    if (list.length === 0) {
+      logEmptyResult('admin_orders', { shopId, status, limit });
+    }
+    res.json(list || []);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/orders/:id', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Invalid order id' });
+    const [orders] = await pool.execute('SELECT * FROM online_orders WHERE id = ? AND shop_id = ?', [id, shopId]);
+    if ((orders as any[]).length === 0) return res.status(404).json({ error: 'Not found' });
+    const order = (orders as any[])[0];
+    const [items] = await pool.execute(
+      'SELECT id, product_id, name_snapshot, sku_snapshot, quantity, sell_price_snapshot as unit_price FROM online_order_items WHERE order_id = ?',
+      [id]
+    ).catch(() => [[]]);
+    res.json({ ...order, items: items || [] });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/admin/orders/:id/status', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Invalid order id' });
+    const status = String(req.body?.status || '').trim();
+    if (!status) return res.status(400).json({ error: 'status is required' });
+    const orderStatus =
+      status === 'pending'
+        ? 'NEW'
+        : status === 'confirmed'
+        ? 'PROCESSING'
+        : status === 'completed'
+        ? 'DELIVERED'
+        : status === 'cancelled'
+        ? 'CANCELLED'
+        : status;
+    await pool.execute(
+      'UPDATE online_orders SET status = ?, order_status = ? WHERE id = ? AND shop_id = ?',
+      [status, orderStatus, id, shopId]
+    );
+    res.json({ ok: true, status });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== ADMIN PAYMENTS / ORDERS (payments page) ==========
+app.get('/api/admin/payments-orders/orders', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const limitRaw = Number(req.query.limit);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 500) : 200;
+    const status = String(req.query.status || '').trim();
+    const paymentStatus = String(req.query.paymentStatus || '').trim();
+    const branchIdRaw = Number(req.query.branchId);
+    const branchId = Number.isFinite(branchIdRaw) && branchIdRaw > 0 ? Math.floor(branchIdRaw) : null;
+    const search = String(req.query.search || '').trim();
+    let dateFrom = String(req.query.dateFrom || '').trim();
+    let dateTo = String(req.query.dateTo || '').trim();
+    if (!dateFrom && !dateTo) {
+      const now = new Date();
+      const toDefault = now.toISOString().slice(0, 10);
+      const fromDate = new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000);
+      dateFrom = fromDate.toISOString().slice(0, 10);
+      dateTo = `${toDefault} 23:59:59`;
+    }
+
+    const conditions: string[] = ['o.shop_id = ?'];
+    const params: any[] = [shopId];
+    if (status) {
+      conditions.push('o.status = ?');
+      params.push(status);
+    }
+    if (paymentStatus) {
+      conditions.push('o.payment_status = ?');
+      params.push(paymentStatus);
+    }
+    if (branchId) {
+      conditions.push('o.branch_id = ?');
+      params.push(branchId);
+    }
+    if (search) {
+      const like = `%${search}%`;
+      const num = Number(search);
+      conditions.push('(o.customer_name LIKE ? OR o.phone LIKE ? OR o.public_code LIKE ? OR o.id = ?)');
+      params.push(like, like, like, Number.isFinite(num) ? num : -1);
+    }
+    if (dateFrom) {
+      conditions.push('o.created_at >= ?');
+      params.push(dateFrom);
+    }
+    if (dateTo) {
+      conditions.push('o.created_at <= ?');
+      params.push(dateTo);
+    }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const sql = `
+      SELECT o.id, o.shop_id, o.status, o.order_status, o.payment_status, o.customer_name, o.phone, o.governorate, o.city, o.address, o.notes,
+             o.total, o.payment_method, o.branch_id,
+             b.name as branch_name, b.name_ar as branch_name_ar, b.name_en as branch_name_en,
+             o.created_at
+      FROM online_orders o
+      LEFT JOIN branches b ON b.id = o.branch_id
+      ${where}
+      ORDER BY o.created_at DESC
+      LIMIT ${limit}
+    `;
+    const [rows] = await pool.execute(sql, params).catch(() => [[]]);
+    const list = rows as any[];
+    if (list.length === 0) {
+      logEmptyResult('payments_orders_orders', { shopId, status, paymentStatus, branchId, search, dateFrom, dateTo, limit });
+    }
+    res.json(list || []);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/payments-orders/payments', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const limitRaw = Number(req.query.limit);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 500) : 200;
+    const status = String(req.query.status || '').trim();
+    const method = String(req.query.method || '').trim();
+    const branchIdRaw = Number(req.query.branchId);
+    const branchId = Number.isFinite(branchIdRaw) && branchIdRaw > 0 ? Math.floor(branchIdRaw) : null;
+    const search = String(req.query.search || '').trim();
+    let dateFrom = String(req.query.dateFrom || '').trim();
+    let dateTo = String(req.query.dateTo || '').trim();
+    if (!dateFrom && !dateTo) {
+      const now = new Date();
+      const toDefault = now.toISOString().slice(0, 10);
+      const fromDate = new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000);
+      dateFrom = fromDate.toISOString().slice(0, 10);
+      dateTo = `${toDefault} 23:59:59`;
+    }
+
+    const conditions: string[] = ['p.shop_id = ?'];
+    const params: any[] = [shopId];
+    if (status) {
+      conditions.push('p.status = ?');
+      params.push(status);
+    }
+    if (method) {
+      conditions.push('p.method = ?');
+      params.push(method);
+    }
+    if (branchId) {
+      conditions.push('p.branch_id = ?');
+      params.push(branchId);
+    }
+    if (search) {
+      const like = `%${search}%`;
+      const num = Number(search);
+      conditions.push('(o.customer_name LIKE ? OR o.phone LIKE ? OR o.public_code LIKE ? OR p.order_id = ?)');
+      params.push(like, like, like, Number.isFinite(num) ? num : -1);
+    }
+    if (dateFrom) {
+      conditions.push('p.created_at >= ?');
+      params.push(dateFrom);
+    }
+    if (dateTo) {
+      conditions.push('p.created_at <= ?');
+      params.push(dateTo);
+    }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const sql = `
+      SELECT p.id, p.shop_id, p.order_id, p.method, p.amount, p.reference, p.status, p.proof_url, p.reject_reason,
+             o.customer_name, o.phone, o.public_code,
+             b.name as branch_name, b.name_ar as branch_name_ar, b.name_en as branch_name_en,
+             p.created_at
+      FROM payments p
+      LEFT JOIN online_orders o ON o.id = p.order_id
+      LEFT JOIN branches b ON b.id = p.branch_id
+      ${where}
+      ORDER BY p.created_at DESC
+      LIMIT ${limit}
+    `;
+    const [rows] = await pool.execute(sql, params).catch(() => [[]]);
+    const list = rows as any[];
+    if (list.length === 0) {
+      logEmptyResult('payments_orders_payments', { shopId, status, method, branchId, search, dateFrom, dateTo, limit });
+    }
+    res.json(list || []);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/payments/:id/confirm', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Invalid payment id' });
+    const [rows] = await pool.execute('SELECT order_id FROM payments WHERE id = ? AND shop_id = ?', [id, shopId]);
+    if ((rows as any[]).length === 0) return res.status(404).json({ error: 'Payment not found' });
+    const orderId = (rows as any[])[0]?.order_id;
+    await pool.execute('UPDATE payments SET status = "confirmed", reject_reason = NULL WHERE id = ? AND shop_id = ?', [id, shopId]);
+    if (orderId) {
+      await pool.execute('UPDATE online_orders SET payment_status = "confirmed" WHERE id = ? AND shop_id = ?', [orderId, shopId]);
+    }
+    res.json({ ok: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/payments/:id/reject', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Invalid payment id' });
+    const reason = String(req.body?.reason || '').trim() || null;
+    const [rows] = await pool.execute('SELECT order_id FROM payments WHERE id = ? AND shop_id = ?', [id, shopId]);
+    if ((rows as any[]).length === 0) return res.status(404).json({ error: 'Payment not found' });
+    const orderId = (rows as any[])[0]?.order_id;
+    await pool.execute('UPDATE payments SET status = "rejected", reject_reason = ? WHERE id = ? AND shop_id = ?', [reason, id, shopId]);
+    if (orderId) {
+      await pool.execute('UPDATE online_orders SET payment_status = "rejected" WHERE id = ? AND shop_id = ?', [orderId, shopId]);
+    }
+    res.json({ ok: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -2373,6 +2718,82 @@ app.get('/api/notifications/unread-count', authenticateToken, async (req: any, r
   }
 });
 
+// Notifications list (Activity & Notifications page)
+app.get('/api/notifications', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const limitRaw = Number(req.query.limit);
+    const offsetRaw = Number(req.query.offset);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 100) : 20;
+    const offset = Number.isFinite(offsetRaw) && offsetRaw >= 0 ? Math.floor(offsetRaw) : 0;
+    const source = String(req.query.source || '').trim().toLowerCase();
+    const q = String(req.query.q || '').trim();
+
+    const conditions: string[] = ['shop_id = ?'];
+    const params: any[] = [shopId];
+    if (source && ['online', 'pos', 'system'].includes(source)) {
+      conditions.push('source = ?');
+      params.push(source);
+    }
+    if (q) {
+      conditions.push('(title_ar LIKE ? OR title_en LIKE ? OR body_ar LIKE ? OR body_en LIKE ?)');
+      params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
+    }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const sql = `
+      SELECT id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta, created_at
+      FROM notifications
+      ${where}
+      ORDER BY created_at DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+    const [rows] = await pool.execute(sql, params).catch(() => [[]]);
+    const items = rows as any[];
+    if (items.length === 0) {
+      logEmptyResult('notifications', { shopId, source, q, limit, offset });
+    }
+
+    const [unreadRows] = await pool.execute(
+      'SELECT COUNT(*) as cnt FROM notifications WHERE shop_id = ? AND (is_read = 0 OR is_read IS NULL)',
+      [shopId]
+    ).catch(() => [[{ cnt: 0 }]]);
+    const unreadCount = Number((unreadRows as any[])[0]?.cnt || 0);
+    const nextOffset = items.length >= limit ? offset + limit : null;
+    res.json({ ok: true, items, unreadCount, nextOffset });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/notifications/:id/read', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Invalid notification id' });
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    await pool.execute('UPDATE notifications SET is_read = 1 WHERE id = ? AND shop_id = ?', [id, shopId]);
+    res.json({ ok: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/notifications/mark-all-read', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const [result] = await pool.execute(
+      'UPDATE notifications SET is_read = 1 WHERE shop_id = ? AND (is_read = 0 OR is_read IS NULL)',
+      [shopId]
+    );
+    const updated = (result as any)?.affectedRows ?? 0;
+    res.json({ ok: true, updated });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ========== SHOP PROFILE ==========
 app.get('/api/shops/profile', authenticateToken, async (req: any, res: Response) => {
   try {
@@ -2653,20 +3074,23 @@ app.get('/api/users', authenticateToken, requireRole('super_admin', 'shop_owner'
 
 app.post('/api/users', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
   try {
-    const username = (req.body?.username ?? req.body?.identifier ?? req.body?.email ?? '').toString().trim();
+    const rawUsername = req.body?.username ?? req.body?.identifier ?? req.body?.email ?? '';
+    const username = String(rawUsername || '').trim();
     const password = req.body?.password;
-    const role = (req.body?.role ?? req.body?.userRole ?? '').toString().trim();
+    const role = req.body?.role ?? req.body?.userRole ?? '';
     const branchId = req.body?.branchId != null ? Number(req.body.branchId) : null;
     if (!username || !password || !role) {
       return res.status(400).json({ error: 'username, password, and role are required' });
     }
 
-    const requestedRole = role as string;
+    const requestedRole = String(role);
     if (!['shop_owner', 'branch_manager', 'multi_branch_manager', 'cashier', 'warehouse'].includes(requestedRole)) {
       return res.status(400).json({ error: 'Invalid role' });
     }
 
-    const shopId = req.user.role === 'super_admin' ? req.body.shopId : req.user.shop_id;
+    const r = getShopId(req);
+    if (r.forbidden) return res.status(403).json({ error: 'shopId must match your shop' });
+    const shopId = req.user.role === 'super_admin' ? (r.shopId ?? req.body.shopId) : req.user.shop_id;
     if (!shopId) {
       return res.status(400).json({ error: 'shopId is required' });
     }

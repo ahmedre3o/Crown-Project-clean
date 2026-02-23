@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { ShopSwitcher, getActiveShopId } from '@/components/ShopSwitcher';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiRequest } from '@/contexts/AuthContext';
+import { apiRequest, getNoShopMessage, isShopMissingError } from '@/contexts/AuthContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getPlanFeatures } from '@/permissions';
 import { useRouteGuard } from '@/guards/useRouteGuard';
@@ -71,6 +71,13 @@ export default function UsersPage() {
       });
       setBranches(Array.isArray(branchesData) ? branchesData : []);
     } catch (err: any) {
+      if (isShopMissingError(err)) {
+        setUsers([]);
+        setBranches([]);
+        setSubscription(null);
+        setError(getNoShopMessage(language));
+        return;
+      }
       setError(err.message || 'Failed to load');
     } finally {
       setLoading(false);
@@ -97,7 +104,7 @@ export default function UsersPage() {
       setError(language === 'ar' ? 'اختر المتجر أولاً' : 'Please select a shop first');
       return;
     }
-    const payload: Record<string, unknown> = { identifier: form.identifier.trim(), password: form.password, role: validRole };
+    const payload: Record<string, unknown> = { username: form.identifier.trim(), password: form.password, role: validRole };
     if (showBranchSelector && form.branchId) payload.branchId = Number(form.branchId);
     setCreatingUser(true);
     try {
@@ -109,8 +116,8 @@ export default function UsersPage() {
       await loadUsers();
     } catch (err: any) {
       const msg = err?.message || '';
-      if (msg === 'SHOP_ID_REQUIRED') {
-        setError(language === 'ar' ? 'اختر المتجر أولاً' : 'Please select a shop first');
+      if (msg === 'SHOP_ID_REQUIRED' || isShopMissingError(err)) {
+        setError(getNoShopMessage(language));
         return;
       }
       setError(msg === 'PLAN_USER_LIMIT_REACHED' ? (language === 'ar' ? LIMIT_MSG_AR : LIMIT_MSG_EN) : msg);

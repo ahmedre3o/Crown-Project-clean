@@ -14,7 +14,7 @@ import {
 import { AlertTriangle, Package, TrendingUp, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useLanguage } from '../contexts/LanguageContext';
-import { apiRequest, useAuth } from '../contexts/AuthContext';
+import { apiRequest, getNoShopMessage, isShopMissingError, useAuth } from '../contexts/AuthContext';
 import { useRouteGuard } from '../guards/useRouteGuard';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { formatCurrency, formatNumber } from '@/lib/formatters';
@@ -86,6 +86,7 @@ export default function DashboardPage() {
   const [recentProducts, setRecentProducts] = useState<RecentProduct[]>([]);
   const [staffCount, setStaffCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [trialToast, setTrialToast] = useState<string | null>(null);
 
   const displayName = user?.username?.split('@')[0] || (user as any)?.ownerName || user?.username || '';
@@ -151,11 +152,13 @@ export default function DashboardPage() {
         apiRequest('/admin/inventory/slow-moving/summary?days=120&threshold=2').catch(() => ({ ok: false, deadCount: 0, slowCount: 0, deadValue: 0, slowValue: 0 })),
       ]);
 
+      setError(null);
       setStats(statsData);
-      setSalesChartData(salesData);
-      setProfitChartData(profitData);
-      setLowStockProducts(lowStockData);
-      setRecentProducts(recentData.slice(0, 6));
+      setSalesChartData(Array.isArray(salesData) ? salesData : []);
+      setProfitChartData(Array.isArray(profitData) ? profitData : []);
+      setLowStockProducts(Array.isArray(lowStockData) ? lowStockData : []);
+      const recentList = Array.isArray(recentData) ? recentData : [];
+      setRecentProducts(recentList.slice(0, 6));
       const summary = summaryRes as AnalyticsSummary;
       setOnlineStats(summary?.ok ? summary.online : { total: 0, count: 0 });
       setOperationsCount(summary?.ok ? (Number(summary.pos?.count ?? 0) + Number(summary.online?.count ?? 0)) : 0);
@@ -168,8 +171,17 @@ export default function DashboardPage() {
       } catch (err) {
         setStaffCount(null);
       }
-    } catch (error) {
-      console.error('Failed to load dashboard data:', error);
+    } catch (error: any) {
+      if (isShopMissingError(error)) {
+        setError(getNoShopMessage(language));
+        setLowStockProducts([]);
+        setRecentProducts([]);
+        setSalesChartData([]);
+        setProfitChartData([]);
+      } else {
+        console.error('Failed to load dashboard data:', error);
+        setError(language === 'ar' ? 'فشل تحميل البيانات' : 'Failed to load data');
+      }
     } finally {
       setLoading(false);
     }
@@ -212,6 +224,11 @@ export default function DashboardPage() {
             >
               {language === 'ar' ? 'إخفاء' : 'Dismiss'}
             </button>
+          </div>
+        )}
+        {error && (
+          <div className="mb-6 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-200">
+            {error}
           </div>
         )}
         <div className="flex items-center justify-between mb-6">

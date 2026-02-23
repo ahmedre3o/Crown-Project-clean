@@ -25,6 +25,7 @@ export default function ManualEntryPage() {
   const { t, direction, language } = useLanguage();
   const { user, loading: authLoading, effectiveRole } = useAuth();
   const { allowed } = useRouteGuard(user, authLoading, { feature: 'manual_entry', effectiveRole });
+  const packageMissing = !user?.package;
   const [form, setForm] = useState({
     nameEn: '',
     nameAr: '',
@@ -131,7 +132,12 @@ export default function ManualEntryPage() {
       <div className="flex-1 p-8 pt-20 md:pt-8 overflow-y-auto">
         <h1 className="text-2xl font-bold text-cyan-200 mb-6">{t('manual.title')}</h1>
         <div className="neon-card rounded-xl p-6">
-          {error && (
+        {packageMissing && (
+          <div className="mb-4 rounded-lg border border-amber-400/40 bg-amber-400/10 p-3 text-sm text-amber-200">
+            {language === 'ar' ? 'بيانات الباقة غير متاحة حالياً' : 'Package data unavailable'}
+          </div>
+        )}
+        {error && (
             <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
               {error}
             </div>

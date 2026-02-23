@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ShoppingCart, Package, Star } from 'lucide-react';
-import { API_BASE_URL } from '../../api-config';
+import { apiRequest } from '../../contexts/AuthContext';
 
 interface Product {
   id: number;
@@ -41,12 +41,8 @@ export default function StorefrontPage() {
 
   const loadStorefront = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/public/storefront/${shopId}`);
-      if (!response.ok) {
-        throw new Error('Storefront not available');
-      }
-      const storefrontData = await response.json();
-      setData(storefrontData);
+      const storefrontData = await apiRequest(`/public/storefront/${shopId}`);
+      setData(storefrontData || null);
     } catch (error) {
       console.error('Failed to load storefront:', error);
     } finally {
@@ -82,7 +78,8 @@ export default function StorefrontPage() {
   }
 
   const cartCount = cart.length;
-  const cartItems = data.products.filter((p) => cart.includes(p.id));
+  const products = Array.isArray(data?.products) ? data.products : [];
+  const cartItems = products.filter((p) => cart.includes(p.id));
 
   return (
     <div className="min-h-screen bg-black text-white" dir={language === 'ar' ? 'rtl' : 'ltr'}>
@@ -134,12 +131,12 @@ export default function StorefrontPage() {
           </h3>
           <div className="flex items-center gap-2 text-cyan-400">
             <Package className="w-5 h-5" />
-            <span>{data.products.length} {language === 'ar' ? 'منتج' : 'products'}</span>
+            <span>{products.length} {language === 'ar' ? 'منتج' : 'products'}</span>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {data.products.map((product) => {
+          {products.map((product) => {
             const inCart = cart.includes(product.id);
             return (
               <div key={product.id} className="neon-box rounded-xl p-6 hover:scale-105 transition-transform">

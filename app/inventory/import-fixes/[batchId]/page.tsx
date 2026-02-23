@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { API_BASE_URL } from '../../../api-config';
+import { apiRequest } from '../../../contexts/AuthContext';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 
@@ -39,22 +39,6 @@ const CANONICAL_FIELDS = [
   { key: 'imageUrl', apiKey: 'imageUrl', labelAr: 'الصورة', labelEn: 'Image URL' },
 ];
 
-function buildHeaders(): Record<string, string> {
-  const token = localStorage.getItem('token');
-  const headers: Record<string, string> = {};
-  if (token) headers.Authorization = `Bearer ${token}`;
-  try {
-    const raw = localStorage.getItem('user');
-    if (raw) {
-      const u = JSON.parse(raw);
-      if (u?.shopId) headers['x-shop-id'] = String(u.shopId);
-    }
-  } catch {
-    // ignore
-  }
-  return headers;
-}
-
 export default function ImportFixesPage() {
   const params = useParams();
   const router = useRouter();
@@ -78,10 +62,9 @@ export default function ImportFixesPage() {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch(`${API_BASE_URL}/products/import/batch/${batchId}`, { headers: buildHeaders() });
-      const data = await res.json().catch(() => ({}));
-      if (!data.ok || !res.ok) {
-        setError(data.error || 'Failed to load batch');
+      const data = await apiRequest(`/products/import/batch/${batchId}`);
+      if (!data?.ok) {
+        setError(data?.error || 'Failed to load batch');
         return;
       }
       setBatch(data.batch);
@@ -117,15 +100,10 @@ export default function ImportFixesPage() {
     if (!edits || Object.keys(edits).length === 0) return;
     setCommitting(String(rowIndex));
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/products/import/batch/${batchId}/row/${rowIndex}`,
-        {
-          method: 'PATCH',
-          headers: { ...buildHeaders(), 'Content-Type': 'application/json' },
-          body: JSON.stringify(edits),
-        }
-      );
-      const data = await res.json();
+      const data = await apiRequest(`/products/import/batch/${batchId}/row/${rowIndex}`, {
+        method: 'PATCH',
+        body: JSON.stringify(edits),
+      });
       if (data.ok) {
         setEditing((prev) => {
           const next = { ...prev };
@@ -146,11 +124,7 @@ export default function ImportFixesPage() {
   const commitAll = async () => {
     setCommitAllLoading(true);
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/products/import/batch/${batchId}/commit`,
-        { method: 'POST', headers: buildHeaders() }
-      );
-      const data = await res.json();
+      const data = await apiRequest(`/products/import/batch/${batchId}/commit`, { method: 'POST' });
       if (data.ok) {
         const msg = data.messageAr || (language === 'ar' ? `تم اعتماد ${data.committed ?? 0} صنف` : `${data.committed ?? 0} items committed`);
         alert(msg);

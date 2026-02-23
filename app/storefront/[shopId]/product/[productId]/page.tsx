@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ShoppingCart, ChevronLeft, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
-import { API_BASE_URL } from '../../../../api-config';
+import { apiRequest } from '../../../../contexts/AuthContext';
 
 interface Product {
   id: number;
@@ -43,9 +43,8 @@ export default function StorefrontProductPage() {
 
   useEffect(() => {
     if (shopId && productId) {
-      fetch(`${API_BASE_URL}/public/storefront/${shopId}/product/${productId}`)
-        .then((r) => r.ok ? r.json() : null)
-        .then(setData)
+      apiRequest(`/public/storefront/${shopId}/product/${productId}`)
+        .then((resp) => setData(resp || null))
         .catch(() => setData(null))
         .finally(() => setLoading(false));
     }

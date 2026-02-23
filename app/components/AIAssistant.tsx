@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Mic, Send, MessageCircle, X, Copy, Volume2, VolumeX, Square } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { API_BASE_URL } from '../api-config';
+import { apiRequest } from '../contexts/AuthContext';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import { useBranch } from '../contexts/BranchContext';
@@ -111,16 +111,7 @@ export function AIAssistant() {
     if (!open) return;
     (async () => {
       try {
-        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-        const resp = await fetch(`${API_BASE_URL}/ai/status`, {
-          method: 'GET',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        });
-        const json = await resp.json().catch(() => ({}));
+        const json = await apiRequest('/ai/status');
         if (json && (json.mode === 'cloud' || json.mode === 'offline')) {
           setAiMode(json.mode);
         } else {
@@ -143,7 +134,6 @@ export function AIAssistant() {
       setErrorToast(null);
 
       try {
-        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
         const history = messages.slice(-16).map((m) => ({ role: m.role, content: m.content }));
         const u = user as { id?: number; userId?: number; shop_id?: number; shopId?: number } | null;
         const shopId =
@@ -163,17 +153,10 @@ export function AIAssistant() {
           lang,
         };
 
-        const response = await fetch(`${API_BASE_URL}/chat`, {
+        const data = await apiRequest('/chat', {
           method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
           body: JSON.stringify({ message: trimmed, lang, context, history }),
         });
-
-        const data = await response.json().catch(() => ({}));
 
         const isAiUnavailable = data && data.ok === false && data.error === 'AI_UNAVAILABLE';
         const preferredMessage =

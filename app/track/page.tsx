@@ -3,7 +3,7 @@
 import React, { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Package, MapPin, Phone, Clock, CheckCircle, XCircle } from 'lucide-react';
-import { API_BASE_URL } from '../api-config';
+import { apiRequest } from '../contexts/AuthContext';
 import Link from 'next/link';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { formatCurrency } from '@/lib/formatters';
@@ -55,10 +55,9 @@ function TrackPageContent() {
     const load = async () => {
       try {
         setError(null);
-        const res = await fetch(`${API_BASE_URL}/storefront/orders/track?code=${encodeURIComponent(code)}&phone=${encodeURIComponent(phone)}`);
-        const json = await res.json();
+        const json = await apiRequest(`/storefront/orders/track?code=${encodeURIComponent(code)}&phone=${encodeURIComponent(phone)}`);
         if (!alive) return;
-        if (!res.ok || !json?.ok) {
+        if (!json?.ok) {
           setError(json?.ar || json?.error || 'Order not found');
           setData(null);
           setShop(null);

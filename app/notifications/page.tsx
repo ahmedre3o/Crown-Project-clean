@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Bell, Search, ChevronDown, ChevronUp, CheckCheck, Globe, ShoppingCart, FileText } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { apiRequest, useAuth } from '../contexts/AuthContext';
+import { apiRequest, getNoShopMessage, isShopMissingError, useAuth } from '../contexts/AuthContext';
 import { useRouteGuard } from '../guards/useRouteGuard';
 
 interface Notification {
@@ -56,7 +56,14 @@ export default function NotificationsPage() {
         setNextOffset(res?.nextOffset ?? null);
         setUnreadCount(Number(res?.unreadCount ?? 0));
       } catch (err: any) {
-        setError(err?.message || (language === 'ar' ? 'فشل التحميل' : 'Failed to load'));
+        if (isShopMissingError(err)) {
+          setItems([]);
+          setUnreadCount(0);
+          setNextOffset(null);
+          setError(getNoShopMessage(language));
+        } else {
+          setError(err?.message || (language === 'ar' ? 'فشل التحميل' : 'Failed to load'));
+        }
       } finally {
         setLoading(false);
         setLoadingMore(false);

@@ -73,18 +73,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(savedToken);
       setUser(JSON.parse(savedUser));
     }
-    const refreshUser = async () => {
+  const refreshUser = async () => {
       if (!savedToken) {
         setLoading(false);
         return;
       }
       try {
-        const response = await fetch(`${API_BASE_URL}/auth/me`, {
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${savedToken}`,
-          },
+        const response = await apiFetch('/auth/me', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          skipShopId: true,
         });
         if (response.ok) {
           const data = await response.json();
@@ -121,14 +119,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (username: string, password: string, shopId?: string) => {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+    const response = await apiFetch('/auth/login', {
       method: 'POST',
-      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         ...(shopId ? { 'X-Shop-Id': String(shopId).trim() } : {}),
       },
       body: JSON.stringify({ username: username.trim(), password }),
+      skipAuth: true,
+      skipShopId: true,
     });
 
     const raw = await response.text();
@@ -201,12 +200,69 @@ export function getStoredToken() {
   );
 }
 
-export const apiRequest = async (url: string, options: RequestInit = {}) => {
+export function getActiveShopId(): number | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    const fromUser = Number(user?.shopId ?? user?.shop_id ?? NaN);
+    const fromStorage = Number(localStorage.getItem('activeShopId') ?? NaN);
+    if (Number.isFinite(fromStorage) && fromStorage > 0) return fromStorage;
+    if (Number.isFinite(fromUser) && fromUser > 0) return fromUser;
+  } catch {}
+  return null;
+}
+
+function isShopRequiredPath(url: string): boolean {
+  try {
+    const path = url.startsWith('http') ? new URL(url).pathname : url;
+    const safe = path.startsWith('/') ? path : `/${path}`;
+    if (safe.startsWith('/auth') || safe.startsWith('/public') || safe.startsWith('/health') || safe.startsWith('/setup-admin')) {
+      return false;
+    }
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+export function isShopMissingError(err: any): boolean {
+  return err?.code === 'SHOP_ID_REQUIRED' || err?.message === 'SHOP_ID_REQUIRED';
+}
+
+export function getNoShopMessage(language: string): string {
+  return language === 'ar' ? 'لا توجد بيانات / لم يتم اختيار متجر' : 'No data / shop not selected';
+}
+
+export type ApiFetchOptions = RequestInit & { skipAuth?: boolean; skipShopId?: boolean };
+
+export const apiFetch = async (url: string, options: ApiFetchOptions = {}) => {
   const token = getStoredToken();
+  const activeShopId = getActiveShopId();
+  const { skipAuth, skipShopId, ...fetchOptions } = options;
+  if (!skipShopId && token && isShopRequiredPath(url) && !activeShopId) {
+    const err: any = new Error('SHOP_ID_REQUIRED');
+    err.code = 'SHOP_ID_REQUIRED';
+    throw err;
+  }
+
+  const headers: HeadersInit = {
+    ...(fetchOptions.headers || {}),
+  };
+  if (!skipAuth && token) (headers as any).Authorization = `Bearer ${token}`;
+  if (!skipShopId && activeShopId) (headers as any)['X-Shop-Id'] = String(activeShopId);
+
+  const target = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+  return fetch(target, {
+    ...fetchOptions,
+    credentials: 'include',
+    headers,
+  });
+};
+
+export const apiRequest = async (url: string, options: RequestInit = {}) => {
   const storedUser = localStorage.getItem('user');
   const userObj = storedUser ? JSON.parse(storedUser) : null;
   const isSuperAdmin = userObj?.role === 'super_admin';
-  // Role override only affects UI; API always uses real role for security
   const shopId =
     userObj?.shopId ?? userObj?.shop_id ??
     (isSuperAdmin && typeof window !== 'undefined' ? localStorage.getItem('crown-active-shop-id') : null);
@@ -214,34 +270,13 @@ export const apiRequest = async (url: string, options: RequestInit = {}) => {
     typeof window !== 'undefined' && shopId
       ? localStorage.getItem(`crown-active-branch-${shopId}`)
       : null;
-
-  // ---- Auto attach shopId header ----
-  let activeShopId: number | null = null;
-  try {
-    if (typeof window !== 'undefined') {
-      const user = JSON.parse(localStorage.getItem('user') || 'null');
-      const fromUser = Number(user?.shopId ?? user?.shop_id ?? NaN);
-      const fromStorage = Number(localStorage.getItem('activeShopId') ?? NaN);
-      if (Number.isFinite(fromStorage) && fromStorage > 0) activeShopId = fromStorage;
-      else if (Number.isFinite(fromUser) && fromUser > 0) activeShopId = fromUser;
-    }
-  } catch {}
-
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    ...(token && { Authorization: `Bearer ${token}` }),
-    ...(branchId && { 'x-branch-id': String(branchId) }),
-    ...(options.headers || {}),
-  };
-
-  if (activeShopId && activeShopId > 0) {
-    (headers as any)['x-shop-id'] = String(activeShopId);
-  }
-
-  const response = await fetch(`${API_BASE_URL}${url}`, {
+  const response = await apiFetch(url, {
     ...options,
-    credentials: 'include',
-    headers,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(branchId && { 'X-Branch-Id': String(branchId) }),
+      ...(options.headers || {}),
+    },
   });
 
   const raw = await response.text();

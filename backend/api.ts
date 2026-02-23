@@ -1824,6 +1824,9 @@ app.get('/api/admin/inventory/slow-moving/summary', authenticateToken, async (re
     ).catch(() => [[{ c: 0, v: 0 }]]);
     const deadRow = (dead as any[])[0] || {};
     const slowRow = (slow as any[])[0] || {};
+    if (!Number(deadRow.c ?? 0) && !Number(slowRow.c ?? 0)) {
+      console.log('[admin/inventory/slow-moving/summary] empty result', { shopId, days, threshold });
+    }
     res.json({
       ok: true,
       deadCount: Number(deadRow.c ?? 0),
@@ -1865,6 +1868,9 @@ app.get('/api/admin/inventory/slow-moving', authenticateToken, async (req: any, 
     sql += ' ORDER BY (p.sell_price * p.stock_quantity) DESC LIMIT ? OFFSET ?';
     params.push(limit, offset);
     const [rows] = await pool.execute(sql, params);
+    if ((rows as any[]).length === 0) {
+      console.log('[admin/inventory/slow-moving] empty result', { shopId, days, threshold, q, limit, offset });
+    }
     res.json({ items: rows || [] });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -2139,6 +2145,213 @@ app.get('/api/admin/reports/day-details', authenticateToken, async (req: any, re
     if (source === 'online') items = items.filter((i: any) => i.source === 'online');
     items.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     res.json({ ok: true, items });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== ADMIN ORDERS + PAYMENTS (store-admin/orders, store-admin/payments) ==========
+app.get('/api/admin/orders', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const where: string[] = ['o.shop_id = ?'];
+    const params: any[] = [shopId];
+    const status = String(req.query.status || '').trim();
+    const paymentStatus = String(req.query.paymentStatus || '').trim();
+    const branchId = String(req.query.branchId || '').trim();
+    const search = String(req.query.search || '').trim();
+    const dateFrom = String(req.query.dateFrom || '').trim();
+    const dateTo = String(req.query.dateTo || '').trim();
+
+    if (status) { where.push('o.order_status = ?'); params.push(status); }
+    if (paymentStatus) { where.push('o.payment_status = ?'); params.push(paymentStatus); }
+    if (branchId) { where.push('o.branch_id = ?'); params.push(branchId); }
+    if (search) {
+      where.push('(o.customer_name LIKE ? OR o.phone LIKE ? OR o.public_code LIKE ?)');
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    }
+    if (dateFrom && dateTo) {
+      where.push('DATE(o.created_at) BETWEEN ? AND ?');
+      params.push(dateFrom, dateTo);
+    } else if (!dateFrom && !dateTo) {
+      // default safe range: last 30 days
+      where.push('o.created_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)');
+    } else if (dateFrom) {
+      where.push('DATE(o.created_at) >= ?');
+      params.push(dateFrom);
+    } else if (dateTo) {
+      where.push('DATE(o.created_at) <= ?');
+      params.push(dateTo);
+    }
+
+    const sql = `
+      SELECT o.id, o.shop_id, o.status, o.order_status, o.payment_status, o.customer_name, o.phone, o.governorate, o.city, o.address,
+             o.notes, o.total, o.payment_method, o.branch_id, o.created_at
+      FROM online_orders o
+      WHERE ${where.join(' AND ')}
+      ORDER BY o.created_at DESC
+    `;
+    const [rows] = await pool.execute(sql, params);
+    if ((rows as any[]).length === 0) {
+      console.log('[admin/orders] empty result', { shopId, status, paymentStatus, branchId, search, dateFrom, dateTo });
+    }
+    res.json(rows || []);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/orders/:id', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Invalid id' });
+    const [orders] = await pool.execute('SELECT * FROM online_orders WHERE id = ? AND shop_id = ?', [id, shopId]);
+    if ((orders as any[]).length === 0) return res.status(404).json({ error: 'Not found' });
+    const [items] = await pool.execute(
+      'SELECT id, order_id, product_id, name_snapshot, sku_snapshot, quantity, sell_price_snapshot, price_snapshot FROM online_order_items WHERE order_id = ?',
+      [id]
+    );
+    res.json({ ...(orders as any[])[0], items: items || [] });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/admin/orders/:id/status', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const id = parseInt(req.params.id, 10);
+    const status = String(req.body?.status || '').trim();
+    if (!id || !status) return res.status(400).json({ error: 'status required' });
+    await pool.execute('UPDATE online_orders SET order_status = ? WHERE id = ? AND shop_id = ?', [status, id, shopId]);
+    res.json({ ok: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/payments-orders/orders', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const where: string[] = ['o.shop_id = ?'];
+    const params: any[] = [shopId];
+    const status = String(req.query.status || '').trim();
+    const paymentStatus = String(req.query.paymentStatus || '').trim();
+    const branchId = String(req.query.branchId || '').trim();
+    const search = String(req.query.search || '').trim();
+    const dateFrom = String(req.query.dateFrom || '').trim();
+    const dateTo = String(req.query.dateTo || '').trim();
+    if (status) { where.push('o.order_status = ?'); params.push(status); }
+    if (paymentStatus) { where.push('o.payment_status = ?'); params.push(paymentStatus); }
+    if (branchId) { where.push('o.branch_id = ?'); params.push(branchId); }
+    if (search) {
+      where.push('(o.customer_name LIKE ? OR o.phone LIKE ? OR o.public_code LIKE ?)');
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    }
+    if (dateFrom && dateTo) {
+      where.push('DATE(o.created_at) BETWEEN ? AND ?');
+      params.push(dateFrom, dateTo);
+    } else if (!dateFrom && !dateTo) {
+      where.push('o.created_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)');
+    } else if (dateFrom) {
+      where.push('DATE(o.created_at) >= ?');
+      params.push(dateFrom);
+    } else if (dateTo) {
+      where.push('DATE(o.created_at) <= ?');
+      params.push(dateTo);
+    }
+    const sql = `
+      SELECT o.id, o.shop_id, o.status, o.order_status, o.payment_status, o.customer_name, o.phone, o.governorate, o.city, o.address,
+             o.notes, o.total, o.payment_method, o.branch_id, o.created_at
+      FROM online_orders o
+      WHERE ${where.join(' AND ')}
+      ORDER BY o.created_at DESC
+    `;
+    const [rows] = await pool.execute(sql, params);
+    if ((rows as any[]).length === 0) {
+      console.log('[admin/payments-orders/orders] empty result', { shopId, status, paymentStatus, branchId, search, dateFrom, dateTo });
+    }
+    res.json(rows || []);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/payments-orders/payments', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const where: string[] = ['p.shop_id = ?'];
+    const params: any[] = [shopId];
+    const status = String(req.query.status || '').trim();
+    const method = String(req.query.method || '').trim();
+    const branchId = String(req.query.branchId || '').trim();
+    const search = String(req.query.search || '').trim();
+    const dateFrom = String(req.query.dateFrom || '').trim();
+    const dateTo = String(req.query.dateTo || '').trim();
+    if (status) { where.push('p.status = ?'); params.push(status); }
+    if (method) { where.push('p.method = ?'); params.push(method); }
+    if (branchId) { where.push('p.branch_id = ?'); params.push(branchId); }
+    if (search) {
+      where.push('(o.customer_name LIKE ? OR o.phone LIKE ? OR o.public_code LIKE ?)');
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    }
+    if (dateFrom && dateTo) {
+      where.push('DATE(p.created_at) BETWEEN ? AND ?');
+      params.push(dateFrom, dateTo);
+    } else if (!dateFrom && !dateTo) {
+      where.push('p.created_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)');
+    } else if (dateFrom) {
+      where.push('DATE(p.created_at) >= ?');
+      params.push(dateFrom);
+    } else if (dateTo) {
+      where.push('DATE(p.created_at) <= ?');
+      params.push(dateTo);
+    }
+    const sql = `
+      SELECT p.*, o.customer_name, o.phone, o.public_code
+      FROM payments p
+      LEFT JOIN online_orders o ON o.id = p.order_id
+      WHERE ${where.join(' AND ')}
+      ORDER BY p.created_at DESC
+    `;
+    const [rows] = await pool.execute(sql, params);
+    if ((rows as any[]).length === 0) {
+      console.log('[admin/payments-orders/payments] empty result', { shopId, status, method, branchId, search, dateFrom, dateTo });
+    }
+    res.json(rows || []);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/payments/:id/confirm', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Invalid id' });
+    await pool.execute('UPDATE payments SET status = ? WHERE id = ? AND shop_id = ?', ['confirmed', id, shopId]);
+    res.json({ ok: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/payments/:id/reject', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Invalid id' });
+    const reason = String(req.body?.reason || '').trim() || null;
+    await pool.execute('UPDATE payments SET status = ?, reject_reason = ? WHERE id = ? AND shop_id = ?', ['rejected', reason, id, shopId]);
+    res.json({ ok: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -2440,13 +2653,16 @@ app.get('/api/users', authenticateToken, requireRole('super_admin', 'shop_owner'
 
 app.post('/api/users', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
   try {
-    const { username, password, role } = req.body;
+    const username = (req.body?.username ?? req.body?.identifier ?? req.body?.email ?? '').toString().trim();
+    const password = req.body?.password;
+    const role = (req.body?.role ?? req.body?.userRole ?? '').toString().trim();
+    const branchId = req.body?.branchId != null ? Number(req.body.branchId) : null;
     if (!username || !password || !role) {
       return res.status(400).json({ error: 'username, password, and role are required' });
     }
 
     const requestedRole = role as string;
-    if (!['shop_owner', 'cashier', 'warehouse'].includes(requestedRole)) {
+    if (!['shop_owner', 'branch_manager', 'multi_branch_manager', 'cashier', 'warehouse'].includes(requestedRole)) {
       return res.status(400).json({ error: 'Invalid role' });
     }
 
@@ -2477,6 +2693,19 @@ app.post('/api/users', authenticateToken, requireRole('super_admin', 'shop_owner
       [username, hashedPassword, requestedRole, shopPackage || 'bronze', shopId]
     );
     const insertResult = result as any;
+    if (branchId && Number.isFinite(branchId)) {
+      try {
+        const [branchRows] = await pool.execute('SELECT id FROM branches WHERE id = ? AND shop_id = ?', [branchId, shopId]);
+        if ((branchRows as any[]).length > 0) {
+          await pool.execute(
+            'INSERT IGNORE INTO user_branch_assignments (user_id, branch_id, shop_id) VALUES (?, ?, ?)',
+            [insertResult.insertId, branchId, shopId]
+          );
+        }
+      } catch {
+        // best effort; don't block user creation
+      }
+    }
     res.status(201).json({ id: insertResult.insertId, username, role: requestedRole });
   } catch (error: any) {
     if (error.code === 'ER_DUP_ENTRY') {

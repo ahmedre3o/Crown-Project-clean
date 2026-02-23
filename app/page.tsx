@@ -3,7 +3,7 @@
 import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from './contexts/AuthContext';
-import { API_BASE_URL } from './api-config';
+import { apiFetch } from './contexts/AuthContext';
 
 export default function RootPage() {
   const router = useRouter();
@@ -18,7 +18,7 @@ export default function RootPage() {
       const checkStorefront = async () => {
         try {
           const host = typeof window !== 'undefined' ? window.location.host : '';
-          const response = await fetch(`${API_BASE_URL}/public/storefront`, {
+          const response = await apiFetch('/public/storefront', {
             headers: { 'x-shop-domain': host },
           });
           if (response.ok) {

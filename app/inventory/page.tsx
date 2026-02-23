@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { useLanguage } from '../contexts/LanguageContext';
-import { apiRequest, useAuth } from '../contexts/AuthContext';
+import { apiRequest, getNoShopMessage, isShopMissingError, useAuth } from '../contexts/AuthContext';
 import { useRouteGuard } from '../guards/useRouteGuard';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { canAccess, getPlanFeatures } from '../permissions';
@@ -103,7 +103,12 @@ export default function InventoryPage() {
       const data = await apiRequest('/products');
       setProducts(data);
     } catch (err: any) {
-      setError(err.message || 'Failed to load products');
+      if (isShopMissingError(err)) {
+        setProducts([]);
+        setError(getNoShopMessage(language));
+      } else {
+        setError(err.message || 'Failed to load products');
+      }
     } finally {
       setLoading(false);
     }

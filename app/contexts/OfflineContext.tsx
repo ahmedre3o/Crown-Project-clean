@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { API_BASE_URL } from '../api-config';
+import { apiFetch } from '../contexts/AuthContext';
 import { getQueue, getQueueCount, removeFromQueue, type QueuedItem } from '../../lib/offline-queue';
 
 interface OfflineContextType {
@@ -49,7 +49,6 @@ export const OfflineProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const syncNow = useCallback(async () => {
     if (!navigator.onLine) return;
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     const storedUser = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
     const userObj = storedUser ? JSON.parse(storedUser) : null;
     const shopId = userObj?.shopId ?? userObj?.shop_id ?? (userObj?.role === 'super_admin' ? localStorage.getItem('crown-active-shop-id') : null);
@@ -58,14 +57,11 @@ export const OfflineProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const items = await getQueue();
     for (const item of items) {
       try {
-        const res = await fetch(`${API_BASE_URL}${item.endpoint}`, {
+        const res = await apiFetch(item.endpoint, {
           method: item.method,
-          credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
-            ...(token && { Authorization: `Bearer ${token}` }),
-            ...(shopId && { 'x-shop-id': String(shopId) }),
-            ...(branchId && { 'x-branch-id': String(branchId) }),
+            ...(branchId && { 'X-Branch-Id': String(branchId) }),
           },
           body: JSON.stringify(item.payload),
         });

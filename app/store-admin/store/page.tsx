@@ -160,6 +160,7 @@ export default function StoreManagementPage() {
     row.verification_method === 'cname'
       ? `${row.verification_token}.${cfg.cnameRoot}`
       : `crown-site-verification=${row.verification_token}`;
+  const safeDomains = Array.isArray(domains) ? domains : [];
 
   if (authLoading || !allowed) return null;
 
@@ -263,7 +264,7 @@ export default function StoreManagementPage() {
                       </tr>
                     </thead>
                     <tbody className="text-slate-200">
-                      {domains.map((row) => {
+                      {safeDomains.map((row) => {
                         const active = Number(row.is_active) === 1 && row.status === 'active';
                         const recordName = recordNameFor(row.domain);
                         const recordValue = recordValueFor(row);

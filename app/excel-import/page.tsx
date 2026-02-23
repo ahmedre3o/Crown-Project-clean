@@ -4,8 +4,7 @@ import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { Sidebar } from '@/components/Sidebar';
 import { useLanguage } from '../contexts/LanguageContext';
-import { API_BASE_URL } from '../api-config';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, apiFetch } from '../contexts/AuthContext';
 import { useRouteGuard } from '../guards/useRouteGuard';
 
 type AnalyzeResponse = {
@@ -71,25 +70,9 @@ export default function ExcelImportPage() {
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [mappingConfirmed, setMappingConfirmed] = useState(false);
 
-  const buildHeaders = () => {
-    const token = localStorage.getItem('token');
-    const headers: Record<string, string> = {};
-    if (token) headers.Authorization = `Bearer ${token}`;
-    try {
-      const raw = localStorage.getItem('user');
-      if (raw) {
-        const u = JSON.parse(raw);
-        if (u?.shopId) headers['x-shop-id'] = String(u.shopId);
-      }
-    } catch {
-      // ignore
-    }
-    return headers;
-  };
-
   const downloadTemplate = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/products/import/template`, { headers: buildHeaders() });
+      const res = await apiFetch('/products/import/template');
       if (!res.ok) throw new Error('Download failed');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -117,10 +100,9 @@ export default function ExcelImportPage() {
       const form = new FormData();
       form.append('mode', 'analyze');
       form.append('file', f, f.name);
-      const url = `${API_BASE_URL}/products/import?mode=analyze&sheet=${sheetIndex}&headerRow=${headerRowIndex}`;
-      const res = await fetch(url, {
+      const url = `/products/import?mode=analyze&sheet=${sheetIndex}&headerRow=${headerRowIndex}`;
+      const res = await apiFetch(url, {
         method: 'POST',
-        headers: buildHeaders(),
         body: form,
       });
       const data: AnalyzeResponse = await res.json().catch(() => ({}));
@@ -163,10 +145,9 @@ export default function ExcelImportPage() {
       if (Object.keys(mapToUse).length > 0) {
         form.append('mapping', JSON.stringify(mapToUse));
       }
-      const url = `${API_BASE_URL}/products/import?mode=import&sheet=${sheetIndex}&headerRow=${headerRowIndex}`;
-      const res = await fetch(url, {
+      const url = `/products/import?mode=import&sheet=${sheetIndex}&headerRow=${headerRowIndex}`;
+      const res = await apiFetch(url, {
         method: 'POST',
-        headers: buildHeaders(),
         body: form,
       });
       const data: ImportResponse = await res.json().catch(() => ({}));

@@ -3,7 +3,7 @@
 import React, { Suspense, useEffect, useState, useCallback } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiRequest, useAuth } from '@/contexts/AuthContext';
+import { apiRequest, getNoShopMessage, isShopMissingError, useAuth } from '@/contexts/AuthContext';
 import { useRouteGuard } from '@/guards/useRouteGuard';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useBranch, getBranchDisplayName } from '@/contexts/BranchContext';
@@ -126,7 +126,12 @@ function PaymentsPageContent() {
       const data = await apiRequest(`/admin/payments-orders/orders?${q.toString()}`);
       setOrders(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      setError(err.message || t('فشل تحميل الطلبات', 'Failed to load orders'));
+      if (isShopMissingError(err)) {
+        setOrders([]);
+        setError(getNoShopMessage(language));
+      } else {
+        setError(err.message || t('فشل تحميل الطلبات', 'Failed to load orders'));
+      }
     } finally {
       setLoading(false);
     }
@@ -146,7 +151,12 @@ function PaymentsPageContent() {
       const data = await apiRequest(`/admin/payments-orders/payments?${q.toString()}`);
       setPayments(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      setError(err.message || t('فشل تحميل المدفوعات', 'Failed to load payments'));
+      if (isShopMissingError(err)) {
+        setPayments([]);
+        setError(getNoShopMessage(language));
+      } else {
+        setError(err.message || t('فشل تحميل المدفوعات', 'Failed to load payments'));
+      }
     } finally {
       setLoading(false);
     }

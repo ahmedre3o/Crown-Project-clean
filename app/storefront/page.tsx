@@ -4,7 +4,7 @@ import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Sparkles, Clock, Globe, Search, ShoppingCart, Package, X, ExternalLink } from 'lucide-react';
 import { NeonCrownIcon } from '../components/NeonCrownIcon';
-import { API_BASE_URL } from '../api-config';
+import { apiFetch, apiRequest } from '../contexts/AuthContext';
 
 type Category = {
   id: number;
@@ -165,17 +165,17 @@ function StorefrontPageContent() {
       const headers: Record<string, string> = {};
 
       if (domainParam) {
-        url = `${API_BASE_URL}/public/storefront/by-domain?domain=${encodeURIComponent(domainParam)}`;
+        url = `/public/storefront/by-domain?domain=${encodeURIComponent(domainParam)}`;
       } else if (shopIdParam && /^\d+$/.test(String(shopIdParam))) {
-        url = `${API_BASE_URL}/public/storefront/preview/${encodeURIComponent(String(shopIdParam))}-shop`;
+        url = `/public/storefront/preview/${encodeURIComponent(String(shopIdParam))}-shop`;
       } else if (previewSlug) {
-        url = `${API_BASE_URL}/public/storefront/preview/${encodeURIComponent(previewSlug)}`;
+        url = `/public/storefront/preview/${encodeURIComponent(previewSlug)}`;
       } else {
-        url = `${API_BASE_URL}/public/storefront`;
+        url = `/public/storefront`;
         headers['x-shop-domain'] = host;
       }
 
-      const response = await fetch(url, { headers });
+      const response = await apiFetch(url, { headers });
 
       const raw = await response.text();
       let payload: any = null;
@@ -227,8 +227,10 @@ function StorefrontPageContent() {
       : data?.shop?.business_name_en || data?.shop?.business_name || data?.shop?.business_name_ar || data?.shop?.name || 'Crown Store';
   const currency = data?.shop?.currency_symbol || (language === 'ar' ? 'ج.م' : 'EGP');
 
+  const products = Array.isArray(data?.products) ? data.products : [];
+
   const filteredProducts = useMemo(() => {
-    const list = data?.products || [];
+    const list = products;
     const q = query.trim().toLowerCase();
     if (!q) return list;
     return list.filter((p) => {
@@ -244,12 +246,12 @@ function StorefrontPageContent() {
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [data?.products, query]);
+  }, [products, query]);
 
   const cartItems = useMemo(() => {
     const ids = Object.keys(cart).map((k) => Number(k));
-    return (data?.products || []).filter((p) => ids.includes(p.id));
-  }, [cart, data?.products]);
+    return products.filter((p) => ids.includes(p.id));
+  }, [cart, products]);
 
   const cartCount = useMemo(() => Object.values(cart).reduce((s, n) => s + Number(n || 0), 0), [cart]);
   const cartTotal = useMemo(
@@ -665,13 +667,10 @@ function StorefrontPageContent() {
                       quantity: cart[p.id] || 1,
                     })),
                   };
-                  const res = await fetch(`${API_BASE_URL}/storefront/orders`, {
+                  const json = await apiRequest('/storefront/orders', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload),
                   });
-                  const json = await res.json();
-                  if (!res.ok) throw new Error(json?.ar || json?.error || 'Failed');
                   setCheckoutOpen(false);
                   setCart({});
                   setCheckoutForm({ customerName: '', phone: '', governorate: '', city: '', address: '', notes: '', paymentMethod: 'cash_on_delivery' });

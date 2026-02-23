@@ -4,7 +4,7 @@ import React, { Suspense, useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Sidebar } from '@/components/Sidebar';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiRequest, useAuth } from '@/contexts/AuthContext';
+import { apiRequest, getNoShopMessage, isShopMissingError, useAuth } from '@/contexts/AuthContext';
 import { useRouteGuard } from '@/guards/useRouteGuard';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { formatCurrency } from '@/lib/formatters';
@@ -75,9 +75,14 @@ function OnlineOrdersPageContent() {
       setError(null);
       const url = statusFilter ? `/admin/orders?status=${statusFilter}` : '/admin/orders';
       const data = await apiRequest(url);
-      setOrders(data);
+      setOrders(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      setError(err.message || (language === 'ar' ? 'فشل تحميل الطلبات' : 'Failed to load orders'));
+      if (isShopMissingError(err)) {
+        setOrders([]);
+        setError(getNoShopMessage(language));
+      } else {
+        setError(err.message || (language === 'ar' ? 'فشل تحميل الطلبات' : 'Failed to load orders'));
+      }
     } finally {
       setLoading(false);
     }
@@ -90,7 +95,8 @@ function OnlineOrdersPageContent() {
     }
     try {
       const order = await apiRequest(`/admin/orders/${orderId}`);
-      setItemsMap((prev) => ({ ...prev, [orderId]: order.items || [] }));
+      const items = Array.isArray(order?.items) ? order.items : [];
+      setItemsMap((prev) => ({ ...prev, [orderId]: items }));
       setExpandedId(orderId);
     } catch (err) {
       setItemsMap((prev) => ({ ...prev, [orderId]: [] }));

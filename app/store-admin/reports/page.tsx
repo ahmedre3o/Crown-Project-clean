@@ -72,6 +72,81 @@ function normalizeDailyProfit(points: Array<{ date: string; profit: number }>) {
   return points;
 }
 
+function ensureArray<T>(value: any): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function toNumber(value: any) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function normalizeReportSummary(raw: any, range: { from: string; to: string }): ReportSummary {
+  const payload = raw?.data ?? raw ?? {};
+  const fallbackRange = payload?.range?.from && payload?.range?.to ? payload.range : range;
+  const profitNoteAr = payload?.profit?.profitNoteAr ?? 'لا توجد بيانات متاحة';
+  const profitNoteEn = payload?.profit?.profitNoteEn ?? 'No data available';
+
+  if (payload?.sales) {
+    const sales = payload.sales ?? {};
+    return {
+      ok: payload?.ok !== false,
+      range: fallbackRange,
+      sales: {
+        totalRevenue: toNumber(sales.totalRevenue),
+        ordersCount: toNumber(sales.ordersCount),
+        avgOrderValue: toNumber(sales.avgOrderValue),
+        posRevenue: toNumber(sales.posRevenue),
+        onlineRevenueConfirmed: toNumber(sales.onlineRevenueConfirmed),
+        onlineOrdersConfirmedCount: toNumber(sales.onlineOrdersConfirmedCount),
+        statusBreakdown: sales.statusBreakdown,
+      },
+      profit: {
+        available: Boolean(payload?.profit?.available),
+        totalProfit: toNumber(payload?.profit?.totalProfit),
+        profitNoteAr,
+        profitNoteEn,
+      },
+      charts: {
+        dailyRevenue: ensureArray(payload?.charts?.dailyRevenue ?? payload?.charts?.dailySales),
+        dailyProfit: ensureArray(payload?.charts?.dailyProfit),
+      },
+      topProducts: ensureArray(payload?.topProducts ?? payload?.top_products),
+    };
+  }
+
+  const posTotal = toNumber(payload?.pos?.total);
+  const posCount = toNumber(payload?.pos?.count);
+  const onlineTotal = toNumber(payload?.online?.total);
+  const onlineCount = toNumber(payload?.online?.count);
+  const totalRevenue = posTotal + onlineTotal;
+  const ordersCount = posCount + onlineCount;
+  const avgOrderValue = ordersCount > 0 ? totalRevenue / ordersCount : 0;
+
+  return {
+    ok: payload?.ok !== false,
+    range: fallbackRange,
+    sales: {
+      totalRevenue,
+      ordersCount,
+      avgOrderValue,
+      posRevenue: posTotal,
+      onlineRevenueConfirmed: onlineTotal,
+      onlineOrdersConfirmedCount: onlineCount,
+    },
+    profit: {
+      available: false,
+      profitNoteAr,
+      profitNoteEn,
+    },
+    charts: {
+      dailyRevenue: [],
+      dailyProfit: [],
+    },
+    topProducts: [],
+  };
+}
+
 export default function ReportsCenterPage() {
   const { t, language, direction } = useLanguage();
   const { user, loading: authLoading, effectiveRole } = useAuth();
@@ -128,7 +203,7 @@ export default function ReportsCenterPage() {
         apiRequest(`/admin/reports/transactions?from=${from}&to=${to}&source=${source}&limit=500`).catch(() => ({ ok: true, items: [] })),
         apiRequest(`/admin/reports/dead-stock?days=120&threshold=2`).catch(() => ({ ok: false })),
       ]);
-      const summary = summaryRes as ReportSummary;
+      const summary = normalizeReportSummary(summaryRes, { from, to });
       // Step 2: log raw API data + time-series fields
       console.log('REPORTS API RAW:', summary);
       console.log('dailySales:', (summary as any)?.charts?.dailySales);
@@ -311,6 +386,15 @@ export default function ReportsCenterPage() {
     from: new Date(from),
     to: to ? new Date(to) : undefined,
   };
+  const hasReportContent = Boolean(
+    data &&
+      (data.sales.totalRevenue !== 0 ||
+        data.sales.ordersCount !== 0 ||
+        data.sales.avgOrderValue !== 0 ||
+        data.topProducts.length > 0 ||
+        data.charts.dailyRevenue.length > 0 ||
+        (data.profit.available && (data.profit.totalProfit ?? 0) !== 0))
+  );
 
   return (
     <div className="min-h-screen bg-black text-white flex" dir={direction}>
@@ -438,7 +522,13 @@ export default function ReportsCenterPage() {
             </div>
           )}
 
-          {data?.ok && (
+          {data?.ok && !hasReportContent && (
+            <div className="p-8 neon-card rounded-xl text-center text-gray-400 print:hidden">
+              {language === 'ar' ? 'لا توجد بيانات متاحة' : 'No data available'}
+            </div>
+          )}
+
+          {data?.ok && hasReportContent && (
             <>
               <div className="p-6 neon-card rounded-xl break-inside-avoid">
                 <h3 className="text-xl font-bold mb-4 text-cyan-200">{t('reports.salesSummary')}</h3>

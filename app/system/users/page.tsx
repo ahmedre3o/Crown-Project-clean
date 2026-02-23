@@ -59,16 +59,31 @@ export default function SystemUsersPage() {
         const params = new URLSearchParams({ limit: '20', offset: String(offset) });
         if (search.trim()) params.set('q', search.trim());
 
-        const res: SystemUsersResponse = await apiRequest(`/system/users?${params.toString()}`);
+        const res: any = await apiRequest(`/system/users?${params.toString()}`);
         if (res?.ok === false) {
           setError(language === 'ar' ? 'فشل تحميل المستخدمين' : 'Failed to load users');
           setItems([]);
           setNextOffset(null);
           return;
         }
-        const list = Array.isArray(res.items) ? res.items : [];
+        const list = Array.isArray(res?.items)
+          ? res.items
+          : Array.isArray(res?.users)
+          ? res.users
+          : Array.isArray(res?.data)
+          ? res.data
+          : Array.isArray(res)
+          ? res
+          : [];
         setItems((prev) => (append ? [...prev, ...list] : list));
-        setNextOffset(res.nextOffset ?? null);
+        const nextOffsetRaw = res?.nextOffset ?? res?.next_offset ?? null;
+        const nextOffsetValue =
+          typeof nextOffsetRaw === 'number'
+            ? nextOffsetRaw
+            : nextOffsetRaw != null
+            ? Number(nextOffsetRaw)
+            : null;
+        setNextOffset(Number.isFinite(nextOffsetValue as number) ? (nextOffsetValue as number) : null);
       } catch (err: any) {
         setError(err?.message || (language === 'ar' ? 'فشل التحميل' : 'Failed to load'));
       } finally {

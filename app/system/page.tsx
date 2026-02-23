@@ -16,6 +16,31 @@ interface SystemStats {
   active60m?: number;
 }
 
+const toNumber = (value: any, fallback = 0) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+};
+
+const normalizeSystemStats = (raw: any): SystemStats | null => {
+  if (!raw || typeof raw !== 'object') return null;
+  const totalUsers = toNumber(raw.totalUsers ?? raw.total_users ?? raw.users ?? 0);
+  const totalShopsRaw = raw.totalShops ?? raw.total_shops ?? raw.shops ?? null;
+  const totalShops = Number.isFinite(Number(totalShopsRaw)) ? Number(totalShopsRaw) : null;
+  const onlineUsers = toNumber(
+    raw.onlineUsers ?? raw.online_users ?? raw.active15m ?? raw.active_15m ?? raw.online ?? 0
+  );
+  const active15m = toNumber(raw.active15m ?? raw.active_15m ?? raw.onlineUsers ?? raw.online_users ?? onlineUsers);
+  const active60m = toNumber(raw.active60m ?? raw.active_60m ?? 0);
+  return {
+    ok: raw.ok !== false,
+    totalUsers,
+    totalShops,
+    onlineUsers,
+    active15m,
+    active60m,
+  };
+};
+
 export default function SystemDashboardPage() {
   const { language, direction } = useLanguage();
   const { user, loading: authLoading, effectiveRole } = useAuth();
@@ -35,7 +60,13 @@ export default function SystemDashboardPage() {
       setError(null);
       apiRequest('/system/stats')
         .then((res: any) => {
-          setStats(res);
+          const normalized = normalizeSystemStats(res);
+          if (!normalized) {
+            setError(language === 'ar' ? 'فشل تحميل الإحصائيات' : 'Failed to load stats');
+            setStats(null);
+            return;
+          }
+          setStats(normalized);
         })
         .catch((err: any) => {
           setError(err?.message || (language === 'ar' ? 'فشل تحميل الإحصائيات' : 'Failed to load stats'));

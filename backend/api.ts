@@ -39,6 +39,20 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Log CORS configuration at startup
+console.log('CORS_ORIGIN env:', process.env.CORS_ORIGIN || '(not set)');
+const allowedOrigins = Array.from(
+  new Set(
+    [
+      ...(process.env.CORS_ORIGIN || '').split(',').map((origin) => origin.trim()).filter(Boolean),
+      'https://crowncs.org',
+      'https://www.crowncs.org',
+      'http://localhost:3000',
+    ].filter(Boolean)
+  )
+);
+console.log('Allowed origins:', allowedOrigins);
+
 // Dev-only request logger to confirm active routes and hits
 if (process.env.NODE_ENV !== 'production') {
   app.use((req, _res, next) => {
@@ -155,14 +169,6 @@ app.get('/api/setup-admin', async (_req: Request, res: Response) => {
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const JWT_SECRET = process.env.JWT_SECRET || 'crown-services-secret-key-2026';
 const PORT = parseInt(process.env.PORT || '8080', 10);
-
-// Log CORS configuration at startup
-console.log('CORS_ORIGIN env:', process.env.CORS_ORIGIN || '(not set)');
-const allowedOrigins = (process.env.CORS_ORIGIN || '')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-console.log('Allowed origins:', allowedOrigins);
 
 // Masked Gemini key log (no full key ever printed)
 if (process.env.NODE_ENV !== 'production') {

@@ -29,8 +29,8 @@ dotenv.config({ path: localEnvPath });
 dotenv.config({ path: rootEnvPath });
 
 const app = express();
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
 // CORS: allow only specific origins (required when using credentials: true — no wildcard).
 // Defaults: crowncs.org, www, localhost:3000. Add crown-web Cloud Run URL via CORS_ORIGIN or CORS_FRONTEND_URL.
@@ -48,15 +48,23 @@ const allowedOrigins = [...new Set([...defaultOrigins, ...fromEnv, frontendUrl].
 
 const corsOptions: cors.CorsOptions = {
   origin(origin, callback) {
-    if (!origin) return callback(null, false);
+    if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, origin);
     return callback(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Shop-Id', 'X-Requested-With', 'Accept'],
+  // Reflect Access-Control-Request-Headers to allow all custom X-* headers.
   optionsSuccessStatus: 204,
 };
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const requested = req.header('access-control-request-headers');
+  if (requested) {
+    res.header('Access-Control-Allow-Headers', requested);
+  }
+  next();
+});
 
 app.use(cors(corsOptions));
 app.options(/(.*)/, cors(corsOptions));

@@ -3331,8 +3331,8 @@ app.get('/api/admin/reports/day-details', authenticateToken, async (req: any, re
 // Notifications unread count (frontend NotificationsBell). Returns 0 if notifications table missing. Uses shop_id (schema has shop_id, not user_id).
 app.get('/api/notifications/unread-count', authenticateToken, async (req: any, res: Response) => {
   try {
-    const shopId = getShopId(req).shopId;
-    if (shopId == null) return res.json({ count: 0 });
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
     const [rows] = await pool.execute(
       'SELECT COUNT(*) as cnt FROM notifications WHERE shop_id = ? AND (is_read = 0 OR is_read IS NULL)',
       [shopId]

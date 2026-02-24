@@ -7,6 +7,7 @@ import { apiRequest, getNoShopMessage, isShopMissingError, useAuth } from '../co
 import { useRouteGuard } from '../guards/useRouteGuard';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { canAccess, getPlanFeatures } from '../permissions';
+import { formatCurrency } from '@/lib/formatters';
 import { AIAssistant } from '../components/AIAssistant';
 import { BarcodeScanner } from '../components/BarcodeScanner';
 import { Image as ImageIcon, Pencil, MapPin } from 'lucide-react';
@@ -58,7 +59,7 @@ export default function InventoryPage() {
   const { t, direction, language } = useLanguage();
   const { user, loading: authLoading, effectiveRole } = useAuth();
   const { allowed } = useRouteGuard(user, authLoading, { feature: 'inventory', effectiveRole });
-  const { symbol } = useCurrency();
+  const { currency, symbol } = useCurrency();
   const planFeatures = getPlanFeatures(user?.package);
   const canEditInventory = canAccess(effectiveRole as any, 'inventory_edit', planFeatures);
   const canViewAvailability = canAccess(effectiveRole as any, 'branch_availability', planFeatures);
@@ -182,7 +183,11 @@ export default function InventoryPage() {
       setShowForm(false);
       await loadProducts();
     } catch (err: any) {
-      setError(err.message || 'Failed to save product');
+      if (isShopMissingError(err)) {
+        setError(getNoShopMessage(language));
+      } else {
+        setError(err.message || 'Failed to save product');
+      }
     } finally {
       setSaving(false);
     }
@@ -469,10 +474,10 @@ export default function InventoryPage() {
                           </span>
                         </td>
                         <td className="py-2">
-                          {Number(product.sell_price || 0).toFixed(2)} {symbol}
+                          {formatCurrency(product.sell_price || 0, language === 'ar' ? 'ar' : 'en', currency, symbol)}
                         </td>
                         <td className="py-2">
-                          {Number(product.buy_price || 0).toFixed(2)} {symbol}
+                          {formatCurrency(product.buy_price || 0, language === 'ar' ? 'ar' : 'en', currency, symbol)}
                         </td>
                         <td className="py-2">
                           {product.image_url ? (

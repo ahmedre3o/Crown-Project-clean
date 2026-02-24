@@ -1,6 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { useLanguage } from './LanguageContext';
+import { getCurrencySymbol } from '@/lib/formatters';
 
 type CurrencyCode =
   | 'EGP'
@@ -18,23 +20,6 @@ type CurrencyCode =
   | 'CNY'
   | 'TRY';
 
-const currencySymbols: Record<CurrencyCode, string> = {
-  EGP: 'ج.م',
-  SAR: 'ر.س',
-  USD: '$',
-  AED: 'د.إ',
-  KWD: 'د.ك',
-  QAR: 'ر.ق',
-  EUR: '€',
-  GBP: '£',
-  JPY: '¥',
-  CAD: 'C$',
-  AUD: 'A$',
-  INR: '₹',
-  CNY: '¥',
-  TRY: '₺',
-};
-
 interface CurrencyContextType {
   currency: CurrencyCode;
   symbol: string;
@@ -44,20 +29,11 @@ interface CurrencyContextType {
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
 
 function detectCurrency(): CurrencyCode {
-  if (typeof navigator === 'undefined') return 'EGP';
-  const locale = navigator.language || 'ar-EG';
-  if (locale.startsWith('ar-EG')) return 'EGP';
-  if (locale.startsWith('ar-SA')) return 'SAR';
-  if (locale.startsWith('ar-AE')) return 'AED';
-  if (locale.startsWith('ar-KW')) return 'KWD';
-  if (locale.startsWith('ar-QA')) return 'QAR';
-  if (locale.startsWith('en-GB')) return 'GBP';
-  if (locale.startsWith('de') || locale.startsWith('fr') || locale.startsWith('es')) return 'EUR';
-  if (locale.startsWith('ja')) return 'JPY';
-  return 'USD';
+  return 'EGP';
 }
 
 export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { language } = useLanguage();
   const [currency, setCurrencyState] = useState<CurrencyCode>('EGP');
 
   useEffect(() => {
@@ -73,7 +49,7 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
-  const symbol = useMemo(() => currencySymbols[currency], [currency]);
+  const symbol = useMemo(() => getCurrencySymbol(language === 'ar' ? 'ar' : 'en', currency, null), [currency, language]);
 
   return (
     <CurrencyContext.Provider value={{ currency, symbol, setCurrency }}>

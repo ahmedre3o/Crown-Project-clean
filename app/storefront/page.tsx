@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Sparkles, Clock, Globe, Search, ShoppingCart, Package, X, ExternalLink } from 'lucide-react';
 import { NeonCrownIcon } from '../components/NeonCrownIcon';
 import { apiFetch, apiRequest } from '../contexts/AuthContext';
+import { formatCurrency } from '@/lib/formatters';
 
 type Category = {
   id: number;
@@ -34,6 +35,7 @@ type Shop = {
   business_name_en?: string | null;
   activity_type?: string | null;
   package?: string | null;
+  currency_code?: string | null;
   currency_symbol?: string | null;
 };
 
@@ -225,7 +227,8 @@ function StorefrontPageContent() {
     language === 'ar'
       ? data?.shop?.business_name_ar || data?.shop?.business_name || data?.shop?.business_name_en || data?.shop?.name || 'Crown Store'
       : data?.shop?.business_name_en || data?.shop?.business_name || data?.shop?.business_name_ar || data?.shop?.name || 'Crown Store';
-  const currency = data?.shop?.currency_symbol || (language === 'ar' ? 'ج.م' : 'EGP');
+  const currencyCode = data?.shop?.currency_code || 'EGP';
+  const currencySymbol = data?.shop?.currency_symbol || null;
 
   const products = Array.isArray(data?.products) ? data.products : [];
 
@@ -515,8 +518,7 @@ function StorefrontPageContent() {
 
                       <div className="flex flex-col items-end gap-2 shrink-0">
                         <div className="text-lg font-black text-cyan-200">
-                          {Number(product.sell_price || 0).toFixed(2)}{' '}
-                          <span className="text-xs text-cyan-200/80">{currency}</span>
+                          {formatCurrency(product.sell_price || 0, language === 'ar' ? 'ar' : 'en', currencyCode, currencySymbol)}
                         </div>
                         <div
                           className={`text-[10px] px-2 py-1 rounded-full border ${
@@ -607,7 +609,7 @@ function StorefrontPageContent() {
                     </div>
                   </div>
                   <div className="text-cyan-200 font-bold">
-                    {(Number(p.sell_price || 0) * (cart[p.id] || 0)).toFixed(2)} <span className="text-xs">{currency}</span>
+                    {formatCurrency(Number(p.sell_price || 0) * (cart[p.id] || 0), language === 'ar' ? 'ar' : 'en', currencyCode, currencySymbol)}
                   </div>
                 </div>
               ))}
@@ -616,7 +618,7 @@ function StorefrontPageContent() {
               <div className="flex items-center justify-between">
                 <div className="text-sm text-slate-300">{language === 'ar' ? 'الإجمالي' : 'Total'}</div>
                 <div className="text-xl font-black text-cyan-100">
-                  {cartTotal.toFixed(2)} <span className="text-xs text-cyan-200/80">{currency}</span>
+                  {formatCurrency(cartTotal, language === 'ar' ? 'ar' : 'en', currencyCode, currencySymbol)}
                 </div>
               </div>
               <button

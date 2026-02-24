@@ -6,6 +6,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { apiRequest, useAuth } from '@/contexts/AuthContext';
 import { useRouteGuard } from '@/guards/useRouteGuard';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import { formatCurrency } from '@/lib/formatters';
 import { useBranch, getBranchDisplayName } from '@/contexts/BranchContext';
 import { ChevronDown, ChevronUp, Package, CreditCard, Search, X } from 'lucide-react';
 import { getStoredShopId } from '@/lib/shop';
@@ -29,6 +30,7 @@ interface Order {
   branch_name_ar?: string;
   branch_name_en?: string;
   created_at: string;
+  source?: 'online' | 'pos';
 }
 
 interface Payment {
@@ -48,12 +50,17 @@ interface Payment {
   branch_name_ar?: string;
   branch_name_en?: string;
   created_at: string;
+  source?: 'online' | 'pos';
 }
 
 interface OrderItem {
   id: number;
   name_snapshot?: string | null;
   sell_price_snapshot?: number;
+  unit_price?: number;
+  price_snapshot?: number;
+  name_en?: string;
+  name_ar?: string;
   quantity: number;
 }
 
@@ -61,7 +68,7 @@ function PaymentsPageContent() {
   const { language, direction } = useLanguage();
   const { user, loading: authLoading, effectiveRole } = useAuth();
   const { allowed } = useRouteGuard(user, authLoading, { feature: 'payments_admin', effectiveRole, showDenied: true });
-  const { symbol } = useCurrency();
+  const { currency, symbol } = useCurrency();
   const { branches, activeBranch } = useBranch();
   const [tab, setTab] = useState<'orders' | 'payments'>('orders');
   const [orders, setOrders] = useState<Order[]>([]);
@@ -114,6 +121,13 @@ function PaymentsPageContent() {
     };
     return map[s]?.[language] || s || '-';
   };
+  const sourceLabel = (src?: string) => {
+    if (src === 'pos') return language === 'ar' ? 'نقطة بيع' : 'POS';
+    return language === 'ar' ? 'أونلاين' : 'Online';
+  };
+  const resolveItemName = (item: OrderItem) => item.name_snapshot || item.name_en || item.name_ar || '-';
+  const resolveItemUnitPrice = (item: OrderItem) =>
+    Number(item.sell_price_snapshot ?? item.price_snapshot ?? item.unit_price ?? 0);
 
   const loadOrders = useCallback(async () => {
     try {
@@ -128,7 +142,8 @@ function PaymentsPageContent() {
       if (filters.dateFrom) q.set('dateFrom', filters.dateFrom);
       if (filters.dateTo) q.set('dateTo', filters.dateTo);
       const data = await apiRequest(`/admin/payments-orders/orders?${q.toString()}`);
-      setOrders(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setOrders(list.map((row) => ({ ...row, source: row.source || 'online' })));
     } catch (err: any) {
       if (err?.message === 'SHOP_ID_REQUIRED') {
         setNeedsShop(true);
@@ -154,7 +169,8 @@ function PaymentsPageContent() {
       if (filters.dateFrom) q.set('dateFrom', filters.dateFrom);
       if (filters.dateTo) q.set('dateTo', filters.dateTo);
       const data = await apiRequest(`/admin/payments-orders/payments?${q.toString()}`);
-      setPayments(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setPayments(list.map((row) => ({ ...row, source: row.source || 'online' })));
     } catch (err: any) {
       if (err?.message === 'SHOP_ID_REQUIRED') {
         setNeedsShop(true);
@@ -186,14 +202,18 @@ function PaymentsPageContent() {
     return () => window.removeEventListener('crown-shop-changed', handler);
   }, [authLoading, allowed, tab, loadOrders, loadPayments]);
 
-  const loadOrderDetail = async (orderId: number) => {
+  const loadOrderDetail = async (order: Order) => {
+    const orderId = order.id;
     if (orderDetails[orderId]) {
       setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
       return;
     }
     try {
-      const order = await apiRequest(`/admin/orders/${orderId}`);
-      const items = Array.isArray(order?.items) ? order.items : [];
+      const detail =
+        order.source === 'pos'
+          ? await apiRequest(`/sales/${orderId}/items`)
+          : await apiRequest(`/admin/orders/${orderId}`);
+      const items = Array.isArray(detail?.items) ? detail.items : Array.isArray(detail) ? detail : [];
       setOrderDetails((prev) => ({ ...prev, [orderId]: items }));
       setExpandedOrderId(orderId);
     } catch {
@@ -205,22 +225,26 @@ function PaymentsPageContent() {
   const openDrawer = async (order: Order) => {
     setDrawerOrder(order);
     try {
-      const detail = await apiRequest(`/admin/orders/${order.id}`);
-      setDrawerItems(Array.isArray(detail?.items) ? detail.items : []);
+      const detail =
+        order.source === 'pos'
+          ? await apiRequest(`/sales/${order.id}/items`)
+          : await apiRequest(`/admin/orders/${order.id}`);
+      setDrawerItems(Array.isArray(detail?.items) ? detail.items : Array.isArray(detail) ? detail : []);
     } catch {
       setDrawerItems([]);
     }
   };
 
-  const updateOrderStatus = async (orderId: number, status: string) => {
+  const updateOrderStatus = async (order: Order, status: string) => {
     try {
-      setUpdatingId(orderId);
-      await apiRequest(`/admin/orders/${orderId}/status`, {
+      if (order.source === 'pos') return;
+      setUpdatingId(order.id);
+      await apiRequest(`/admin/orders/${order.id}/status`, {
         method: 'PATCH',
         body: JSON.stringify({ status }),
       });
-      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
-      if (drawerOrder?.id === orderId) setDrawerOrder((o) => (o ? { ...o, status } : null));
+      setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, status } : o)));
+      if (drawerOrder?.id === order.id) setDrawerOrder((o) => (o ? { ...o, status } : null));
     } catch (err: any) {
       setError(err.message || t('فشل تحديث الحالة', 'Failed to update status'));
     } finally {
@@ -260,7 +284,7 @@ function PaymentsPageContent() {
   if (authLoading || !allowed) return null;
 
   return (
-    <div className={`min-h-screen flex ${direction === 'rtl' ? 'flex-row-reverse' : ''}`}>
+    <div className="min-h-screen flex" dir={direction}>
       <Sidebar />
       <main className="flex-1 p-6 md:p-8">
         <div className="max-w-6xl mx-auto">
@@ -399,7 +423,7 @@ function PaymentsPageContent() {
                   >
                     <div
                       className="flex flex-wrap items-center justify-between gap-4 px-5 py-4 cursor-pointer"
-                      onClick={() => loadOrderDetail(order.id)}
+                      onClick={() => loadOrderDetail(order)}
                     >
                       <div className="flex flex-wrap items-center gap-4">
                         <div className="text-cyan-100 font-bold">#{order.id}</div>
@@ -408,7 +432,7 @@ function PaymentsPageContent() {
                           <div className="text-xs text-slate-400">{order.phone}</div>
                         </div>
                         <div className="text-cyan-200 font-bold">
-                          {Number(order.total).toFixed(2)} {symbol}
+                          {formatCurrency(order.total, language === 'ar' ? 'ar' : 'en', currency, symbol)}
                         </div>
                         <div
                           className={`text-xs px-2 py-1 rounded-full border ${
@@ -427,6 +451,15 @@ function PaymentsPageContent() {
                         </div>
                         <div className="text-xs px-2 py-1 rounded-full border border-cyan-500/20 bg-cyan-500/5 text-cyan-300">
                           {orderStatusLabel(order.order_status || (order.status === 'pending' ? 'NEW' : order.status === 'confirmed' ? 'PROCESSING' : order.status === 'completed' ? 'DELIVERED' : 'CANCELLED'))}
+                        </div>
+                        <div
+                          className={`text-xs px-2 py-1 rounded-full border ${
+                            order.source === 'pos'
+                              ? 'border-purple-500/30 bg-purple-500/10 text-purple-200'
+                              : 'border-cyan-500/30 bg-cyan-500/10 text-cyan-200'
+                          }`}
+                        >
+                          {sourceLabel(order.source)}
                         </div>
                         {order.branch_name && (
                           <div className="text-xs text-slate-500">
@@ -455,7 +488,9 @@ function PaymentsPageContent() {
                           <div>
                             <div className="text-xs text-slate-400 mb-1">{t('العنوان', 'Address')}</div>
                             <div className="text-sm text-slate-200">
-                              {order.governorate}, {order.city} — {order.address}
+                              {order.address
+                                ? `${order.governorate || ''}${order.governorate && order.city ? ', ' : ''}${order.city || ''} — ${order.address}`
+                                : (language === 'ar' ? '—' : '—')}
                             </div>
                           </div>
                           {order.notes && (
@@ -473,9 +508,9 @@ function PaymentsPageContent() {
                           <div className="space-y-2">
                             {(orderDetails[order.id] || []).map((item) => (
                               <div key={item.id} className="flex justify-between text-sm text-slate-200 py-1">
-                                <span>{item.name_snapshot || '-'} x {item.quantity}</span>
+                                <span>{resolveItemName(item)} x {item.quantity}</span>
                                 <span>
-                                  {(Number(item.sell_price_snapshot ?? 0) * item.quantity).toFixed(2)} {symbol}
+                                  {formatCurrency(resolveItemUnitPrice(item) * item.quantity, language === 'ar' ? 'ar' : 'en', currency, symbol)}
                                 </span>
                               </div>
                             ))}
@@ -485,14 +520,14 @@ function PaymentsPageContent() {
                           {order.status === 'pending' && (
                             <>
                               <button
-                                onClick={(e) => { e.stopPropagation(); updateOrderStatus(order.id, 'confirmed'); }}
+                                onClick={(e) => { e.stopPropagation(); updateOrderStatus(order, 'confirmed'); }}
                                 disabled={updatingId === order.id}
                                 className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold disabled:opacity-60"
                               >
                                 {t('تأكيد', 'Confirm')}
                               </button>
                               <button
-                                onClick={(e) => { e.stopPropagation(); updateOrderStatus(order.id, 'cancelled'); }}
+                                onClick={(e) => { e.stopPropagation(); updateOrderStatus(order, 'cancelled'); }}
                                 disabled={updatingId === order.id}
                                 className="px-4 py-2 rounded-xl border border-red-500/30 text-red-200 hover:bg-red-500/10 text-sm font-semibold disabled:opacity-60"
                               >
@@ -503,14 +538,14 @@ function PaymentsPageContent() {
                           {order.status === 'confirmed' && (
                             <>
                               <button
-                                onClick={(e) => { e.stopPropagation(); updateOrderStatus(order.id, 'completed'); }}
+                                onClick={(e) => { e.stopPropagation(); updateOrderStatus(order, 'completed'); }}
                                 disabled={updatingId === order.id}
                                 className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-500 text-white text-sm font-semibold disabled:opacity-60"
                               >
                                 {t('مكتمل', 'Complete')}
                               </button>
                               <button
-                                onClick={(e) => { e.stopPropagation(); updateOrderStatus(order.id, 'cancelled'); }}
+                                onClick={(e) => { e.stopPropagation(); updateOrderStatus(order, 'cancelled'); }}
                                 disabled={updatingId === order.id}
                                 className="px-4 py-2 rounded-xl border border-red-500/30 text-red-200 hover:bg-red-500/10 text-sm font-semibold disabled:opacity-60"
                               >
@@ -533,6 +568,7 @@ function PaymentsPageContent() {
                     <th className="py-2 px-3 text-left">{t('رقم الدفع', 'Payment ID')}</th>
                     <th className="py-2 px-3 text-left">{t('التاريخ', 'Date')}</th>
                     <th className="py-2 px-3 text-left">{t('الطريقة', 'Method')}</th>
+                    <th className="py-2 px-3 text-left">{t('النوع', 'Source')}</th>
                     <th className="py-2 px-3 text-left">{t('المبلغ', 'Amount')}</th>
                     <th className="py-2 px-3 text-left">{t('المرجع', 'Reference')}</th>
                     <th className="py-2 px-3 text-left">{t('الحالة', 'Status')}</th>
@@ -543,10 +579,23 @@ function PaymentsPageContent() {
                 <tbody>
                   {payments.map((p) => (
                     <tr key={p.id} className="border-b border-cyan-500/10 hover:bg-cyan-500/5">
-                      <td className="py-2 px-3">#{p.id}</td>
+                      <td className="py-2 px-3">
+                        {p.source === 'pos' ? `POS-${Math.abs(p.id)}` : `#${p.id}`}
+                      </td>
                       <td className="py-2 px-3">{new Date(p.created_at).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')}</td>
                       <td className="py-2 px-3">{p.method}</td>
-                      <td className="py-2 px-3 font-bold text-cyan-200">{Number(p.amount).toFixed(2)} {symbol}</td>
+                      <td className="py-2 px-3">
+                        <span className={`text-xs px-2 py-1 rounded-full border ${
+                          p.source === 'pos'
+                            ? 'border-purple-500/30 bg-purple-500/10 text-purple-200'
+                            : 'border-cyan-500/30 bg-cyan-500/10 text-cyan-200'
+                        }`}>
+                          {sourceLabel(p.source)}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 font-bold text-cyan-200">
+                        {formatCurrency(p.amount, language === 'ar' ? 'ar' : 'en', currency, symbol)}
+                      </td>
                       <td className="py-2 px-3">{p.reference || '—'}</td>
                       <td className="py-2 px-3">
                         <span className={`${p.status === 'confirmed' ? 'text-green-400' : p.status === 'rejected' ? 'text-red-400' : 'text-amber-400'}`}>
@@ -555,7 +604,7 @@ function PaymentsPageContent() {
                       </td>
                       <td className="py-2 px-3">#{p.order_id}</td>
                       <td className="py-2 px-3">
-                        {p.status === 'pending' && (
+                        {p.status === 'pending' && p.source !== 'pos' && (
                           <div className="flex gap-2">
                             <button
                               onClick={() => confirmPayment(p.id)}
@@ -594,9 +643,20 @@ function PaymentsPageContent() {
             >
               <div className="p-6">
                 <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-lg font-bold text-cyan-200">
-                    {t('تفاصيل الطلب', 'Order Details')} #{drawerOrder.id}
-                  </h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-cyan-200">
+                      {t('تفاصيل الطلب', 'Order Details')} #{drawerOrder.id}
+                    </h2>
+                    <span
+                      className={`text-xs px-2 py-1 rounded-full border ${
+                        drawerOrder.source === 'pos'
+                          ? 'border-purple-500/30 bg-purple-500/10 text-purple-200'
+                          : 'border-cyan-500/30 bg-cyan-500/10 text-cyan-200'
+                      }`}
+                    >
+                      {sourceLabel(drawerOrder.source)}
+                    </span>
+                  </div>
                   <button
                     onClick={() => setDrawerOrder(null)}
                     className="p-2 rounded border border-cyan-500/30 hover:bg-cyan-500/10"
@@ -607,11 +667,25 @@ function PaymentsPageContent() {
                 <div className="space-y-4">
                   <div>
                     <div className="text-xs text-slate-400">{t('العميل', 'Customer')}</div>
-                    <div className="text-slate-200">{drawerOrder.customer_name} — {drawerOrder.phone}</div>
+                    <div className="text-slate-200">
+                      {(drawerOrder.customer_name || (language === 'ar' ? 'عميل مباشر' : 'Walk-in'))} — {drawerOrder.phone || '—'}
+                    </div>
                   </div>
                   <div>
                     <div className="text-xs text-slate-400">{t('العنوان', 'Address')}</div>
-                    <div className="text-slate-200">{drawerOrder.governorate}, {drawerOrder.city}<br />{drawerOrder.address}</div>
+                    <div className="text-slate-200">
+                      {drawerOrder.address ? (
+                        <>
+                          {(drawerOrder.governorate || drawerOrder.city) ? (
+                            <>
+                              {`${drawerOrder.governorate || ''}${drawerOrder.governorate && drawerOrder.city ? ', ' : ''}${drawerOrder.city || ''}`}
+                              <br />
+                            </>
+                          ) : null}
+                          {drawerOrder.address}
+                        </>
+                      ) : (language === 'ar' ? '—' : '—')}
+                    </div>
                   </div>
                   {drawerOrder.notes && (
                     <div>
@@ -624,8 +698,8 @@ function PaymentsPageContent() {
                     <div className="mt-2 space-y-2">
                       {drawerItems.map((item) => (
                         <div key={item.id} className="flex justify-between text-sm">
-                          <span>{item.name_snapshot || '-'} x {item.quantity}</span>
-                          <span>{(Number(item.sell_price_snapshot ?? 0) * item.quantity).toFixed(2)} {symbol}</span>
+                          <span>{resolveItemName(item)} x {item.quantity}</span>
+                          <span>{formatCurrency(resolveItemUnitPrice(item) * item.quantity, language === 'ar' ? 'ar' : 'en', currency, symbol)}</span>
                         </div>
                       ))}
                     </div>
@@ -633,21 +707,21 @@ function PaymentsPageContent() {
                   <div className="pt-4 border-t border-cyan-500/20">
                     <div className="flex justify-between font-bold text-cyan-200">
                       <span>{t('الإجمالي', 'Total')}</span>
-                      <span>{Number(drawerOrder.total).toFixed(2)} {symbol}</span>
+                      <span>{formatCurrency(drawerOrder.total, language === 'ar' ? 'ar' : 'en', currency, symbol)}</span>
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2 pt-4">
                     {drawerOrder.status === 'pending' && (
                       <>
                         <button
-                          onClick={() => updateOrderStatus(drawerOrder.id, 'confirmed')}
+                          onClick={() => updateOrderStatus(drawerOrder, 'confirmed')}
                           disabled={updatingId === drawerOrder.id}
                           className="px-4 py-2 rounded-xl bg-cyan-600 text-white text-sm font-semibold disabled:opacity-60"
                         >
                           {t('تأكيد الدفع والطلب', 'Confirm payment & order')}
                         </button>
                         <button
-                          onClick={() => updateOrderStatus(drawerOrder.id, 'cancelled')}
+                          onClick={() => updateOrderStatus(drawerOrder, 'cancelled')}
                           disabled={updatingId === drawerOrder.id}
                           className="px-4 py-2 rounded-xl border border-red-500/30 text-red-200 text-sm font-semibold disabled:opacity-60"
                         >

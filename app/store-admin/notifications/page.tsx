@@ -141,7 +141,7 @@ export default function NotificationsPage() {
   if (authLoading || !allowed) return null;
 
   return (
-    <div className={`min-h-screen flex ${direction === 'rtl' ? 'flex-row-reverse' : ''}`}>
+    <div className="min-h-screen flex" dir={direction}>
       <Sidebar />
       <main className="flex-1 p-6 md:p-8">
         <div className="max-w-4xl mx-auto">

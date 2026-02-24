@@ -1852,8 +1852,18 @@ app.get('/api/admin/inventory/slow-moving/summary', authenticateToken, async (re
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
-    const days = Math.min(365, Math.max(1, parseInt(req.query.days as string, 10) || 120));
-    const threshold = Math.min(100, Math.max(0, parseInt(req.query.threshold as string, 10) || 2));
+    const daysRaw = req.query.days;
+    const thresholdRaw = req.query.threshold;
+    const parsedDays = daysRaw != null && String(daysRaw).trim() !== '' ? Number.parseInt(String(daysRaw), 10) : 120;
+    if (!Number.isFinite(parsedDays)) {
+      return res.status(400).json({ error: 'days must be an integer' });
+    }
+    const parsedThreshold = thresholdRaw != null && String(thresholdRaw).trim() !== '' ? Number(String(thresholdRaw)) : 2;
+    if (!Number.isFinite(parsedThreshold)) {
+      return res.status(400).json({ error: 'threshold must be a number' });
+    }
+    const days = Math.min(365, Math.max(1, Math.floor(parsedDays)));
+    const threshold = Math.min(100, Math.max(0, parsedThreshold));
     const since = new Date();
     since.setDate(since.getDate() - days);
     const sinceStr = since.toISOString().slice(0, 10);
@@ -1877,6 +1887,8 @@ app.get('/api/admin/inventory/slow-moving/summary', authenticateToken, async (re
     }
     res.json({
       ok: true,
+      days,
+      threshold,
       deadCount: Number(deadRow.c ?? 0),
       deadValue: Number(deadRow.v ?? 0),
       slowCount: Number(slowRow.c ?? 0),
@@ -1887,38 +1899,198 @@ app.get('/api/admin/inventory/slow-moving/summary', authenticateToken, async (re
   }
 });
 
+app.get('/api/pos/alerts', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const [countRows] = await pool.execute(
+      `SELECT COUNT(*) as c
+       FROM products
+       WHERE shop_id = ? AND (is_deleted = 0 OR is_deleted IS NULL)
+       AND stock_quantity <= COALESCE(min_stock_level, 0)`,
+      [shopId]
+    ).catch(() => [[{ c: 0 }]]);
+    const lowStockCount = Number((countRows as any[])[0]?.c ?? 0);
+    const [lowStock] = await pool.execute(
+      `SELECT id, name_en, name_ar, stock_quantity, min_stock_level
+       FROM products
+       WHERE shop_id = ? AND (is_deleted = 0 OR is_deleted IS NULL)
+       AND stock_quantity <= COALESCE(min_stock_level, 0)
+       ORDER BY stock_quantity ASC
+       LIMIT 20`,
+      [shopId]
+    ).catch(() => [[]]);
+
+    const days = 120;
+    const threshold = 2;
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    const sinceStr = since.toISOString().slice(0, 10);
+    const [dead] = await pool.execute(
+      `SELECT COUNT(*) as c FROM products p
+       WHERE p.shop_id = ? AND (p.is_deleted = 0 OR p.is_deleted IS NULL)
+       AND NOT EXISTS (SELECT 1 FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE si.product_id = p.id AND s.created_at >= ?)`,
+      [shopId, sinceStr]
+    ).catch(() => [[{ c: 0 }]]);
+    const [slow] = await pool.execute(
+      `SELECT COUNT(*) as c FROM products p
+       WHERE p.shop_id = ? AND (p.is_deleted = 0 OR p.is_deleted IS NULL)
+       AND EXISTS (SELECT 1 FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE si.product_id = p.id AND s.created_at >= ?)
+       AND (SELECT COALESCE(SUM(si.quantity), 0) FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE si.product_id = p.id AND s.created_at >= ?) <= ?`,
+      [shopId, sinceStr, sinceStr, threshold]
+    ).catch(() => [[{ c: 0 }]]);
+    const deadCount = Number((dead as any[])[0]?.c ?? 0);
+    const slowCount = Number((slow as any[])[0]?.c ?? 0);
+
+    res.json({
+      lowStock: (lowStock as any[]) || [],
+      lowStockCount,
+      slowSummary: { deadCount, slowCount },
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/admin/inventory/slow-moving', authenticateToken, async (req: any, res: Response) => {
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
-    const days = Math.min(365, Math.max(1, parseInt(req.query.days as string, 10) || 120));
-    const threshold = Math.min(100, Math.max(0, parseInt(req.query.threshold as string, 10) || 2));
-    const limit = Math.min(500, Math.max(1, parseInt(req.query.limit as string, 10) || 100));
-    const offset = Math.max(0, parseInt(req.query.offset as string, 10) || 0);
+    const typeRaw = String(req.query.type || 'all').trim().toLowerCase();
+    const type = typeRaw === 'dead' || typeRaw === 'slow' || typeRaw === 'all' ? typeRaw : null;
+    if (!type) return res.status(400).json({ error: 'type must be one of: all, dead, slow' });
+
+    const bucketRaw = String(req.query.bucket || '').trim();
+    const allowedBuckets = new Set(['', '0_30', '31_90', '91_180', '180_plus', 'never_sold']);
+    if (!allowedBuckets.has(bucketRaw)) {
+      return res.status(400).json({ error: 'bucket is invalid' });
+    }
+
+    const daysRaw = req.query.days;
+    const thresholdRaw = req.query.threshold;
+    const limitRaw = req.query.limit;
+    const offsetRaw = req.query.offset;
+
+    const parsedDays = daysRaw != null && String(daysRaw).trim() !== '' ? Number.parseInt(String(daysRaw), 10) : 120;
+    if (!Number.isFinite(parsedDays)) {
+      return res.status(400).json({ error: 'days must be an integer' });
+    }
+    const parsedThreshold = thresholdRaw != null && String(thresholdRaw).trim() !== '' ? Number(String(thresholdRaw)) : 2;
+    if (!Number.isFinite(parsedThreshold)) {
+      return res.status(400).json({ error: 'threshold must be a number' });
+    }
+    const parsedLimit = limitRaw != null && String(limitRaw).trim() !== '' ? Number.parseInt(String(limitRaw), 10) : 100;
+    if (!Number.isFinite(parsedLimit)) {
+      return res.status(400).json({ error: 'limit must be an integer' });
+    }
+    const parsedOffset = offsetRaw != null && String(offsetRaw).trim() !== '' ? Number.parseInt(String(offsetRaw), 10) : 0;
+    if (!Number.isFinite(parsedOffset)) {
+      return res.status(400).json({ error: 'offset must be an integer' });
+    }
+
+    const days = Math.min(365, Math.max(1, Math.floor(parsedDays)));
+    const threshold = Math.min(100, Math.max(0, parsedThreshold));
+    const limit = Math.min(500, Math.max(1, Math.floor(parsedLimit)));
+    const offset = Math.max(0, Math.floor(parsedOffset));
     const q = String(req.query.q || '').trim();
     const since = new Date();
     since.setDate(since.getDate() - days);
     const sinceStr = since.toISOString().slice(0, 10);
     let sql = `
-      SELECT p.id, p.name_en as nameEn, p.name_ar as nameAr, p.sku, p.stock_quantity as stock, (p.sell_price * p.stock_quantity) as tiedValue,
-             (SELECT MAX(s.created_at) FROM sales s JOIN sale_items si ON si.sale_id = s.id WHERE si.product_id = p.id AND s.shop_id = p.shop_id AND s.created_at >= ?) as lastSoldAt,
-             (SELECT COALESCE(SUM(si.quantity), 0) FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE si.product_id = p.id AND s.created_at >= ?) as soldQtyWindow,
-             'Reduce stock' as recommendationEn, 'تقليل الكمية' as recommendationAr
+      SELECT p.id as productId,
+             p.name_en as nameEn,
+             p.name_ar as nameAr,
+             p.sku,
+             p.stock_quantity as stock,
+             p.sell_price as price,
+             p.buy_price as costPrice,
+             (p.sell_price * p.stock_quantity) as tiedValue,
+             c.name_en as categoryNameEn,
+             c.name_ar as categoryNameAr,
+             ls.lastSoldAt as lastSoldAt,
+             COALESCE(sw.soldQtyWindow, 0) as soldQtyWindow
       FROM products p
+      LEFT JOIN categories c ON c.id = p.category_id
+      LEFT JOIN (
+        SELECT si.product_id, MAX(s.created_at) as lastSoldAt
+        FROM sale_items si
+        JOIN sales s ON s.id = si.sale_id
+        WHERE s.shop_id = ?
+        GROUP BY si.product_id
+      ) ls ON ls.product_id = p.id
+      LEFT JOIN (
+        SELECT si.product_id, COALESCE(SUM(si.quantity), 0) as soldQtyWindow
+        FROM sale_items si
+        JOIN sales s ON s.id = si.sale_id
+        WHERE s.shop_id = ? AND s.created_at >= ?
+        GROUP BY si.product_id
+      ) sw ON sw.product_id = p.id
       WHERE p.shop_id = ? AND (p.is_deleted = 0 OR p.is_deleted IS NULL)
-      AND (SELECT COALESCE(SUM(si.quantity), 0) FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE si.product_id = p.id AND s.created_at >= ?) <= ?
     `;
-    const params: any[] = [sinceStr, sinceStr, shopId, sinceStr, threshold];
+    const params: any[] = [shopId, shopId, sinceStr, shopId];
+    const windowExpr = 'COALESCE(sw.soldQtyWindow, 0)';
+    if (type === 'dead') {
+      sql += ` AND ${windowExpr} = 0`;
+    } else if (type === 'slow') {
+      sql += ` AND ${windowExpr} > 0 AND ${windowExpr} <= ?`;
+      params.push(threshold);
+    } else {
+      sql += ` AND ${windowExpr} <= ?`;
+      params.push(threshold);
+    }
+    if (bucketRaw === 'never_sold') {
+      sql += ' AND ls.lastSoldAt IS NULL';
+    } else if (bucketRaw === '0_30') {
+      sql += ' AND ls.lastSoldAt IS NOT NULL AND DATEDIFF(CURRENT_DATE(), ls.lastSoldAt) BETWEEN 0 AND 30';
+    } else if (bucketRaw === '31_90') {
+      sql += ' AND ls.lastSoldAt IS NOT NULL AND DATEDIFF(CURRENT_DATE(), ls.lastSoldAt) BETWEEN 31 AND 90';
+    } else if (bucketRaw === '91_180') {
+      sql += ' AND ls.lastSoldAt IS NOT NULL AND DATEDIFF(CURRENT_DATE(), ls.lastSoldAt) BETWEEN 91 AND 180';
+    } else if (bucketRaw === '180_plus') {
+      sql += ' AND ls.lastSoldAt IS NOT NULL AND DATEDIFF(CURRENT_DATE(), ls.lastSoldAt) > 180';
+    }
     if (q) {
       sql += ' AND (p.name_en LIKE ? OR p.name_ar LIKE ? OR p.sku LIKE ?)';
       params.push(`%${q}%`, `%${q}%`, `%${q}%`);
     }
-    sql += ' ORDER BY (p.sell_price * p.stock_quantity) DESC LIMIT ? OFFSET ?';
-    params.push(limit, offset);
+    // NOTE: Some MySQL setups throw mysqld_stmt_execute errors with LIMIT placeholders.
+    // To keep bindings stable, inject clamped numeric LIMIT/OFFSET directly.
+    sql += ` ORDER BY (p.sell_price * p.stock_quantity) DESC LIMIT ${limit} OFFSET ${offset}`;
     const [rows] = await pool.execute(sql, params);
-    const items = rows as any[];
+    const now = Date.now();
+    const items = (rows as any[]).map((row: any) => {
+      const lastSoldAt = row.lastSoldAt ? new Date(row.lastSoldAt) : null;
+      const daysSinceLastSale = lastSoldAt ? Math.max(0, Math.floor((now - lastSoldAt.getTime()) / 86400000)) : null;
+      let bucket = 'never_sold';
+      if (daysSinceLastSale != null) {
+        if (daysSinceLastSale <= 30) bucket = '0_30';
+        else if (daysSinceLastSale <= 90) bucket = '31_90';
+        else if (daysSinceLastSale <= 180) bucket = '91_180';
+        else bucket = '180_plus';
+      }
+      const suggestedDiscountPct =
+        bucket === '0_30' ? null : bucket === '31_90' ? 5 : bucket === '91_180' ? 10 : bucket === '180_plus' ? 20 : 25;
+      return {
+        productId: row.productId,
+        name: row.nameEn,
+        nameAr: row.nameAr,
+        sku: row.sku,
+        category: row.categoryNameEn || row.categoryNameAr || null,
+        stock: Number(row.stock ?? 0),
+        price: Number(row.price ?? 0),
+        costPrice: row.costPrice != null ? Number(row.costPrice) : null,
+        tiedValue: Number(row.tiedValue ?? 0),
+        lastSoldAt: row.lastSoldAt ?? null,
+        soldQtyWindow: Number(row.soldQtyWindow ?? 0),
+        daysSinceLastSale,
+        bucket,
+        suggestedDiscountPct,
+        recommendationEn: 'Reduce stock',
+        recommendationAr: 'تقليل الكمية',
+      };
+    });
     if (items.length === 0) {
-      logEmptyResult('inventory_slow_moving', { shopId, days, threshold, q, limit, offset });
+      logEmptyResult('inventory_slow_moving', { shopId, days, threshold, type, bucket: bucketRaw, q, limit, offset });
     }
     res.json({ items: items || [] });
   } catch (error: any) {
@@ -2410,7 +2582,59 @@ app.get('/api/admin/payments-orders/orders', authenticateToken, async (req: any,
       LIMIT ${limit}
     `;
     const [rows] = await pool.execute(sql, params).catch(() => [[]]);
-    const list = rows as any[];
+    const onlineList = (rows as any[]).map((row: any) => ({ ...row, source: 'online' }));
+
+    const allowPosByStatus = !status || status === 'completed' || status === 'confirmed';
+    const allowPosByPayment = !paymentStatus || paymentStatus === 'confirmed';
+    let posList: any[] = [];
+    if (allowPosByStatus && allowPosByPayment) {
+      const posConditions: string[] = ['s.shop_id = ?'];
+      const posParams: any[] = [shopId];
+      if (branchId) {
+        posConditions.push('s.branch_id = ?');
+        posParams.push(branchId);
+      }
+      if (search) {
+        const like = `%${search}%`;
+        const num = Number(search);
+        posConditions.push('(s.customer_name LIKE ? OR s.customer_phone LIKE ? OR s.invoice_number LIKE ? OR s.id = ?)');
+        posParams.push(like, like, like, Number.isFinite(num) ? num : -1);
+      }
+      if (dateFrom) {
+        posConditions.push('s.created_at >= ?');
+        posParams.push(dateFrom);
+      }
+      if (dateTo) {
+        posConditions.push('s.created_at <= ?');
+        posParams.push(dateTo);
+      }
+      const posWhere = posConditions.length ? `WHERE ${posConditions.join(' AND ')}` : '';
+      const posSql = `
+        SELECT s.id, s.shop_id, s.customer_name, s.customer_phone as phone, s.customer_address as address,
+               s.total_amount as total, s.payment_method, s.branch_id, s.created_at,
+               b.name as branch_name, b.name_ar as branch_name_ar, b.name_en as branch_name_en
+        FROM sales s
+        LEFT JOIN branches b ON b.id = s.branch_id
+        ${posWhere}
+        ORDER BY s.created_at DESC
+        LIMIT ${limit}
+      `;
+      const [posRows] = await pool.execute(posSql, posParams).catch(() => [[]]);
+      posList = (posRows as any[]).map((row: any) => ({
+        ...row,
+        status: 'completed',
+        order_status: 'DELIVERED',
+        payment_status: 'confirmed',
+        governorate: row.governorate ?? '',
+        city: row.city ?? '',
+        notes: null,
+        source: 'pos',
+      }));
+    }
+
+    const list = [...onlineList, ...posList]
+      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+      .slice(0, limit);
     if (list.length === 0) {
       logEmptyResult('payments_orders_orders', { shopId, status, paymentStatus, branchId, search, dateFrom, dateTo, limit });
     }
@@ -2483,7 +2707,71 @@ app.get('/api/admin/payments-orders/payments', authenticateToken, async (req: an
       LIMIT ${limit}
     `;
     const [rows] = await pool.execute(sql, params).catch(() => [[]]);
-    const list = rows as any[];
+    const onlinePayments = (rows as any[]).map((row: any) => ({ ...row, source: 'online' }));
+
+    const allowPosByStatus = !status || status === 'confirmed';
+    let posPayments: any[] = [];
+    if (allowPosByStatus) {
+      const posConditions: string[] = ['s.shop_id = ?'];
+      const posParams: any[] = [shopId];
+      if (method) {
+        posConditions.push('s.payment_method = ?');
+        posParams.push(method);
+      }
+      if (branchId) {
+        posConditions.push('s.branch_id = ?');
+        posParams.push(branchId);
+      }
+      if (search) {
+        const like = `%${search}%`;
+        const num = Number(search);
+        posConditions.push('(s.customer_name LIKE ? OR s.customer_phone LIKE ? OR s.invoice_number LIKE ? OR s.id = ?)');
+        posParams.push(like, like, like, Number.isFinite(num) ? num : -1);
+      }
+      if (dateFrom) {
+        posConditions.push('s.created_at >= ?');
+        posParams.push(dateFrom);
+      }
+      if (dateTo) {
+        posConditions.push('s.created_at <= ?');
+        posParams.push(dateTo);
+      }
+      const posWhere = posConditions.length ? `WHERE ${posConditions.join(' AND ')}` : '';
+      const posSql = `
+        SELECT s.id, s.shop_id, s.payment_method as method, s.total_amount as amount,
+               s.invoice_number as reference, s.customer_name, s.customer_phone as phone, s.created_at,
+               b.name as branch_name, b.name_ar as branch_name_ar, b.name_en as branch_name_en
+        FROM sales s
+        LEFT JOIN branches b ON b.id = s.branch_id
+        ${posWhere}
+        ORDER BY s.created_at DESC
+        LIMIT ${limit}
+      `;
+      const [posRows] = await pool.execute(posSql, posParams).catch(() => [[]]);
+      posPayments = (posRows as any[]).map((row: any) => ({
+        id: -Number(row.id),
+        shop_id: row.shop_id,
+        order_id: row.id,
+        method: row.method,
+        amount: row.amount,
+        reference: row.reference || null,
+        status: 'confirmed',
+        proof_url: null,
+        reject_reason: null,
+        customer_name: row.customer_name,
+        phone: row.phone,
+        public_code: null,
+        branch_name: row.branch_name,
+        branch_name_ar: row.branch_name_ar,
+        branch_name_en: row.branch_name_en,
+        created_at: row.created_at,
+        source: 'pos',
+      }));
+    }
+
+    const list = [...onlinePayments, ...posPayments]
+      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+      .slice(0, limit);
     if (list.length === 0) {
       logEmptyResult('payments_orders_payments', { shopId, status, method, branchId, search, dateFrom, dateTo, limit });
     }
@@ -2654,213 +2942,6 @@ app.get('/api/admin/reports/day-details', authenticateToken, async (req: any, re
     if (source === 'online') items = items.filter((i: any) => i.source === 'online');
     items.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     res.json({ ok: true, items });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ========== ADMIN ORDERS + PAYMENTS (store-admin/orders, store-admin/payments) ==========
-app.get('/api/admin/orders', authenticateToken, async (req: any, res: Response) => {
-  try {
-    const shopId = getShopIdOrFail(req, res);
-    if (shopId === null) return;
-    const where: string[] = ['o.shop_id = ?'];
-    const params: any[] = [shopId];
-    const status = String(req.query.status || '').trim();
-    const paymentStatus = String(req.query.paymentStatus || '').trim();
-    const branchId = String(req.query.branchId || '').trim();
-    const search = String(req.query.search || '').trim();
-    const dateFrom = String(req.query.dateFrom || '').trim();
-    const dateTo = String(req.query.dateTo || '').trim();
-
-    if (status) { where.push('o.order_status = ?'); params.push(status); }
-    if (paymentStatus) { where.push('o.payment_status = ?'); params.push(paymentStatus); }
-    if (branchId) { where.push('o.branch_id = ?'); params.push(branchId); }
-    if (search) {
-      where.push('(o.customer_name LIKE ? OR o.phone LIKE ? OR o.public_code LIKE ?)');
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
-    }
-    if (dateFrom && dateTo) {
-      where.push('DATE(o.created_at) BETWEEN ? AND ?');
-      params.push(dateFrom, dateTo);
-    } else if (!dateFrom && !dateTo) {
-      // default safe range: last 30 days
-      where.push('o.created_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)');
-    } else if (dateFrom) {
-      where.push('DATE(o.created_at) >= ?');
-      params.push(dateFrom);
-    } else if (dateTo) {
-      where.push('DATE(o.created_at) <= ?');
-      params.push(dateTo);
-    }
-
-    const sql = `
-      SELECT o.id, o.shop_id, o.status, o.order_status, o.payment_status, o.customer_name, o.phone, o.governorate, o.city, o.address,
-             o.notes, o.total, o.payment_method, o.branch_id, o.created_at
-      FROM online_orders o
-      WHERE ${where.join(' AND ')}
-      ORDER BY o.created_at DESC
-    `;
-    const [rows] = await pool.execute(sql, params);
-    if ((rows as any[]).length === 0) {
-      console.log('[admin/orders] empty result', { shopId, status, paymentStatus, branchId, search, dateFrom, dateTo });
-    }
-    res.json(rows || []);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get('/api/admin/orders/:id', authenticateToken, async (req: any, res: Response) => {
-  try {
-    const shopId = getShopIdOrFail(req, res);
-    if (shopId === null) return;
-    const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Invalid id' });
-    const [orders] = await pool.execute('SELECT * FROM online_orders WHERE id = ? AND shop_id = ?', [id, shopId]);
-    if ((orders as any[]).length === 0) return res.status(404).json({ error: 'Not found' });
-    const [items] = await pool.execute(
-      'SELECT id, order_id, product_id, name_snapshot, sku_snapshot, quantity, sell_price_snapshot, price_snapshot FROM online_order_items WHERE order_id = ?',
-      [id]
-    );
-    res.json({ ...(orders as any[])[0], items: items || [] });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.patch('/api/admin/orders/:id/status', authenticateToken, async (req: any, res: Response) => {
-  try {
-    const shopId = getShopIdOrFail(req, res);
-    if (shopId === null) return;
-    const id = parseInt(req.params.id, 10);
-    const status = String(req.body?.status || '').trim();
-    if (!id || !status) return res.status(400).json({ error: 'status required' });
-    await pool.execute('UPDATE online_orders SET order_status = ? WHERE id = ? AND shop_id = ?', [status, id, shopId]);
-    res.json({ ok: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get('/api/admin/payments-orders/orders', authenticateToken, async (req: any, res: Response) => {
-  try {
-    const shopId = getShopIdOrFail(req, res);
-    if (shopId === null) return;
-    const where: string[] = ['o.shop_id = ?'];
-    const params: any[] = [shopId];
-    const status = String(req.query.status || '').trim();
-    const paymentStatus = String(req.query.paymentStatus || '').trim();
-    const branchId = String(req.query.branchId || '').trim();
-    const search = String(req.query.search || '').trim();
-    const dateFrom = String(req.query.dateFrom || '').trim();
-    const dateTo = String(req.query.dateTo || '').trim();
-    if (status) { where.push('o.order_status = ?'); params.push(status); }
-    if (paymentStatus) { where.push('o.payment_status = ?'); params.push(paymentStatus); }
-    if (branchId) { where.push('o.branch_id = ?'); params.push(branchId); }
-    if (search) {
-      where.push('(o.customer_name LIKE ? OR o.phone LIKE ? OR o.public_code LIKE ?)');
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
-    }
-    if (dateFrom && dateTo) {
-      where.push('DATE(o.created_at) BETWEEN ? AND ?');
-      params.push(dateFrom, dateTo);
-    } else if (!dateFrom && !dateTo) {
-      where.push('o.created_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)');
-    } else if (dateFrom) {
-      where.push('DATE(o.created_at) >= ?');
-      params.push(dateFrom);
-    } else if (dateTo) {
-      where.push('DATE(o.created_at) <= ?');
-      params.push(dateTo);
-    }
-    const sql = `
-      SELECT o.id, o.shop_id, o.status, o.order_status, o.payment_status, o.customer_name, o.phone, o.governorate, o.city, o.address,
-             o.notes, o.total, o.payment_method, o.branch_id, o.created_at
-      FROM online_orders o
-      WHERE ${where.join(' AND ')}
-      ORDER BY o.created_at DESC
-    `;
-    const [rows] = await pool.execute(sql, params);
-    if ((rows as any[]).length === 0) {
-      console.log('[admin/payments-orders/orders] empty result', { shopId, status, paymentStatus, branchId, search, dateFrom, dateTo });
-    }
-    res.json(rows || []);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get('/api/admin/payments-orders/payments', authenticateToken, async (req: any, res: Response) => {
-  try {
-    const shopId = getShopIdOrFail(req, res);
-    if (shopId === null) return;
-    const where: string[] = ['p.shop_id = ?'];
-    const params: any[] = [shopId];
-    const status = String(req.query.status || '').trim();
-    const method = String(req.query.method || '').trim();
-    const branchId = String(req.query.branchId || '').trim();
-    const search = String(req.query.search || '').trim();
-    const dateFrom = String(req.query.dateFrom || '').trim();
-    const dateTo = String(req.query.dateTo || '').trim();
-    if (status) { where.push('p.status = ?'); params.push(status); }
-    if (method) { where.push('p.method = ?'); params.push(method); }
-    if (branchId) { where.push('p.branch_id = ?'); params.push(branchId); }
-    if (search) {
-      where.push('(o.customer_name LIKE ? OR o.phone LIKE ? OR o.public_code LIKE ?)');
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
-    }
-    if (dateFrom && dateTo) {
-      where.push('DATE(p.created_at) BETWEEN ? AND ?');
-      params.push(dateFrom, dateTo);
-    } else if (!dateFrom && !dateTo) {
-      where.push('p.created_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)');
-    } else if (dateFrom) {
-      where.push('DATE(p.created_at) >= ?');
-      params.push(dateFrom);
-    } else if (dateTo) {
-      where.push('DATE(p.created_at) <= ?');
-      params.push(dateTo);
-    }
-    const sql = `
-      SELECT p.*, o.customer_name, o.phone, o.public_code
-      FROM payments p
-      LEFT JOIN online_orders o ON o.id = p.order_id
-      WHERE ${where.join(' AND ')}
-      ORDER BY p.created_at DESC
-    `;
-    const [rows] = await pool.execute(sql, params);
-    if ((rows as any[]).length === 0) {
-      console.log('[admin/payments-orders/payments] empty result', { shopId, status, method, branchId, search, dateFrom, dateTo });
-    }
-    res.json(rows || []);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/admin/payments/:id/confirm', authenticateToken, async (req: any, res: Response) => {
-  try {
-    const shopId = getShopIdOrFail(req, res);
-    if (shopId === null) return;
-    const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Invalid id' });
-    await pool.execute('UPDATE payments SET status = ? WHERE id = ? AND shop_id = ?', ['confirmed', id, shopId]);
-    res.json({ ok: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/admin/payments/:id/reject', authenticateToken, async (req: any, res: Response) => {
-  try {
-    const shopId = getShopIdOrFail(req, res);
-    if (shopId === null) return;
-    const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Invalid id' });
-    const reason = String(req.body?.reason || '').trim() || null;
-    await pool.execute('UPDATE payments SET status = ?, reject_reason = ? WHERE id = ? AND shop_id = ?', ['rejected', reason, id, shopId]);
-    res.json({ ok: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

@@ -9,6 +9,7 @@ import { useOffline } from '../contexts/OfflineContext';
 import { createPosSaleOrInvoice } from '../../lib/offline-api';
 import { useRouteGuard } from '../guards/useRouteGuard';
 import { useCurrency } from '../contexts/CurrencyContext';
+import { formatCurrency } from '@/lib/formatters';
 import { getPlanFeatures } from '../permissions';
 import { Sidebar } from '@/components/Sidebar';
 import { getActiveShopId } from '@/components/ShopSwitcher';
@@ -49,7 +50,7 @@ export default function PosPage() {
   const { user, loading: authLoading, effectiveRole } = useAuth();
   const { isOnline, refreshQueue } = useOffline();
   const { allowed } = useRouteGuard(user, authLoading, { feature: 'pos', effectiveRole, showDenied: true });
-  const { symbol } = useCurrency();
+  const { currency, symbol } = useCurrency();
   const planFeatures = getPlanFeatures(user?.package);
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -708,13 +709,13 @@ export default function PosPage() {
                   <div class="item">
                     <span class="item-name">${item.name}</span>
                     <span class="item-qty">${item.quantity}x</span>
-                    <span class="item-price">${item.total.toFixed(2)} ${symbol}</span>
+                    <span class="item-price">${formatCurrency(item.total, language === 'ar' ? 'ar' : 'en', currency, symbol)}</span>
                   </div>
                 `).join('')}
               </div>
             <div class="total">
               <span>Total / الإجمالي</span>
-              <span>${total.toFixed(2)} ${symbol}</span>
+              <span>${formatCurrency(total, language === 'ar' ? 'ar' : 'en', currency, symbol)}</span>
             </div>
             </div>
             <div class="footer">
@@ -902,7 +903,7 @@ export default function PosPage() {
                     <p className="text-sm text-gray-400 mb-2">{product.brand}</p>
                     <div className="flex justify-between items-center">
                       <span className="text-cyan-400 font-bold">
-                        {Number(product.sell_price || 0).toFixed(2)} {symbol}
+                        {formatCurrency(product.sell_price || 0, language === 'ar' ? 'ar' : 'en', currency, symbol)}
                       </span>
                       <span className={`text-xs ${(product.available_stock ?? product.stock_quantity) > 0 ? 'text-green-400' : 'text-red-400'}`}>
                         {(product.available_stock ?? product.stock_quantity)} {t('pos.inStock')}
@@ -972,7 +973,7 @@ export default function PosPage() {
                           </button>
                         </div>
                         <span className="text-cyan-400 font-bold">
-                          {Number(item.total || 0).toFixed(2)} {symbol}
+                          {formatCurrency(item.total || 0, language === 'ar' ? 'ar' : 'en', currency, symbol)}
                         </span>
                       </div>
                     </div>
@@ -1004,7 +1005,7 @@ export default function PosPage() {
                 <div className="flex justify-between items-center mb-4">
                   <span className="text-lg font-bold">{t('pos.total')}:</span>
                   <span className="text-2xl font-bold text-cyan-400">
-                    {total.toFixed(2)} {symbol}
+                    {formatCurrency(total, language === 'ar' ? 'ar' : 'en', currency, symbol)}
                   </span>
                 </div>
               </div>

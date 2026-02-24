@@ -253,12 +253,12 @@ function InvoicesPageContent() {
             <meta charset="UTF-8">
             <title>Receipt - ${invoice.invoice_number || invoice.id}</title>
             <style>
-              @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+              @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Inter:wght@400;500;600;700&display=swap');
               * { margin: 0; padding: 0; box-sizing: border-box; }
               body {
-                font-family: 'Orbitron', monospace;
-                background: #ffffff;
-                color: #111827;
+                font-family: 'Inter', sans-serif;
+                background: #05070c;
+                color: #e2e8f0;
                 padding: 24px;
                 line-height: 1.6;
                 -webkit-print-color-adjust: exact;
@@ -266,90 +266,103 @@ function InvoicesPageContent() {
               }
               .receipt {
                 width: 100%;
-                max-width: 800px;
+                max-width: 820px;
                 margin: 0 auto;
-                background: #ffffff;
-                border: 1px solid #e5e7eb;
-                border-radius: 12px;
-                padding: 24px;
+                background: #0b1220;
+                border: 1px solid rgba(0, 243, 255, 0.35);
+                border-radius: 16px;
+                padding: 28px;
                 position: relative;
                 overflow: hidden;
                 display: flex;
                 flex-direction: column;
                 min-height: 70vh;
+                box-shadow: 0 0 30px rgba(0, 243, 255, 0.18), 0 0 60px rgba(236, 72, 153, 0.08);
+              }
+              .receipt:before {
+                content: '';
+                position: absolute;
+                inset: 0;
+                border: 1px solid rgba(236, 72, 153, 0.15);
+                border-radius: 16px;
+                pointer-events: none;
               }
               .header {
                 text-align: center;
                 margin-bottom: 30px;
-                border-bottom: 1px solid #e5e7eb;
+                border-bottom: 1px solid rgba(0, 243, 255, 0.2);
                 padding-bottom: 20px;
               }
               .header h1 {
-                font-size: 34px;
+                font-family: 'Orbitron', monospace;
+                font-size: 32px;
                 font-weight: 900;
                 text-transform: uppercase;
-                letter-spacing: 3px;
+                letter-spacing: 4px;
                 margin-bottom: 10px;
+                color: #e6feff;
+                text-shadow: 0 0 12px rgba(0, 243, 255, 0.5);
               }
               .header p {
                 font-size: 12px;
-                color: #6b7280;
+                color: #94a3b8;
                 text-transform: uppercase;
                 letter-spacing: 2px;
               }
               .copy-label {
                 display: inline-block;
                 margin-top: 10px;
-                padding: 6px 12px;
+                padding: 6px 14px;
                 border-radius: 999px;
-                border: 2px solid #ef4444;
-                color: #991b1b;
-                background: #fee2e2;
-                font-weight: 900;
+                border: 1px solid rgba(236, 72, 153, 0.6);
+                color: #f472b6;
+                background: rgba(236, 72, 153, 0.12);
+                font-weight: 700;
                 font-size: 12px;
                 letter-spacing: 1px;
                 text-transform: uppercase;
+                box-shadow: 0 0 14px rgba(236, 72, 153, 0.18);
               }
               .info {
                 margin-bottom: 25px;
-                font-size: 11px;
-                color: #4b5563;
+                font-size: 12px;
+                color: #cbd5f5;
               }
               .items { margin-bottom: 25px; }
               .item {
                 display: flex;
                 justify-content: space-between;
                 padding: 12px 0;
-                border-bottom: 1px solid #e5e7eb;
+                border-bottom: 1px dashed rgba(148, 163, 184, 0.3);
                 font-size: 13px;
               }
-              .item-name { flex: 1; color: #111827; }
-              .item-qty { margin: 0 15px; color: #6b7280; }
-              .item-price { color: #111827; font-weight: 700; }
+              .item-name { flex: 1; color: #e2e8f0; }
+              .item-qty { margin: 0 15px; color: #94a3b8; }
+              .item-price { color: #67e8f9; font-weight: 700; }
               .total {
                 margin-top: 20px;
                 padding-top: 20px;
-                border-top: 1px solid #e5e7eb;
+                border-top: 1px solid rgba(0, 243, 255, 0.35);
                 display: flex;
                 justify-content: space-between;
                 font-size: 20px;
                 font-weight: 700;
                 text-transform: uppercase;
+                color: #e6feff;
               }
               .footer {
                 margin-top: 30px;
                 text-align: center;
                 font-size: 10px;
-                color: #6b7280;
+                color: #94a3b8;
                 text-transform: uppercase;
                 letter-spacing: 1px;
               }
               @media print {
                 @page { size: auto portrait; margin: 8mm; }
-                body { padding: 0; }
+                body { padding: 0; background: #0b1220; }
                 .receipt {
                   box-shadow: none;
-                  border-color: #d1d5db;
                   width: 100%;
                   max-width: 210mm;
                   min-height: 100%;

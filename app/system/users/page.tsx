@@ -219,7 +219,7 @@ export default function SystemUsersPage() {
   };
 
   return (
-    <div className={`min-h-screen flex ${dir === 'rtl' ? 'flex-row-reverse' : ''}`}>
+    <div className="min-h-screen flex" dir={dir}>
       <Sidebar />
       <main
         className="flex-1 p-6 md:p-8 overflow-y-auto bg-[#020617]"

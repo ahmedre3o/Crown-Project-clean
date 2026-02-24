@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { useLanguage } from '../contexts/LanguageContext';
-import { apiRequest, useAuth } from '../contexts/AuthContext';
+import { apiRequest, getNoShopMessage, isShopMissingError, useAuth } from '../contexts/AuthContext';
 import { useRouteGuard } from '../guards/useRouteGuard';
 import { BarcodeScanner } from '../components/BarcodeScanner';
 
@@ -27,9 +27,10 @@ export default function ManualEntryPage() {
   const { allowed } = useRouteGuard(user, authLoading, { feature: 'manual_entry', effectiveRole });
   const rawPackage = (user as any)?.package;
   const hasPackageString = typeof rawPackage === 'string' && rawPackage.trim().length > 0;
-  const hasPackageObject = rawPackage && typeof rawPackage === 'object';
-  const maxProducts = hasPackageObject ? ((rawPackage as any)?.maxProducts ?? 500) : 500;
-  const showPackageUnavailable = !hasPackageString && !hasPackageObject;
+  const packageObj = rawPackage && typeof rawPackage === 'object' ? (rawPackage as any) : null;
+  const maxProducts = Number.isFinite(Number(packageObj?.maxProducts)) ? Number(packageObj?.maxProducts) : Infinity;
+  const showPackageUnavailable = !hasPackageString && !packageObj;
+  const showMaxProducts = Number.isFinite(maxProducts) && maxProducts !== Infinity;
   const [form, setForm] = useState({
     nameEn: '',
     nameAr: '',
@@ -56,8 +57,10 @@ export default function ManualEntryPage() {
     try {
       const data = await apiRequest('/products');
       setProducts(data);
-    } catch (err) {
-      // ignore
+    } catch (err: any) {
+      if (isShopMissingError(err)) {
+        setError(getNoShopMessage(language));
+      }
     }
   };
 
@@ -122,7 +125,11 @@ export default function ManualEntryPage() {
       });
       await loadProducts();
     } catch (err: any) {
-      setError(err.message || 'Failed to save');
+      if (isShopMissingError(err)) {
+        setError(getNoShopMessage(language));
+      } else {
+        setError(err.message || 'Failed to save');
+      }
     } finally {
       setSaving(false);
     }
@@ -141,7 +148,7 @@ export default function ManualEntryPage() {
               {language === 'ar' ? 'بيانات الباقة غير متاحة حالياً.' : 'Package data unavailable.'}
             </div>
           )}
-          {hasPackageObject && (
+          {showMaxProducts && (
             <div className="mb-4 text-xs text-slate-400">
               {language === 'ar' ? `حد المنتجات: ${maxProducts}` : `Max products: ${maxProducts}`}
             </div>

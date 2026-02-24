@@ -6,6 +6,7 @@ import { PlanCards } from '@/components/PlanCards';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useCurrency } from '../contexts/CurrencyContext';
+import { USD_RATE_STORAGE_KEY } from '@/lib/formatters';
 import { apiRequest, useAuth } from '../contexts/AuthContext';
 import { useRouteGuard } from '../guards/useRouteGuard';
 
@@ -29,6 +30,7 @@ export default function SettingsPage() {
     currencyCode: currency,
     currencySymbol: '',
   });
+  const [usdRate, setUsdRate] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +86,10 @@ export default function SettingsPage() {
       if (data.currency_code) {
         setCurrency(data.currency_code);
       }
+      if (typeof window !== 'undefined') {
+        const storedRate = window.localStorage.getItem(USD_RATE_STORAGE_KEY);
+        if (storedRate) setUsdRate(storedRate);
+      }
       const subData = await apiRequest('/subscription').catch(() => null);
       if (subData) {
         setSubscription({
@@ -124,6 +130,14 @@ export default function SettingsPage() {
           currencySymbol: profile.currencySymbol,
         }),
       });
+      if (typeof window !== 'undefined') {
+        const parsed = Number(usdRate);
+        if (Number.isFinite(parsed) && parsed > 0) {
+          window.localStorage.setItem(USD_RATE_STORAGE_KEY, String(parsed));
+        } else {
+          window.localStorage.removeItem(USD_RATE_STORAGE_KEY);
+        }
+      }
       setMessage('Saved successfully');
     } catch (err: any) {
       setError(err.message || 'Failed to save');
@@ -267,6 +281,21 @@ export default function SettingsPage() {
               </option>
             ))}
           </select>
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input
+              type="number"
+              inputMode="decimal"
+              className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+              placeholder={language === 'ar' ? 'سعر تحويل الدولار (1 USD = ? EGP)' : 'USD rate (1 USD = ? EGP)'}
+              value={usdRate}
+              onChange={(e) => setUsdRate(e.target.value)}
+            />
+            <div className="text-xs text-slate-400">
+              {language === 'ar'
+                ? 'يُستخدم هذا السعر لتحويل المبيعات من الجنيه إلى الدولار عند اختيار USD.'
+                : 'Used to convert EGP sales to USD when USD is selected.'}
+            </div>
+          </div>
 
           <div className="mt-6 border-t border-cyan-500/20 pt-6">
             <h2 className="text-lg font-bold text-cyan-200 mb-2">

@@ -116,7 +116,8 @@ export function Sidebar() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className={`md:hidden fixed top-4 ${isRtl ? 'right-4' : 'left-4'} z-50 h-10 w-10 rounded-xl bg-cyan-600 text-white shadow-[0_0_16px_rgba(0,243,255,0.4)] flex items-center justify-center`}
+        className="md:hidden fixed top-4 z-50 h-10 w-10 rounded-xl bg-cyan-600 text-white shadow-[0_0_16px_rgba(0,243,255,0.4)] flex items-center justify-center"
+        style={{ insetInlineStart: '1rem' }}
         aria-label="Open menu"
       >
         <Menu className="h-5 w-5" />
@@ -130,11 +131,16 @@ export function Sidebar() {
       )}
 
       <aside
-        className={`fixed top-0 ${isRtl ? 'right-0' : 'left-0'} z-50 h-full bg-[#0a0f18] border-cyan-500/40 flex flex-col justify-between transition-transform duration-300 md:static md:translate-x-0 ${
+        className={`fixed top-0 z-50 h-full bg-[#0a0f18] border-cyan-500/40 flex flex-col justify-between transition-transform duration-300 md:static md:translate-x-0 ${
           collapsed ? 'md:w-20' : 'md:w-64'
-        } w-64 ${isRtl ? 'border-l' : 'border-r'} ${
+        } w-64 ${
           open ? 'translate-x-0' : isRtl ? 'translate-x-full' : '-translate-x-full'
         }`}
+        style={{
+          insetInlineStart: 0,
+          borderInlineEndWidth: '1px',
+          borderInlineEndStyle: 'solid',
+        }}
       >
         <div>
           {/* Brand Cluster */}
@@ -186,7 +192,10 @@ export function Sidebar() {
                           {branchDropdownOpen && (
                             <>
                               <div className="fixed inset-0 z-10" onClick={() => setBranchDropdownOpen(false)} />
-                              <div className="absolute top-full left-0 mt-1 z-20 min-w-[160px] rounded-lg border border-cyan-500/30 bg-[#0b1220] py-1 shadow-xl">
+                              <div
+                                className="absolute top-full mt-1 z-20 min-w-[160px] rounded-lg border border-cyan-500/30 bg-[#0b1220] py-1 shadow-xl"
+                                style={{ insetInlineStart: 0 }}
+                              >
                                 {branches.map((b) => (
                                   <button
                                     key={b.id}

@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ShoppingCart, ChevronLeft, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
+import { formatCurrency } from '@/lib/formatters';
 import { apiRequest } from '../../../../contexts/AuthContext';
 
 interface Product {
@@ -28,6 +29,8 @@ interface Product {
 interface Shop {
   id: number;
   name: string;
+  currency_code?: string | null;
+  currency_symbol?: string | null;
 }
 
 export default function StorefrontProductPage() {
@@ -72,6 +75,8 @@ export default function StorefrontProductPage() {
   }
 
   const { shop, product } = data;
+  const currencyCode = shop?.currency_code || 'EGP';
+  const currencySymbol = shop?.currency_symbol || null;
   const dir = language === 'ar' ? 'rtl' : 'ltr';
   const name = language === 'ar' ? product.name_ar : product.name_en;
   const available = Number(product.available_stock ?? product.stock_quantity ?? 0);
@@ -150,7 +155,7 @@ export default function StorefrontProductPage() {
             <h1 className="text-3xl font-bold text-white mb-2">{name}</h1>
             {product.brand && <p className="text-slate-400 mb-4">{product.brand}</p>}
             <p className="text-4xl font-bold text-cyan-400 mb-6">
-              {product.sell_price.toFixed(2)} {language === 'ar' ? 'ج.م' : 'EGP'}
+              {formatCurrency(product.sell_price, language === 'ar' ? 'ar' : 'en', currencyCode, currencySymbol)}
             </p>
             <p className="text-sm text-slate-400 mb-4">
               {language === 'ar' ? 'المتوفر:' : 'In stock:'} {available}

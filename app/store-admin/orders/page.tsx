@@ -141,11 +141,12 @@ function OnlineOrdersPageContent() {
     };
     return map[s]?.[language] || s;
   };
+  const sourceLabel = language === 'ar' ? 'أونلاين' : 'Online';
 
   if (authLoading || !allowed) return null;
 
   return (
-    <div className={`min-h-screen flex ${direction === 'rtl' ? 'flex-row-reverse' : ''}`}>
+    <div className="min-h-screen flex" dir={direction}>
       <Sidebar />
       <main className="flex-1 p-6 md:p-8">
         <div className="max-w-5xl mx-auto">
@@ -234,6 +235,9 @@ function OnlineOrdersPageContent() {
                         }`}
                       >
                         {statusLabel(order.status)}
+                      </div>
+                      <div className="text-xs px-2 py-1 rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-200">
+                        {sourceLabel}
                       </div>
                       <div className="text-xs text-slate-500">
                         {new Date(order.created_at).toLocaleString(

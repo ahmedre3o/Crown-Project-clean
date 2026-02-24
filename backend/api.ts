@@ -213,10 +213,15 @@ const authenticateToken = async (req: any, res: Response, next: any) => {
     }
 
     if (user.shop_id) {
-      const [shops] = await pool.execute('SELECT package FROM shops WHERE id = ?', [user.shop_id]);
-      const shopArray = shops as any[];
-      if (shopArray.length > 0) {
-        user.package = shopArray[0].package;
+      const synced = await syncShopSubscription(user.shop_id);
+      if (synced?.plan) {
+        user.package = synced.plan;
+      } else {
+        const [shops] = await pool.execute('SELECT package FROM shops WHERE id = ?', [user.shop_id]);
+        const shopArray = shops as any[];
+        if (shopArray.length > 0) {
+          user.package = shopArray[0].package;
+        }
       }
     }
 
@@ -292,6 +297,86 @@ const hasColumn = async (table: string, column: string): Promise<boolean> => {
     return false;
   }
 };
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const maskActivationCode = (code?: string | null) => {
+  const value = String(code || '').trim();
+  if (!value) return '';
+  if (value.length <= 8) return `${value.slice(0, 2)}****${value.slice(-2)}`;
+  return `${value.slice(0, 4)}****${value.slice(-4)}`;
+};
+
+const parseDurationDays = (duration: string, customDays?: number | null) => {
+  const key = String(duration || '').trim().toLowerCase();
+  if (key === 'lifetime') return null;
+  if (key === 'monthly') return 30;
+  if (key === 'quarterly') return 90;
+  if (key === 'yearly') return 365;
+  if (key === 'custom') {
+    const days = Number(customDays);
+    return Number.isFinite(days) && days > 0 ? Math.floor(days) : null;
+  }
+  return 30;
+};
+
+const computeDaysLeft = (expiresAt?: string | Date | null) => {
+  if (!expiresAt) return null;
+  const ts = new Date(expiresAt).getTime();
+  if (!Number.isFinite(ts)) return null;
+  const diff = ts - Date.now();
+  return diff >= 0 ? Math.ceil(diff / DAY_MS) : 0;
+};
+
+async function ensureShopSubscriptionRow(shopId: number) {
+  const [rows] = await pool.execute('SELECT shop_id FROM shop_subscriptions WHERE shop_id = ?', [shopId]).catch(() => [[]]);
+  const list = rows as any[];
+  if (list.length > 0) return;
+  const [shops] = await pool.execute('SELECT package FROM shops WHERE id = ?', [shopId]);
+  const shopArray = shops as any[];
+  const plan = normalizePlan(shopArray[0]?.package || 'bronze');
+  await pool.execute(
+    'INSERT INTO shop_subscriptions (shop_id, plan, status, started_at) VALUES (?, ?, ?, NOW())',
+    [shopId, plan, 'active']
+  );
+}
+
+async function applyPlanToShop(shopId: number, plan: PlanId) {
+  await pool.execute('UPDATE shops SET package = ?, plan_type = ?, is_active = 1 WHERE id = ?', [plan, plan, shopId]);
+  await pool.execute('UPDATE users SET package = ? WHERE shop_id = ?', [plan, shopId]);
+}
+
+async function syncShopSubscription(shopId: number) {
+  await ensureShopSubscriptionRow(shopId);
+  const [rows] = await pool.execute(
+    'SELECT shop_id, plan, status, started_at, expires_at, activation_code, activation_source, last_activated_at FROM shop_subscriptions WHERE shop_id = ?',
+    [shopId]
+  ).catch(() => [[]]);
+  const sub = (rows as any[])[0];
+  if (!sub) return null;
+  if (sub.expires_at) {
+    const expiresMs = new Date(sub.expires_at).getTime();
+    if (Number.isFinite(expiresMs) && expiresMs < Date.now()) {
+      const plan = 'bronze';
+      await pool.execute(
+        `UPDATE shop_subscriptions
+         SET plan = ?, status = 'expired', started_at = NOW(), expires_at = NULL,
+             activation_code = NULL, activation_source = 'expired', last_activated_at = NOW()
+         WHERE shop_id = ?`,
+        [plan, shopId]
+      );
+      await pool.execute('UPDATE shops SET trial_ends_at = NULL WHERE id = ?', [shopId]);
+      await applyPlanToShop(shopId, plan);
+      return {
+        ...sub,
+        plan,
+        status: 'expired',
+        expires_at: null,
+      };
+    }
+  }
+  return sub;
+}
 
 // ========== DOMAIN RESOLUTION + VERIFICATION ==========
 const ALLOWED_DOMAIN_TLDS = new Set(['com', 'net', 'org', 'shop', 'store']);
@@ -486,8 +571,104 @@ app.get('/api/models', authenticateToken, requireRole('super_admin'), async (req
   }
 });
 
+type PlanId = 'bronze' | 'silver' | 'gold' | 'branches';
+
+const PLAN_DEFINITIONS: Record<PlanId, {
+  id: PlanId;
+  name: string;
+  totalUsers: number;
+  additionalUsersLimit: number;
+  features: {
+    pos: boolean;
+    manualEntry: boolean;
+    inventory: boolean;
+    excelImport: boolean;
+    onlineStore: boolean;
+    reports: boolean;
+    notifications: boolean;
+    ai: boolean;
+    branches: boolean;
+  };
+}> = {
+  bronze: {
+    id: 'bronze',
+    name: 'Bronze',
+    totalUsers: 2,
+    additionalUsersLimit: 1,
+    features: {
+      pos: true,
+      manualEntry: true,
+      inventory: true,
+      excelImport: false,
+      onlineStore: false,
+      reports: false,
+      notifications: false,
+      ai: false,
+      branches: false,
+    },
+  },
+  silver: {
+    id: 'silver',
+    name: 'Silver',
+    totalUsers: 5,
+    additionalUsersLimit: 4,
+    features: {
+      pos: true,
+      manualEntry: true,
+      inventory: true,
+      excelImport: true,
+      onlineStore: false,
+      reports: false,
+      notifications: false,
+      ai: false,
+      branches: false,
+    },
+  },
+  gold: {
+    id: 'gold',
+    name: 'Gold',
+    totalUsers: 10,
+    additionalUsersLimit: 9,
+    features: {
+      pos: true,
+      manualEntry: true,
+      inventory: true,
+      excelImport: true,
+      onlineStore: true,
+      reports: true,
+      notifications: true,
+      ai: true,
+      branches: false,
+    },
+  },
+  branches: {
+    id: 'branches',
+    name: 'Branches',
+    totalUsers: 999,
+    additionalUsersLimit: 998,
+    features: {
+      pos: true,
+      manualEntry: true,
+      inventory: true,
+      excelImport: true,
+      onlineStore: true,
+      reports: true,
+      notifications: true,
+      ai: true,
+      branches: true,
+    },
+  },
+};
+
+const normalizePlan = (plan?: string | null): PlanId => {
+  const key = String(plan || '').trim().toLowerCase() as PlanId;
+  return PLAN_DEFINITIONS[key] ? key : 'bronze';
+};
+
+const getPlanDefinition = (plan?: string | null) => PLAN_DEFINITIONS[normalizePlan(plan)];
+
 // Middleware for package-based access control
-const requirePackageFeature = (feature: 'qr' | 'pos' | 'dashboard' | 'excel' | 'ai' | 'storefront') => {
+const requirePackageFeature = (feature: 'qr' | 'pos' | 'dashboard' | 'excel' | 'ai' | 'storefront' | 'reports' | 'branches') => {
   return (req: any, res: Response, next: any) => {
     if (!req.user) {
       return res.status(401).json({ error: 'Authentication required' });
@@ -497,8 +678,9 @@ const requirePackageFeature = (feature: 'qr' | 'pos' | 'dashboard' | 'excel' | '
       return next();
     }
 
-    const plan = (req.user.package || 'bronze') as 'bronze' | 'silver' | 'gold';
+    const plan = normalizePlan(req.user.package || 'bronze');
     const config = tierFeatures[plan] || tierFeatures.bronze;
+    const planFeatures = getPlanDefinition(plan).features;
 
     const allowed =
       feature === 'pos'
@@ -506,13 +688,17 @@ const requirePackageFeature = (feature: 'qr' | 'pos' | 'dashboard' | 'excel' | '
         : feature === 'dashboard'
         ? true
         : feature === 'excel'
-        ? Boolean(config.excelImport)
+        ? Boolean(planFeatures.excelImport)
         : feature === 'ai'
-        ? Boolean(config.voiceAssistant)
+        ? Boolean(planFeatures.ai)
         : feature === 'qr'
         ? Boolean(config.qrCode || config.barcode)
         : feature === 'storefront'
-        ? plan === 'gold'
+        ? Boolean(planFeatures.onlineStore)
+        : feature === 'reports'
+        ? Boolean(planFeatures.reports)
+        : feature === 'branches'
+        ? Boolean(planFeatures.branches)
         : false;
 
     if (!allowed) {
@@ -538,11 +724,20 @@ const tierFeatures = {
     barcode: true,
     qrCode: true,
     pharmacyExpiry: true,
-    reports: true,
+    reports: false,
     voiceAssistant: false,
-    excelImport: false,
+    excelImport: true,
   },
   gold: {
+    maxProducts: null,
+    barcode: true,
+    qrCode: true,
+    pharmacyExpiry: true,
+    reports: true,
+    voiceAssistant: true,
+    excelImport: true,
+  },
+  branches: {
     maxProducts: null,
     barcode: true,
     qrCode: true,
@@ -556,7 +751,7 @@ const tierFeatures = {
 const getShopTier = async (shopId: number) => {
   const [shops] = await pool.execute('SELECT package FROM shops WHERE id = ?', [shopId]);
   const shopArray = shops as any[];
-  return (shopArray[0]?.package || 'bronze') as 'bronze' | 'silver' | 'gold';
+  return normalizePlan(shopArray[0]?.package || 'bronze');
 };
 
 const enforceProductLimit = async (shopId: number, incomingCount: number) => {
@@ -804,7 +999,9 @@ const enforcePlanLimits = async (shopId: number, requestedRole: string) => {
     throw new Error('Shop not found');
   }
 
-  const plan = shopArray[0].package as 'bronze' | 'silver' | 'gold';
+  const plan = normalizePlan(shopArray[0].package || 'bronze');
+  const planConfig = getPlanDefinition(plan);
+
   const [counts] = await pool.execute(
     'SELECT role, COUNT(*) as count FROM users WHERE shop_id = ? GROUP BY role',
     [shopId]
@@ -814,29 +1011,30 @@ const enforcePlanLimits = async (shopId: number, requestedRole: string) => {
     acc[row.role] = row.count;
     return acc;
   }, {});
+  const ownerCount = Number(roleCounts.shop_owner || 0);
+  const totalUsers = Object.values(roleCounts).reduce((sum, n) => sum + Number(n || 0), 0);
+  const additionalUsersCount = Math.max(0, totalUsers - ownerCount);
 
-  if (plan === 'bronze') {
-    if (requestedRole === 'warehouse') {
-      throw new Error('Bronze plan does not allow warehouse users');
-    }
-    if (requestedRole === 'shop_owner' && (roleCounts.shop_owner || 0) >= 1) {
-      throw new Error('Bronze plan allows only 1 owner');
-    }
-    if (requestedRole === 'cashier' && (roleCounts.cashier || 0) >= 1) {
-      throw new Error('Bronze plan allows only 1 cashier');
-    }
+  if (requestedRole === 'shop_owner' && ownerCount >= 1) {
+    throw new Error('Owner already exists');
   }
 
-  if (plan === 'silver') {
-    if (requestedRole === 'shop_owner' && (roleCounts.shop_owner || 0) >= 1) {
-      throw new Error('Silver plan allows only 1 owner');
-    }
-    if (requestedRole === 'cashier' && (roleCounts.cashier || 0) >= 1) {
-      throw new Error('Silver plan allows only 1 cashier');
-    }
-    if (requestedRole === 'warehouse' && (roleCounts.warehouse || 0) >= 1) {
-      throw new Error('Silver plan allows only 1 warehouse user');
-    }
+  if (totalUsers >= planConfig.totalUsers) {
+    const err = new Error('PLAN_USER_LIMIT_REACHED') as any;
+    err.message_ar = 'لقد وصلت للحد الأقصى لعدد المستخدمين في باقتك. قم بالترقية أو احذف مستخدمًا.';
+    err.message_en = "You have reached your plan's user limit. Upgrade your plan or remove a user.";
+    throw err;
+  }
+
+  if (requestedRole !== 'shop_owner' && additionalUsersCount >= planConfig.additionalUsersLimit) {
+    const err = new Error('PLAN_USER_LIMIT_REACHED') as any;
+    err.message_ar = 'لقد وصلت للحد الأقصى لعدد المستخدمين في باقتك. قم بالترقية أو احذف مستخدمًا.';
+    err.message_en = "You have reached your plan's user limit. Upgrade your plan or remove a user.";
+    throw err;
+  }
+
+  if ((requestedRole === 'branch_manager' || requestedRole === 'multi_branch_manager') && plan !== 'branches') {
+    throw new Error('Branch Manager roles require the Branches plan');
   }
 };
 
@@ -992,11 +1190,20 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
       }
     }
 
+    let finalPackage = pkg || 'bronze';
+    if (shopId) {
+      const [shops] = await pool.execute('SELECT package FROM shops WHERE id = ?', [shopId]);
+      const shopArray = shops as any[];
+      if (shopArray.length > 0) {
+        finalPackage = shopArray[0].package || finalPackage;
+      }
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
     
     const [result] = await pool.execute(
       'INSERT INTO users (username, password, role, package, shop_id) VALUES (?, ?, ?, ?, ?)',
-      [username, hashedPassword, requestedRole, pkg || 'bronze', shopId || null]
+      [username, hashedPassword, requestedRole, finalPackage, shopId || null]
     );
 
     const insertResult = result as any;
@@ -1004,7 +1211,7 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
       id: insertResult.insertId, 
       username, 
       role: requestedRole,
-      package: pkg || 'bronze'
+      package: finalPackage
     });
   } catch (error: any) {
     if (error.code === 'ER_DUP_ENTRY') {
@@ -1048,6 +1255,13 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
     
     if (!validPassword) {
       return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    if (user.shop_id) {
+      const synced = await syncShopSubscription(user.shop_id);
+      if (synced?.plan) {
+        user.package = synced.plan;
+      }
     }
 
     const token = jwt.sign(
@@ -1094,7 +1308,6 @@ app.post('/api/auth/register-shop', async (req: Request, res: Response) => {
       address,
       contactEmail,
       contactPhone,
-      package: pkg,
     } = req.body;
 
     if (!username || !password || !businessName) {
@@ -1102,19 +1315,21 @@ app.post('/api/auth/register-shop', async (req: Request, res: Response) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    const trialPlan: PlanId = 'gold';
+    const trialEndsAt = new Date(Date.now() + 7 * DAY_MS);
     const connection = await pool.getConnection();
 
     try {
       await connection.beginTransaction();
       const [userResult] = await connection.execute(
         'INSERT INTO users (username, password, role, package, shop_id) VALUES (?, ?, ?, ?, ?)',
-        [username, hashedPassword, 'shop_owner', pkg || 'bronze', null]
+        [username, hashedPassword, 'shop_owner', trialPlan, null]
       );
       const userInsert = userResult as any;
 
       const [shopResult] = await connection.execute(
-        `INSERT INTO shops (name, business_name, owner_name, activity_type, address, contact_email, contact_phone, owner_id, package)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO shops (name, business_name, owner_name, activity_type, address, contact_email, contact_phone, owner_id, package, plan_type, is_active, trial_ends_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           businessName,
           businessName,
@@ -1124,16 +1339,33 @@ app.post('/api/auth/register-shop', async (req: Request, res: Response) => {
           contactEmail || null,
           contactPhone || null,
           userInsert.insertId,
-          pkg || 'bronze',
+          trialPlan,
+          trialPlan,
+          1,
+          trialEndsAt,
         ]
       );
       const shopInsert = shopResult as any;
 
       await connection.execute('UPDATE users SET shop_id = ? WHERE id = ?', [shopInsert.insertId, userInsert.insertId]);
+      await connection.execute(
+        `INSERT INTO shop_subscriptions (shop_id, plan, status, started_at, expires_at, activation_source, activation_code, last_activated_at, activated_by_user_id)
+         VALUES (?, ?, 'trial', NOW(), ?, 'trial', NULL, NOW(), ?)
+         ON DUPLICATE KEY UPDATE
+           plan = VALUES(plan),
+           status = 'trial',
+           started_at = VALUES(started_at),
+           expires_at = VALUES(expires_at),
+           activation_source = 'trial',
+           activation_code = NULL,
+           last_activated_at = NOW(),
+           activated_by_user_id = VALUES(activated_by_user_id)`,
+        [shopInsert.insertId, trialPlan, trialEndsAt, userInsert.insertId]
+      );
       await connection.commit();
 
       const token = jwt.sign(
-        { userId: userInsert.insertId, role: 'shop_owner', package: pkg || 'bronze', shopId: shopInsert.insertId },
+        { userId: userInsert.insertId, role: 'shop_owner', package: trialPlan, shopId: shopInsert.insertId },
         JWT_SECRET,
         { expiresIn: '24h' }
       );
@@ -1691,7 +1923,7 @@ app.get('/api/admin/shops', authenticateToken, requireRole('super_admin'), async
 });
 
 // ========== ADMIN BRANCHES (X-Shop-Id or token shopId; 400 if missing) ==========
-app.get('/api/admin/branches', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'), async (req: any, res: Response) => {
+app.get('/api/admin/branches', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'), requirePackageFeature('branches'), async (req: any, res: Response) => {
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -1705,7 +1937,7 @@ app.get('/api/admin/branches', authenticateToken, requireRole('super_admin', 'sh
   }
 });
 
-app.post('/api/admin/branches', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'), async (req: any, res: Response) => {
+app.post('/api/admin/branches', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'), requirePackageFeature('branches'), async (req: any, res: Response) => {
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -1723,7 +1955,7 @@ app.post('/api/admin/branches', authenticateToken, requireRole('super_admin', 's
   }
 });
 
-app.get('/api/admin/branches/:id', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'), async (req: any, res: Response) => {
+app.get('/api/admin/branches/:id', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'), requirePackageFeature('branches'), async (req: any, res: Response) => {
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -1738,7 +1970,7 @@ app.get('/api/admin/branches/:id', authenticateToken, requireRole('super_admin',
   }
 });
 
-app.put('/api/admin/branches/:id', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'), async (req: any, res: Response) => {
+app.put('/api/admin/branches/:id', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'), requirePackageFeature('branches'), async (req: any, res: Response) => {
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -1765,7 +1997,7 @@ app.put('/api/admin/branches/:id', authenticateToken, requireRole('super_admin',
   }
 });
 
-app.delete('/api/admin/branches/:id', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'), async (req: any, res: Response) => {
+app.delete('/api/admin/branches/:id', authenticateToken, requireRole('super_admin', 'shop_owner', 'branch_manager', 'multi_branch_manager'), requirePackageFeature('branches'), async (req: any, res: Response) => {
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -2360,24 +2592,82 @@ app.get('/api/subscription', authenticateToken, async (req: any, res: Response) 
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
-    const [rows] = await pool.execute(
-      'SELECT plan, status, started_at, expires_at FROM shop_subscriptions WHERE shop_id = ?',
+    const sub = await syncShopSubscription(shopId);
+    const plan = normalizePlan(sub?.plan || 'bronze');
+    const planConfig = getPlanDefinition(plan);
+    const startedAt = sub?.started_at || null;
+    const expiresAt = sub?.expires_at || null;
+    const daysLeft = computeDaysLeft(expiresAt);
+    const hasActivation = Boolean(sub?.activation_code) || sub?.activation_source === 'code' || sub?.status === 'trial';
+    const planStatus =
+      sub?.status === 'trial'
+        ? 'TRIAL'
+        : !hasActivation && plan === 'bronze'
+        ? 'NONE'
+        : !expiresAt
+        ? 'LIFETIME'
+        : daysLeft != null && daysLeft > 0
+        ? 'ACTIVE'
+        : 'EXPIRED';
+
+    const [counts] = await pool.execute(
+      'SELECT role, COUNT(*) as count FROM users WHERE shop_id = ? GROUP BY role',
+      [shopId]
+    );
+    const countArray = counts as any[];
+    const roleCounts = countArray.reduce<Record<string, number>>((acc, row) => {
+      acc[row.role] = row.count;
+      return acc;
+    }, {});
+    const ownerCount = Number(roleCounts.shop_owner || 0);
+    const totalUsers = Object.values(roleCounts).reduce((sum, n) => sum + Number(n || 0), 0);
+    const additionalUsersCount = Math.max(0, totalUsers - ownerCount);
+    const canAddUser =
+      totalUsers < planConfig.totalUsers && additionalUsersCount < planConfig.additionalUsersLimit;
+
+    const [activations] = await pool.execute(
+      `SELECT license_key as code, duration, duration_days, used_at as activated_at, expires_at as new_expires_at
+       FROM licenses
+       WHERE used_by_shop_id = ?
+       ORDER BY used_at DESC
+       LIMIT 5`,
       [shopId]
     ).catch(() => [[]]);
-    const row = (rows as any[])[0];
-    if (!row) {
-      const [shop] = await pool.execute('SELECT package FROM shops WHERE id = ?', [shopId]);
-      const pkg = (shop as any[])[0]?.package || 'bronze';
-      return res.json({ plan: pkg, status: 'active', started_at: null, expires_at: null });
-    }
-    res.json(row);
+
+    res.json({
+      planName: plan,
+      planStatus,
+      status: sub?.status || 'active',
+      startedAt,
+      expiresAt,
+      lastActivatedAt: sub?.last_activated_at || startedAt,
+      activationCode: sub?.activation_code || null,
+      activationCodeMasked: sub?.activation_code ? maskActivationCode(sub.activation_code) : null,
+      daysLeft,
+      userLimit: planConfig.totalUsers,
+      userLimitTotal: planConfig.totalUsers,
+      additionalUsersLimit: planConfig.additionalUsersLimit,
+      userCount: totalUsers,
+      userCountTotal: totalUsers,
+      additionalUsersCount,
+      canAddUser,
+      permissions: planConfig.features,
+      activations: Array.isArray(activations)
+        ? (activations as any[]).map((row) => ({
+            code: row.code,
+            days: parseDurationDays(row.duration, row.duration_days) ?? 0,
+            activated_at: row.activated_at,
+            new_expires_at: row.new_expires_at,
+          }))
+        : [],
+    });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
 
 // ========== ADMIN ONLINE INVOICES / ORDERS (invoices page) ==========
-app.get('/api/admin/online-invoices', authenticateToken, async (req: any, res: Response) => {
+app.get('/api/admin/online-invoices', authenticateToken, requirePackageFeature('storefront'), async (req: any, res: Response) => {
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -2396,7 +2686,7 @@ app.get('/api/admin/online-invoices', authenticateToken, async (req: any, res: R
   }
 });
 
-app.get('/api/admin/online-invoices/:id', authenticateToken, async (req: any, res: Response) => {
+app.get('/api/admin/online-invoices/:id', authenticateToken, requirePackageFeature('storefront'), async (req: any, res: Response) => {
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -2414,7 +2704,7 @@ app.get('/api/admin/online-invoices/:id', authenticateToken, async (req: any, re
   }
 });
 
-app.post('/api/admin/online-invoices/:id/print', authenticateToken, async (req: any, res: Response) => {
+app.post('/api/admin/online-invoices/:id/print', authenticateToken, requirePackageFeature('storefront'), async (req: any, res: Response) => {
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -2435,7 +2725,7 @@ app.post('/api/admin/online-invoices/:id/print', authenticateToken, async (req: 
 });
 
 // ========== ADMIN ONLINE ORDERS (online orders page) ==========
-app.get('/api/admin/orders', authenticateToken, async (req: any, res: Response) => {
+app.get('/api/admin/orders', authenticateToken, requirePackageFeature('storefront'), async (req: any, res: Response) => {
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -2472,7 +2762,7 @@ app.get('/api/admin/orders', authenticateToken, async (req: any, res: Response) 
   }
 });
 
-app.get('/api/admin/orders/:id', authenticateToken, async (req: any, res: Response) => {
+app.get('/api/admin/orders/:id', authenticateToken, requirePackageFeature('storefront'), async (req: any, res: Response) => {
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -2491,7 +2781,7 @@ app.get('/api/admin/orders/:id', authenticateToken, async (req: any, res: Respon
   }
 });
 
-app.patch('/api/admin/orders/:id/status', authenticateToken, async (req: any, res: Response) => {
+app.patch('/api/admin/orders/:id/status', authenticateToken, requirePackageFeature('storefront'), async (req: any, res: Response) => {
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -2524,6 +2814,7 @@ app.get('/api/admin/payments-orders/orders', authenticateToken, async (req: any,
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
+    const allowOnline = getPlanDefinition(normalizePlan(req.user?.package)).features.onlineStore;
     const limitRaw = Number(req.query.limit);
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 500) : 200;
     const status = String(req.query.status || '').trim();
@@ -2581,8 +2872,11 @@ app.get('/api/admin/payments-orders/orders', authenticateToken, async (req: any,
       ORDER BY o.created_at DESC
       LIMIT ${limit}
     `;
-    const [rows] = await pool.execute(sql, params).catch(() => [[]]);
-    const onlineList = (rows as any[]).map((row: any) => ({ ...row, source: 'online' }));
+    let onlineList: any[] = [];
+    if (allowOnline) {
+      const [rows] = await pool.execute(sql, params).catch(() => [[]]);
+      onlineList = (rows as any[]).map((row: any) => ({ ...row, source: 'online' }));
+    }
 
     const allowPosByStatus = !status || status === 'completed' || status === 'confirmed';
     const allowPosByPayment = !paymentStatus || paymentStatus === 'confirmed';
@@ -2648,6 +2942,7 @@ app.get('/api/admin/payments-orders/payments', authenticateToken, async (req: an
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
+    const allowOnline = getPlanDefinition(normalizePlan(req.user?.package)).features.onlineStore;
     const limitRaw = Number(req.query.limit);
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 500) : 200;
     const status = String(req.query.status || '').trim();
@@ -2706,8 +3001,11 @@ app.get('/api/admin/payments-orders/payments', authenticateToken, async (req: an
       ORDER BY p.created_at DESC
       LIMIT ${limit}
     `;
-    const [rows] = await pool.execute(sql, params).catch(() => [[]]);
-    const onlinePayments = (rows as any[]).map((row: any) => ({ ...row, source: 'online' }));
+    let onlinePayments: any[] = [];
+    if (allowOnline) {
+      const [rows] = await pool.execute(sql, params).catch(() => [[]]);
+      onlinePayments = (rows as any[]).map((row: any) => ({ ...row, source: 'online' }));
+    }
 
     const allowPosByStatus = !status || status === 'confirmed';
     let posPayments: any[] = [];
@@ -2821,7 +3119,7 @@ app.post('/api/admin/payments/:id/reject', authenticateToken, async (req: any, r
 });
 
 // ========== ADMIN REPORTS (reports page) ==========
-app.get('/api/admin/reports/summary', authenticateToken, async (req: any, res: Response) => {
+app.get('/api/admin/reports/summary', authenticateToken, requirePackageFeature('reports'), async (req: any, res: Response) => {
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -2851,7 +3149,7 @@ app.get('/api/admin/reports/summary', authenticateToken, async (req: any, res: R
   }
 });
 
-app.get('/api/admin/reports/profit', authenticateToken, async (req: any, res: Response) => {
+app.get('/api/admin/reports/profit', authenticateToken, requirePackageFeature('reports'), async (req: any, res: Response) => {
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -2879,7 +3177,7 @@ app.get('/api/admin/reports/profit', authenticateToken, async (req: any, res: Re
   }
 });
 
-app.get('/api/admin/reports/transactions', authenticateToken, async (req: any, res: Response) => {
+app.get('/api/admin/reports/transactions', authenticateToken, requirePackageFeature('reports'), async (req: any, res: Response) => {
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -2902,7 +3200,7 @@ app.get('/api/admin/reports/transactions', authenticateToken, async (req: any, r
   }
 });
 
-app.get('/api/admin/reports/dead-stock', authenticateToken, async (req: any, res: Response) => {
+app.get('/api/admin/reports/dead-stock', authenticateToken, requirePackageFeature('reports'), async (req: any, res: Response) => {
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -2922,7 +3220,7 @@ app.get('/api/admin/reports/dead-stock', authenticateToken, async (req: any, res
   }
 });
 
-app.get('/api/admin/reports/day-details', authenticateToken, async (req: any, res: Response) => {
+app.get('/api/admin/reports/day-details', authenticateToken, requirePackageFeature('reports'), async (req: any, res: Response) => {
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -2950,6 +3248,8 @@ app.get('/api/admin/reports/day-details', authenticateToken, async (req: any, re
 // Notifications unread count (frontend NotificationsBell). Returns 0 if notifications table missing. Uses shop_id (schema has shop_id, not user_id).
 app.get('/api/notifications/unread-count', authenticateToken, async (req: any, res: Response) => {
   try {
+    const allowNotifications = getPlanDefinition(normalizePlan(req.user?.package)).features.notifications;
+    if (!allowNotifications) return res.json({ count: 0 });
     const shopId = getShopId(req).shopId;
     if (shopId == null) return res.json({ count: 0 });
     const [rows] = await pool.execute(
@@ -2966,6 +3266,8 @@ app.get('/api/notifications/unread-count', authenticateToken, async (req: any, r
 // Notifications list (Activity & Notifications page)
 app.get('/api/notifications', authenticateToken, async (req: any, res: Response) => {
   try {
+    const allowNotifications = getPlanDefinition(normalizePlan(req.user?.package)).features.notifications;
+    if (!allowNotifications) return res.json({ ok: true, items: [], unreadCount: 0, nextOffset: null });
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
     const limitRaw = Number(req.query.limit);
@@ -3013,6 +3315,8 @@ app.get('/api/notifications', authenticateToken, async (req: any, res: Response)
 
 app.patch('/api/notifications/:id/read', authenticateToken, async (req: any, res: Response) => {
   try {
+    const allowNotifications = getPlanDefinition(normalizePlan(req.user?.package)).features.notifications;
+    if (!allowNotifications) return res.json({ ok: true });
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Invalid notification id' });
     const shopId = getShopIdOrFail(req, res);
@@ -3026,6 +3330,8 @@ app.patch('/api/notifications/:id/read', authenticateToken, async (req: any, res
 
 app.patch('/api/notifications/mark-all-read', authenticateToken, async (req: any, res: Response) => {
   try {
+    const allowNotifications = getPlanDefinition(normalizePlan(req.user?.package)).features.notifications;
+    if (!allowNotifications) return res.json({ ok: true, updated: 0 });
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
     const [result] = await pool.execute(
@@ -3102,7 +3408,7 @@ app.put('/api/shops/profile', authenticateToken, requireRole('super_admin', 'sho
 });
 
 // ========== STORE DOMAINS (Store Admin - shop_owner) ==========
-app.post('/api/domains/add', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
+app.post('/api/domains/add', authenticateToken, requireRole('super_admin', 'shop_owner'), requirePackageFeature('storefront'), async (req: any, res: Response) => {
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -3148,7 +3454,7 @@ app.post('/api/domains/add', authenticateToken, requireRole('super_admin', 'shop
   }
 });
 
-app.post('/api/domains/verify', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
+app.post('/api/domains/verify', authenticateToken, requireRole('super_admin', 'shop_owner'), requirePackageFeature('storefront'), async (req: any, res: Response) => {
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -3195,7 +3501,7 @@ app.post('/api/domains/verify', authenticateToken, requireRole('super_admin', 's
   }
 });
 
-app.post('/api/domains/activate', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
+app.post('/api/domains/activate', authenticateToken, requireRole('super_admin', 'shop_owner'), requirePackageFeature('storefront'), async (req: any, res: Response) => {
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -3245,7 +3551,7 @@ app.post('/api/domains/activate', authenticateToken, requireRole('super_admin', 
   }
 });
 
-app.post('/api/domains/deactivate', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
+app.post('/api/domains/deactivate', authenticateToken, requireRole('super_admin', 'shop_owner'), requirePackageFeature('storefront'), async (req: any, res: Response) => {
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -3275,7 +3581,7 @@ app.post('/api/domains/deactivate', authenticateToken, requireRole('super_admin'
   }
 });
 
-app.get('/api/domains', authenticateToken, requireRole('super_admin', 'shop_owner'), async (req: any, res: Response) => {
+app.get('/api/domains', authenticateToken, requireRole('super_admin', 'shop_owner'), requirePackageFeature('storefront'), async (req: any, res: Response) => {
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -3415,10 +3721,127 @@ app.delete('/api/users/:id', authenticateToken, requireRole('super_admin', 'shop
 });
 
 // ========== LICENSES (Super Admin) ==========
+const buildLicensePermissions = (plan: string) => {
+  const config = getPlanDefinition(normalizePlan(plan));
+  return config.features;
+};
+
+const activateLicenseCode = async (req: any, res: Response) => {
+  try {
+    const code = String(req.body?.code || '').trim();
+    if (!code) {
+      return res.status(400).json({ error: 'Activation code required' });
+    }
+
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+
+    const [licenses] = await pool.execute('SELECT * FROM licenses WHERE license_key = ? LIMIT 1', [code]);
+    const licenseArray = licenses as any[];
+    if (licenseArray.length === 0) {
+      return res.status(404).json({ error: 'Invalid code' });
+    }
+
+    const license = licenseArray[0];
+    if (license.status !== 'unused' || license.used_at) {
+      return res.status(409).json({ error: 'Code already used' });
+    }
+    if (license.code_expires_at) {
+      const codeExpires = new Date(license.code_expires_at).getTime();
+      if (Number.isFinite(codeExpires) && codeExpires < Date.now()) {
+        await pool.execute('UPDATE licenses SET status = "expired" WHERE id = ?', [license.id]);
+        return res.status(410).json({ error: 'Code expired' });
+      }
+    }
+
+    const plan = normalizePlan(license.plan);
+    const durationDays = parseDurationDays(license.duration, license.duration_days);
+    if (String(license.duration).toLowerCase() === 'custom' && !durationDays) {
+      return res.status(400).json({ error: 'Invalid code duration' });
+    }
+    const expiresAt = durationDays ? new Date(Date.now() + durationDays * DAY_MS) : null;
+    let permissions = buildLicensePermissions(plan);
+    if (license.permissions_json) {
+      try {
+        permissions = JSON.parse(license.permissions_json);
+      } catch {
+        permissions = buildLicensePermissions(plan);
+      }
+    }
+
+    await pool.execute(
+      `UPDATE licenses
+       SET status = "active", used_by_user_id = ?, used_by_shop_id = ?, used_at = NOW(),
+           expires_at = ?, permissions_json = ?
+       WHERE id = ?`,
+      [req.user.id, shopId, expiresAt, JSON.stringify(permissions), license.id]
+    );
+
+    await pool.execute(
+      `INSERT INTO shop_subscriptions (shop_id, plan, status, started_at, expires_at, activation_code, activation_source, last_activated_at, activated_by_user_id)
+       VALUES (?, ?, 'active', NOW(), ?, ?, 'code', NOW(), ?)
+       ON DUPLICATE KEY UPDATE
+         plan = VALUES(plan),
+         status = 'active',
+         started_at = VALUES(started_at),
+         expires_at = VALUES(expires_at),
+         activation_code = VALUES(activation_code),
+         activation_source = 'code',
+         last_activated_at = NOW(),
+         activated_by_user_id = VALUES(activated_by_user_id)`,
+      [shopId, plan, expiresAt, code, req.user.id]
+    );
+    await pool.execute('UPDATE shops SET trial_ends_at = NULL WHERE id = ?', [shopId]);
+    await applyPlanToShop(shopId, plan);
+
+    res.json({
+      success: true,
+      plan,
+      planStatus: expiresAt ? 'ACTIVE' : 'LIFETIME',
+      duration: license.duration,
+      durationDays,
+      expiresAt,
+      daysLeft: computeDaysLeft(expiresAt),
+      permissions,
+      activationCode: code,
+      activationCodeMasked: maskActivationCode(code),
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 app.get('/api/licenses', authenticateToken, requireRole('super_admin'), async (req: Request, res: Response) => {
   try {
-    const [licenses] = await pool.execute('SELECT * FROM licenses ORDER BY created_at DESC');
-    res.json(licenses);
+    const filter = String((req.query as any)?.filter || 'all').toLowerCase();
+    await pool.execute(
+      `UPDATE licenses
+       SET status = 'expired'
+       WHERE status = 'unused' AND code_expires_at IS NOT NULL AND code_expires_at < NOW()`
+    ).catch(() => null);
+
+    const conditions: string[] = [];
+    if (filter === 'activated') conditions.push("status = 'active'");
+    if (filter === 'not_activated') conditions.push("status = 'unused'");
+    if (filter === 'expired') conditions.push("status = 'expired'");
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const [licenses] = await pool.execute(`SELECT * FROM licenses ${where} ORDER BY created_at DESC`);
+    const list = (licenses as any[]).map((row) => {
+      let permissions = buildLicensePermissions(row.plan);
+      if (row.permissions_json) {
+        try {
+          permissions = JSON.parse(row.permissions_json);
+        } catch {
+          permissions = buildLicensePermissions(row.plan);
+        }
+      }
+      return {
+        ...row,
+        plan: normalizePlan(row.plan),
+        permissions,
+      };
+    });
+    res.json(list);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -3426,22 +3849,48 @@ app.get('/api/licenses', authenticateToken, requireRole('super_admin'), async (r
 
 app.post('/api/licenses/generate', authenticateToken, requireRole('super_admin'), async (req: Request, res: Response) => {
   try {
-    const { plan, duration, count } = req.body;
-    const allowedPlans = ['bronze', 'silver', 'gold'];
-    const allowedDurations = ['monthly', 'quarterly', 'yearly', 'lifetime'];
-    if (!allowedPlans.includes(plan) || !allowedDurations.includes(duration)) {
+    const { plan, duration, count, customDays, codeExpiresAt, validDays } = req.body || {};
+    const allowedPlans = Object.keys(PLAN_DEFINITIONS);
+    const allowedDurations = ['monthly', 'quarterly', 'yearly', 'lifetime', 'custom'];
+    if (!allowedPlans.includes(String(plan)) || !allowedDurations.includes(String(duration))) {
       return res.status(400).json({ error: 'Invalid plan or duration' });
+    }
+    if (String(duration) === 'custom') {
+      const days = Number(customDays);
+      if (!Number.isFinite(days) || days <= 0) {
+        return res.status(400).json({ error: 'Custom duration requires valid days' });
+      }
     }
 
     const total = Math.min(parseInt(count || '1', 10), 100);
     const codes: string[] = [];
-
     for (let i = 0; i < total; i += 1) {
       codes.push(crypto.randomBytes(10).toString('hex').toUpperCase());
     }
 
-    const values = codes.map((code) => [code, plan, duration]);
-    await pool.query('INSERT INTO licenses (license_key, plan, duration) VALUES ?', [values]);
+    const durationDays = parseDurationDays(duration, customDays);
+    const permissions = buildLicensePermissions(plan);
+    let codeExpires: Date | null = null;
+    if (codeExpiresAt) {
+      const parsed = new Date(codeExpiresAt);
+      if (Number.isFinite(parsed.getTime())) codeExpires = parsed;
+    } else if (validDays) {
+      const days = Number(validDays);
+      if (Number.isFinite(days) && days > 0) codeExpires = new Date(Date.now() + Math.floor(days) * DAY_MS);
+    }
+
+    const values = codes.map((code) => [
+      code,
+      plan,
+      duration,
+      durationDays,
+      JSON.stringify(permissions),
+      codeExpires,
+    ]);
+    await pool.query(
+      'INSERT INTO licenses (license_key, plan, duration, duration_days, permissions_json, code_expires_at) VALUES ?',
+      [values]
+    );
 
     res.status(201).json({ codes });
   } catch (error: any) {
@@ -3449,90 +3898,46 @@ app.post('/api/licenses/generate', authenticateToken, requireRole('super_admin')
   }
 });
 
-app.post('/api/licenses/activate', authenticateToken, async (req: any, res: Response) => {
+app.delete('/api/licenses/:id', authenticateToken, requireRole('super_admin'), async (req: Request, res: Response) => {
   try {
-    const { code } = req.body;
-    if (!code) {
-      return res.status(400).json({ error: 'Activation code required' });
-    }
-
-    const shopId = getShopIdOrFail(req, res);
-    if (shopId === null) return;
-
-    const [licenses] = await pool.execute('SELECT * FROM licenses WHERE license_key = ? AND status = "unused"', [code]);
-    const licenseArray = licenses as any[];
-    if (licenseArray.length === 0) {
-      return res.status(404).json({ error: 'Invalid or used code' });
-    }
-
-    const license = licenseArray[0];
-    const durationMap: Record<string, number | null> = {
-      monthly: 30,
-      quarterly: 90,
-      yearly: 365,
-      lifetime: null,
-    };
-    const days = durationMap[license.duration] ?? 30;
-    const expiresAt = days ? new Date(Date.now() + days * 24 * 60 * 60 * 1000) : null;
-
-    await pool.execute(
-      'UPDATE licenses SET status = "active", used_by_user_id = ?, used_at = NOW(), expires_at = ? WHERE id = ?',
-      [req.user.id, expiresAt, license.id]
-    );
-
-    await pool.execute(
-      'UPDATE shops SET package = ?, plan_type = ?, is_active = 1 WHERE id = ?',
-      ['gold', 'gold', shopId]
-    );
-    await pool.execute('UPDATE users SET package = ? WHERE shop_id = ?', ['gold', shopId]);
-
-    res.json({ success: true, plan: 'gold', duration: license.duration, expiresAt });
+    const id = parseInt((req.params as any).id, 10);
+    if (!id) return res.status(400).json({ error: 'Invalid id' });
+    await pool.execute('DELETE FROM licenses WHERE id = ?', [id]);
+    res.json({ ok: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post('/api/activate', authenticateToken, async (req: any, res: Response) => {
+app.post('/api/licenses/bulk-delete', authenticateToken, requireRole('super_admin'), async (req: Request, res: Response) => {
   try {
-    const { code } = req.body;
-    if (!code) {
-      return res.status(400).json({ error: 'Activation code required' });
-    }
-
-    const shopId = getShopIdOrFail(req, res);
-    if (shopId === null) return;
-
-    const [licenses] = await pool.execute('SELECT * FROM licenses WHERE license_key = ? AND status = "unused"', [code]);
-    const licenseArray = licenses as any[];
-    if (licenseArray.length === 0) {
-      return res.status(404).json({ error: 'Invalid or used code' });
-    }
-
-    const license = licenseArray[0];
-    const durationMap: Record<string, number | null> = {
-      monthly: 30,
-      quarterly: 90,
-      yearly: 365,
-      lifetime: null,
-    };
-    const days = durationMap[license.duration] ?? 30;
-    const expiresAt = days ? new Date(Date.now() + days * 24 * 60 * 60 * 1000) : null;
-
-    await pool.execute(
-      'UPDATE licenses SET status = "active", used_by_user_id = ?, used_at = NOW(), expires_at = ? WHERE id = ?',
-      [req.user.id, expiresAt, license.id]
-    );
-
-    await pool.execute(
-      'UPDATE shops SET package = ?, plan_type = ?, is_active = 1 WHERE id = ?',
-      [license.plan, license.plan, shopId]
-    );
-    await pool.execute('UPDATE users SET package = ? WHERE shop_id = ?', [license.plan, shopId]);
-
-    res.json({ success: true, plan: license.plan, duration: license.duration, expiresAt });
+    const ids = Array.isArray((req as any).body?.ids) ? (req as any).body.ids : [];
+    if (ids.length === 0) return res.json({ deleted: 0 });
+    const clean = ids.map((id: any) => Number(id)).filter((id: number) => Number.isFinite(id) && id > 0);
+    if (clean.length === 0) return res.json({ deleted: 0 });
+    const placeholders = clean.map(() => '?').join(',');
+    const [result] = await pool.execute(`DELETE FROM licenses WHERE id IN (${placeholders})`, clean);
+    res.json({ deleted: (result as any)?.affectedRows ?? 0 });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
+});
+
+app.post('/api/licenses/archive-activated', authenticateToken, requireRole('super_admin'), async (req: Request, res: Response) => {
+  try {
+    const [result] = await pool.execute('DELETE FROM licenses WHERE status = "active"');
+    res.json({ deleted: (result as any)?.affectedRows ?? 0 });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/licenses/activate', authenticateToken, async (req: any, res: Response) => {
+  await activateLicenseCode(req, res);
+});
+
+app.post('/api/activate', authenticateToken, async (req: any, res: Response) => {
+  await activateLicenseCode(req, res);
 });
 
 // ========== PRODUCTS/INVENTORY ==========

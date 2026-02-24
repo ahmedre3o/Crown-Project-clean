@@ -14,13 +14,18 @@ interface LicenseItem {
   license_key: string;
   plan: string;
   duration: string;
+  duration_days?: number | null;
   status: string;
   used_by_user_id: number | null;
+  used_by_shop_id?: number | null;
   used_at: string | null;
+  expires_at?: string | null;
+  code_expires_at?: string | null;
+  permissions?: Record<string, boolean>;
   created_at: string;
 }
 
-type Filter = 'all' | 'activated' | 'not_activated';
+type Filter = 'all' | 'activated' | 'not_activated' | 'expired';
 
 export default function AdminCodesPage() {
   const { direction, language } = useLanguage();
@@ -146,6 +151,7 @@ export default function AdminCodesPage() {
             <option value="all">{language === 'ar' ? 'الكل' : 'All'}</option>
             <option value="activated">{language === 'ar' ? 'المفعلة' : 'Activated'}</option>
             <option value="not_activated">{language === 'ar' ? 'غير المفعلة' : 'Not Activated'}</option>
+            <option value="expired">{language === 'ar' ? 'منتهية' : 'Expired'}</option>
           </select>
           {selectedIds.size > 0 && (
             <button
@@ -186,6 +192,7 @@ export default function AdminCodesPage() {
                   <th className="py-2 px-3 text-left">{language === 'ar' ? 'المدة' : 'Duration'}</th>
                   <th className="py-2 px-3 text-left">{language === 'ar' ? 'الحالة' : 'Status'}</th>
                   <th className="py-2 px-3 text-left">{language === 'ar' ? 'تاريخ التفعيل' : 'Activation Date'}</th>
+                  <th className="py-2 px-3 text-left">{language === 'ar' ? 'تاريخ الانتهاء' : 'Expires'}</th>
                   <th className="py-2 px-3 text-left">{language === 'ar' ? 'إجراء' : 'Action'}</th>
                 </tr>
               </thead>
@@ -215,7 +222,11 @@ export default function AdminCodesPage() {
                       </button>
                     </td>
                     <td className="py-2 px-3 capitalize">{item.plan}</td>
-                    <td className="py-2 px-3 capitalize">{item.duration}</td>
+                    <td className="py-2 px-3 capitalize">
+                      {item.duration === 'custom' && item.duration_days
+                        ? `${language === 'ar' ? 'مخصص' : 'Custom'} (${item.duration_days} ${language === 'ar' ? 'يوم' : 'days'})`
+                        : item.duration}
+                    </td>
                     <td className="py-2 px-3">
                       <span
                         className={
@@ -234,12 +245,23 @@ export default function AdminCodesPage() {
                           ? language === 'ar'
                             ? 'غير مفعل'
                             : 'Not Activated'
+                          : item.status === 'expired'
+                          ? language === 'ar'
+                            ? 'منتهي'
+                            : 'Expired'
                           : item.status}
                       </span>
                     </td>
                     <td className="py-2 px-3">
                       {item.used_at
                         ? new Date(item.used_at).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')
+                        : '—'}
+                    </td>
+                    <td className="py-2 px-3">
+                      {item.used_at && item.expires_at
+                        ? new Date(item.expires_at).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US')
+                        : item.code_expires_at
+                        ? new Date(item.code_expires_at).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US')
                         : '—'}
                     </td>
                     <td className="py-2 px-3">

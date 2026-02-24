@@ -6,6 +6,8 @@ import { Toaster } from 'sonner';
 export const metadata = {
   title: 'Crown Services',
   description: 'SaaS system for Crown Services',
+  manifest: '/manifest.webmanifest',
+  themeColor: '#06b6d4',
 };
 
 export default function RootLayout({

@@ -29,7 +29,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ username: '', password: '', role: 'cashier' });
-  const [licenseForm, setLicenseForm] = useState({ plan: 'bronze', duration: 'monthly', count: '1' });
+  const [licenseForm, setLicenseForm] = useState({ plan: 'bronze', duration: 'monthly', count: '1', customDays: '', validDays: '' });
   const [generatedCodes, setGeneratedCodes] = useState<string[]>([]);
 
   useEffect(() => {
@@ -102,6 +102,8 @@ export default function AdminPage() {
           plan: licenseForm.plan,
           duration: licenseForm.duration,
           count: parseInt(licenseForm.count || '1', 10),
+          customDays: licenseForm.customDays ? parseInt(licenseForm.customDays, 10) : undefined,
+          validDays: licenseForm.validDays ? parseInt(licenseForm.validDays, 10) : undefined,
         }),
       });
       setGeneratedCodes(result.codes || []);
@@ -296,7 +298,7 @@ export default function AdminPage() {
                   {language === 'ar' ? 'عرض قائمة الأكواد' : 'View Codes List'}
                 </Link>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                 <select
                   className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
                   value={licenseForm.plan}
@@ -316,12 +318,29 @@ export default function AdminPage() {
                   <option value="quarterly">Quarterly</option>
                   <option value="yearly">Yearly</option>
                   <option value="lifetime">Lifetime</option>
+                  <option value="custom">Custom (days)</option>
                 </select>
+                {licenseForm.duration === 'custom' && (
+                  <input
+                    type="number"
+                    className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                    placeholder="Custom days"
+                    value={licenseForm.customDays}
+                    onChange={(e) => setLicenseForm((prev) => ({ ...prev, customDays: e.target.value }))}
+                  />
+                )}
                 <input
                   className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
                   placeholder="Count"
                   value={licenseForm.count}
                   onChange={(e) => setLicenseForm((prev) => ({ ...prev, count: e.target.value }))}
+                />
+                <input
+                  type="number"
+                  className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                  placeholder="Code validity (days)"
+                  value={licenseForm.validDays}
+                  onChange={(e) => setLicenseForm((prev) => ({ ...prev, validDays: e.target.value }))}
                 />
               </div>
               <button

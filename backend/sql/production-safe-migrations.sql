@@ -104,6 +104,63 @@ CREATE TABLE IF NOT EXISTS shop_subscriptions (
   FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- 10.1) shop_subscriptions: activation metadata (safe adds)
+SET @col = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'shop_subscriptions' AND COLUMN_NAME = 'activation_code');
+SET @sql = IF(@col = 0, 'ALTER TABLE shop_subscriptions ADD COLUMN activation_code VARCHAR(128) NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'shop_subscriptions' AND COLUMN_NAME = 'activation_source');
+SET @sql = IF(@col = 0, 'ALTER TABLE shop_subscriptions ADD COLUMN activation_source VARCHAR(32) NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'shop_subscriptions' AND COLUMN_NAME = 'activated_by_user_id');
+SET @sql = IF(@col = 0, 'ALTER TABLE shop_subscriptions ADD COLUMN activated_by_user_id INT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'shop_subscriptions' AND COLUMN_NAME = 'last_activated_at');
+SET @sql = IF(@col = 0, 'ALTER TABLE shop_subscriptions ADD COLUMN last_activated_at DATETIME NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- 10.2) licenses: add smart activation fields if table exists
+SET @tbl = (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'licenses');
+SET @col = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'licenses' AND COLUMN_NAME = 'duration_days');
+SET @sql = IF(@tbl = 1 AND @col = 0, 'ALTER TABLE licenses ADD COLUMN duration_days INT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'licenses' AND COLUMN_NAME = 'permissions_json');
+SET @sql = IF(@tbl = 1 AND @col = 0, 'ALTER TABLE licenses ADD COLUMN permissions_json JSON NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'licenses' AND COLUMN_NAME = 'used_by_shop_id');
+SET @sql = IF(@tbl = 1 AND @col = 0, 'ALTER TABLE licenses ADD COLUMN used_by_shop_id INT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'licenses' AND COLUMN_NAME = 'code_expires_at');
+SET @sql = IF(@tbl = 1 AND @col = 0, 'ALTER TABLE licenses ADD COLUMN code_expires_at TIMESTAMP NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'licenses' AND COLUMN_NAME = 'duration');
+SET @sql = IF(@tbl = 1 AND @col = 1, 'ALTER TABLE licenses MODIFY COLUMN duration VARCHAR(32) NOT NULL DEFAULT ''monthly''', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
 -- 11) users: add last_seen_at only if missing (for online/active tracking)
 SET @col = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'users' AND COLUMN_NAME = 'last_seen_at');
 SET @sql = IF(@col = 0, 'ALTER TABLE users ADD COLUMN last_seen_at DATETIME NULL', 'SELECT 1');

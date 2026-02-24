@@ -8,6 +8,7 @@ import { apiRequest, useAuth } from '../contexts/AuthContext';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useRouteGuard } from '../guards/useRouteGuard';
 import { formatCurrency } from '@/lib/formatters';
+import { getPlanFeatures } from '@/permissions';
 
 interface Invoice {
   id: number;
@@ -61,6 +62,7 @@ function InvoicesPageContent() {
   const sourceParam = searchParams.get('source');
   const { t, direction, language } = useLanguage();
   const { user, loading: authLoading, effectiveRole } = useAuth();
+  const planFeatures = getPlanFeatures(user?.package);
   const { allowed } = useRouteGuard(user, authLoading, { feature: 'invoices', effectiveRole, showDenied: true });
   const { symbol, currency } = useCurrency();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -113,6 +115,10 @@ function InvoicesPageContent() {
       const [shopData, ...rest] = await Promise.all([apiRequest('/shops/profile')]);
       setBusiness(shopData);
       if (sourceFilter === 'online') {
+        if (!planFeatures.onlineStore) {
+          setInvoices([]);
+          return;
+        }
         const params = new URLSearchParams({ limit: '200' });
         if (search.trim()) params.set('query', search.trim());
         const data = await apiRequest(`/admin/online-invoices?${params.toString()}`);
@@ -134,7 +140,7 @@ function InvoicesPageContent() {
       } else {
         const [posData, onlineData] = await Promise.all([
           apiRequest('/sales?limit=200&source=pos'),
-          apiRequest('/admin/online-invoices?limit=200'),
+          planFeatures.onlineStore ? apiRequest('/admin/online-invoices?limit=200') : Promise.resolve([]),
         ]);
         const pos = (posData || []).map((r: any) => ({ ...r, invoiceSource: 'pos' as const }));
         const online = (onlineData || []).map((r: any) => ({
@@ -163,6 +169,7 @@ function InvoicesPageContent() {
     if (!itemsMap[invoiceId]) {
       try {
         const isOnline = invoice?.invoiceSource === 'online';
+        if (isOnline && !planFeatures.onlineStore) return;
         const items = isOnline
           ? (await apiRequest(`/admin/online-invoices/${invoiceId}`))?.items || []
           : await apiRequest(`/sales/${invoiceId}/items`);
@@ -179,6 +186,7 @@ function InvoicesPageContent() {
       setError(null);
 
       const isOnline = invoice.invoiceSource === 'online';
+      if (isOnline && !planFeatures.onlineStore) return;
       let items = itemsMap[invoice.id];
       if (!items) {
         items = isOnline

@@ -11,6 +11,8 @@ export type PlanFeatures = {
   excelImport: boolean;
   manualEntry: boolean;
   branches: boolean;
+  notifications: boolean;
+  reports: boolean;
 };
 
 export type NavItemId =
@@ -108,7 +110,7 @@ export function canAccess(
   // Super admin sees everything
   if (role === 'super_admin') return true;
 
-  const { ai, onlineStore, excelImport, manualEntry, branches } = planFeatures;
+  const { ai, onlineStore, excelImport, manualEntry, branches, notifications, reports } = planFeatures;
 
   switch (feature) {
     case 'dashboard':
@@ -137,10 +139,10 @@ export function canAccess(
       return manualEntry && ['shop_owner', 'warehouse'].includes(role);
 
     case 'reports':
-      return ['shop_owner', 'branch_manager', 'multi_branch_manager'].includes(role);
+      return planFeatures.reports && ['shop_owner', 'branch_manager', 'multi_branch_manager'].includes(role);
 
     case 'reports_profit':
-      return role === 'shop_owner';
+      return planFeatures.reports && role === 'shop_owner';
 
     case 'invoices':
       return ['shop_owner', 'branch_manager', 'multi_branch_manager', 'cashier'].includes(role);
@@ -155,7 +157,10 @@ export function canAccess(
       return ['shop_owner', 'branch_manager', 'multi_branch_manager'].includes(role); // cashier, warehouse NO access
 
     case 'notifications':
-      return (onlineStore && ['shop_owner', 'branch_manager', 'multi_branch_manager', 'cashier'].includes(role)) || role === 'shop_owner';
+      return (
+        notifications &&
+        ['shop_owner', 'branch_manager', 'multi_branch_manager', 'cashier'].includes(role)
+      );
 
     case 'branches':
       return role === 'shop_owner' || (branches && ['branch_manager', 'multi_branch_manager'].includes(role));

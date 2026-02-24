@@ -10,7 +10,7 @@ interface User {
   id: number;
   username: string;
   role: 'super_admin' | 'shop_owner' | 'branch_manager' | 'multi_branch_manager' | 'cashier' | 'warehouse';
-  package: 'bronze' | 'silver' | 'gold';
+  package: 'bronze' | 'silver' | 'gold' | 'branches';
   shopId?: number;
   shop_id?: number;
 }
@@ -27,6 +27,7 @@ interface AuthContextType {
   hasRole: (roles: string[]) => boolean;
   hasPackage: (packages: string[]) => boolean;
   loading: boolean;
+  refreshUser: (silent?: boolean) => Promise<void>;
   setRoleOverride: (role: string | null) => void;
   clearRoleOverride: () => void;
 }
@@ -66,48 +67,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const clearRoleOverride = () => setRoleOverride(null);
 
-  useEffect(() => {
+  const refreshUser = async (silent: boolean = false) => {
     const savedToken = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
 
-    if (savedToken && savedUser) {
+    if (savedToken && savedUser && !token) {
       setToken(savedToken);
       setUser(JSON.parse(savedUser));
     }
 
-    const refreshUser = async () => {
-      if (!savedToken) {
-        setLoading(false);
-        return;
-      }
-      try {
-        const response = await apiFetch('/auth/me', {
-          method: 'GET',
-        });
-        if (response.ok) {
-          const data = await response.json();
-          if (data?.user) {
-            setUser(data.user);
-            localStorage.setItem('user', JSON.stringify(data.user));
-            const sid = Number(data.user?.shopId ?? data.user?.shop_id ?? NaN);
-            if (Number.isFinite(sid) && sid > 0) {
-              setStoredShopId(sid);
-            }
-          }
-        } else {
-          // stale/invalid token: clear and redirect to login
-          setToken(null);
-          setUser(null);
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          sessionStorage.removeItem(ROLE_OVERRIDE_KEY);
-          setStoredShopId(null);
-          if (typeof window !== 'undefined') {
-            window.location.href = '/login';
+    if (!savedToken) {
+      if (!silent) setLoading(false);
+      return;
+    }
+
+    if (!silent) setLoading(true);
+
+    try {
+      const response = await apiFetch('/auth/me', {
+        method: 'GET',
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data?.user) {
+          setUser(data.user);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          const sid = Number(data.user?.shopId ?? data.user?.shop_id ?? NaN);
+          if (Number.isFinite(sid) && sid > 0) {
+            setStoredShopId(sid);
           }
         }
-      } catch (error) {
-        // on error, clear and redirect to login to avoid phantom sessions
+      } else {
+        // stale/invalid token: clear and redirect to login
         setToken(null);
         setUser(null);
         localStorage.removeItem('token');
@@ -117,11 +108,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (typeof window !== 'undefined') {
           window.location.href = '/login';
         }
-      } finally {
-        setLoading(false);
       }
-    };
-    refreshUser();
+    } catch (error) {
+      // on error, clear and redirect to login to avoid phantom sessions
+      setToken(null);
+      setUser(null);
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      sessionStorage.removeItem(ROLE_OVERRIDE_KEY);
+      setStoredShopId(null);
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshUser(false);
   }, []);
 
   useEffect(() => {
@@ -207,7 +212,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, effectiveRole, roleOverride, login, logout, hasRole, hasPackage, loading, setRoleOverride, clearRoleOverride }}>
+    <AuthContext.Provider value={{ user, token, effectiveRole, roleOverride, login, logout, hasRole, hasPackage, loading, refreshUser, setRoleOverride, clearRoleOverride }}>
       {children}
     </AuthContext.Provider>
   );

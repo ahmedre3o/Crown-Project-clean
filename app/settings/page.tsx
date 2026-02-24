@@ -13,7 +13,7 @@ import { useRouteGuard } from '../guards/useRouteGuard';
 export default function SettingsPage() {
   const { t, direction, language } = useLanguage();
   const { isOnline } = useOffline();
-  const { user, loading: authLoading, effectiveRole } = useAuth();
+  const { user, loading: authLoading, effectiveRole, refreshUser } = useAuth();
   const { allowed } = useRouteGuard(user, authLoading, { feature: 'settings', effectiveRole, showDenied: true });
   const { currency, setCurrency } = useCurrency();
   const [profile, setProfile] = useState({
@@ -38,12 +38,26 @@ export default function SettingsPage() {
   const [subscription, setSubscription] = useState<{
     planName?: string;
     planStatus?: string;
+    status?: string;
+    activationCode?: string | null;
+    activationCodeMasked?: string | null;
     startedAt?: string;
     expiresAt?: string | null;
     lastActivatedAt?: string;
     daysLeft?: number | null;
     activations?: { code: string; days: number; activated_at: string; previous_expires_at?: string | null; new_expires_at?: string | null }[];
   } | null>(null);
+
+  const planLabels: Record<string, { ar: string; en: string }> = {
+    bronze: { ar: 'برونزي', en: 'Bronze' },
+    silver: { ar: 'فضي', en: 'Silver' },
+    gold: { ar: 'ذهبي', en: 'Gold' },
+    branches: { ar: 'فروع', en: 'Branches' },
+  };
+  const planLabel =
+    subscription?.planName && planLabels[subscription.planName]
+      ? planLabels[subscription.planName][language === 'ar' ? 'ar' : 'en']
+      : subscription?.planName || (language === 'ar' ? 'برونزي' : 'Bronze');
 
   const currencyOptions = [
     { country: 'Egypt', code: 'EGP', symbol: 'ج.م' },
@@ -94,6 +108,10 @@ export default function SettingsPage() {
       if (subData) {
         setSubscription({
           planName: subData.planName,
+          planStatus: subData.planStatus,
+          status: subData.status,
+          activationCode: subData.activationCode ?? null,
+          activationCodeMasked: subData.activationCodeMasked ?? null,
           startedAt: subData.startedAt,
           expiresAt: subData.expiresAt,
           lastActivatedAt: subData.lastActivatedAt,
@@ -301,10 +319,27 @@ export default function SettingsPage() {
             <h2 className="text-lg font-bold text-cyan-200 mb-2">
               {language === 'ar' ? 'حالة الاشتراك' : 'Subscription Status'}
             </h2>
-            <p className="text-sm text-slate-400">
-              {language === 'ar' ? 'الباقة' : 'Plan'}: {subscription?.planName || 'bronze'}
-              {subscription?.planStatus === 'LIFETIME' && ` (${language === 'ar' ? 'مدى الحياة' : 'Lifetime'})`}
-            </p>
+            {subscription?.planStatus === 'NONE' || subscription?.planStatus === 'EXPIRED' ? (
+              <p className="text-sm text-amber-300">
+                {language === 'ar' ? 'لا يوجد اشتراك نشط' : 'No active subscription'}
+              </p>
+            ) : (
+              <p className="text-sm text-slate-400">
+                {language === 'ar' ? 'الباقة' : 'Plan'}: {planLabel}
+                {subscription?.planStatus === 'LIFETIME' && ` (${language === 'ar' ? 'مدى الحياة' : 'Lifetime'})`}
+                {subscription?.planStatus === 'TRIAL' && ` (${language === 'ar' ? 'تجربة مجانية' : 'Trial'})`}
+              </p>
+            )}
+            {(subscription?.planStatus === 'NONE' || subscription?.planStatus === 'EXPIRED') && (
+              <p className="text-xs text-slate-400 mt-1">
+                {language === 'ar' ? 'فعّل كود اشتراك للمتابعة.' : 'Activate a subscription code to continue.'}
+              </p>
+            )}
+            {subscription?.activationCodeMasked && (
+              <p className="text-xs text-slate-500 mt-1">
+                {language === 'ar' ? 'كود التفعيل' : 'Activation code'}: {subscription.activationCodeMasked}
+              </p>
+            )}
             {subscription?.startedAt && (
               <p className="text-xs text-slate-500 mt-1">
                 {language === 'ar' ? 'تاريخ البدء' : 'Start date'}: {new Date(subscription.startedAt).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')}
@@ -368,12 +403,15 @@ export default function SettingsPage() {
                       ...prev,
                       planName: data.plan,
                       planStatus: data.planStatus || (data.expiresAt ? 'ACTIVE' : 'LIFETIME'),
+                      activationCode: data.activationCode ?? activationCode,
+                      activationCodeMasked: data.activationCodeMasked ?? null,
                       expiresAt: data.expiresAt ?? null,
                       lastActivatedAt: new Date().toISOString(),
                       daysLeft: data.planStatus === 'LIFETIME' ? null : (data.daysLeft ?? (data.expiresAt ? Math.ceil((new Date(data.expiresAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000)) : null)),
                     }));
                     setMessage(language === 'ar' ? 'تم تحديث الاشتراك' : 'Subscription updated');
                     setActivationCode('');
+                    await refreshUser(true);
                     loadProfile();
                   } catch (err: any) {
                     setError(err.message || (language === 'ar' ? 'فشل التفعيل' : 'Activation failed'));

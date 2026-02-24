@@ -627,7 +627,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {(user?.role === 'super_admin' || user?.package === 'gold') && <AIAssistant />}
+      {(user?.role === 'super_admin' || user?.package === 'gold' || user?.package === 'branches') && <AIAssistant />}
     </div>
   );
 }

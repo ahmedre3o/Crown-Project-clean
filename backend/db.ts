@@ -803,6 +803,31 @@ export async function initializeDatabase() {
     } catch (e: any) {
       if (e?.code !== 'ER_BAD_FIELD_ERROR') {}
     }
+    try {
+      await pool.execute("ALTER TABLE licenses MODIFY COLUMN duration VARCHAR(32) NOT NULL DEFAULT 'monthly'");
+    } catch (e: any) {
+      if (e?.code !== 'ER_BAD_FIELD_ERROR') {}
+    }
+    try {
+      await pool.execute('ALTER TABLE licenses ADD COLUMN duration_days INT NULL');
+    } catch (e: any) {
+      if (e?.code !== 'ER_DUP_FIELDNAME' && e?.code !== 'ER_NO_SUCH_TABLE') {}
+    }
+    try {
+      await pool.execute('ALTER TABLE licenses ADD COLUMN permissions_json JSON NULL');
+    } catch (e: any) {
+      if (e?.code !== 'ER_DUP_FIELDNAME' && e?.code !== 'ER_NO_SUCH_TABLE') {}
+    }
+    try {
+      await pool.execute('ALTER TABLE licenses ADD COLUMN used_by_shop_id INT NULL');
+    } catch (e: any) {
+      if (e?.code !== 'ER_DUP_FIELDNAME' && e?.code !== 'ER_NO_SUCH_TABLE') {}
+    }
+    try {
+      await pool.execute('ALTER TABLE licenses ADD COLUMN code_expires_at TIMESTAMP NULL');
+    } catch (e: any) {
+      if (e?.code !== 'ER_DUP_FIELDNAME' && e?.code !== 'ER_NO_SUCH_TABLE') {}
+    }
 
     // License codes (plan/feature activation codes)
     await pool.execute(`
@@ -849,6 +874,26 @@ export async function initializeDatabase() {
         FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
+    try {
+      await pool.execute('ALTER TABLE shop_subscriptions ADD COLUMN activation_code VARCHAR(128) NULL');
+    } catch (e: any) {
+      if (e?.code !== 'ER_DUP_FIELDNAME' && e?.code !== 'ER_NO_SUCH_TABLE') {}
+    }
+    try {
+      await pool.execute('ALTER TABLE shop_subscriptions ADD COLUMN activation_source VARCHAR(32) NULL');
+    } catch (e: any) {
+      if (e?.code !== 'ER_DUP_FIELDNAME' && e?.code !== 'ER_NO_SUCH_TABLE') {}
+    }
+    try {
+      await pool.execute('ALTER TABLE shop_subscriptions ADD COLUMN activated_by_user_id INT NULL');
+    } catch (e: any) {
+      if (e?.code !== 'ER_DUP_FIELDNAME' && e?.code !== 'ER_NO_SUCH_TABLE') {}
+    }
+    try {
+      await pool.execute('ALTER TABLE shop_subscriptions ADD COLUMN last_activated_at DATETIME NULL');
+    } catch (e: any) {
+      if (e?.code !== 'ER_DUP_FIELDNAME' && e?.code !== 'ER_NO_SUCH_TABLE') {}
+    }
 
     // Ensure every shop has a row in shop_subscriptions (default bronze)
     try {

@@ -154,8 +154,8 @@ export const PLANS: PlanConfig[] = [
     id: 'branches',
     nameAr: 'فروع',
     nameEn: 'Branches',
-    totalUsers: 30,
-    additionalUsersLimit: 29,
+    totalUsers: 999,
+    additionalUsersLimit: 998,
     features: {
       pos: true,
       manualEntry: true,
@@ -179,8 +179,8 @@ export const PLANS: PlanConfig[] = [
       { key: 'control', ar: 'تحكم على مستوى الفرع', en: 'Branch-level control', included: true },
       { key: 'enterprise', ar: 'إدارة على مستوى المؤسسة', en: 'Enterprise-level management', included: true },
     ],
-    rolesAr: 'مالك + 29',
-    rolesEn: 'Owner + 29',
+    rolesAr: 'مالك + غير محدود',
+    rolesEn: 'Owner + Unlimited',
   },
 ];
 
@@ -214,6 +214,8 @@ export const getPlanFeaturesForFrontend = (planId: string) => {
       excelImport: false,
       manualEntry: true,
       branches: false,
+      notifications: false,
+      reports: false,
     };
   }
   return {
@@ -222,6 +224,8 @@ export const getPlanFeaturesForFrontend = (planId: string) => {
     excelImport: plan.features.excelImport,
     manualEntry: plan.features.manualEntry,
     branches: plan.features.branches,
+    notifications: plan.features.notifications,
+    reports: plan.features.reports,
   };
 };
 

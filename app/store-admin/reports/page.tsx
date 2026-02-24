@@ -40,7 +40,7 @@ interface ReportSummary {
   };
   profit: { available: boolean; totalProfit?: number; profitNoteAr?: string; profitNoteEn?: string };
   charts: {
-    dailyRevenue: Array<{ date: string; pos: number; onlineConfirmed: number; total: number }>;
+    dailyRevenue: Array<{ date: string; pos: number; onlineConfirmed: number; total: number; orders?: number }>;
     dailyProfit?: Array<{ date: string; profit: number }>;
   };
   topProducts: Array<{ productId: number; name: string; sku: string; qty: number; revenue: number; source: string }>;
@@ -52,7 +52,7 @@ function formatDateStr(dateString: string, lang: string) {
 }
 
 function normalizeDailyRevenue(
-  points: Array<{ date: string; pos: number; onlineConfirmed: number; total: number }>
+  points: Array<{ date: string; pos: number; onlineConfirmed: number; total: number; orders?: number }>
 ) {
   if (!points || points.length === 0) return points;
   if (points.length === 1) {
@@ -79,6 +79,58 @@ function ensureArray<T>(value: any): T[] {
 function toNumber(value: any) {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
+}
+
+function normalizeRevenuePoints(raw: any) {
+  const points = ensureArray(raw?.points ?? raw);
+  return points
+    .filter((p) => p?.date)
+    .map((p) => {
+      const pos = toNumber(p.posAmount ?? p.pos ?? 0);
+      const online = toNumber(p.onlineAmount ?? p.onlineConfirmed ?? p.online ?? 0);
+      const total = toNumber(p.totalAmount ?? p.total ?? pos + online);
+      const orders = toNumber(
+        p.totalCount ?? p.ordersCount ?? p.count ?? (toNumber(p.posCount) + toNumber(p.onlineCount))
+      );
+      return {
+        date: String(p.date).slice(0, 10),
+        pos,
+        onlineConfirmed: online,
+        total,
+        orders,
+      };
+    });
+}
+
+function normalizeProfitResponse(raw: any) {
+  const payload = raw?.data ?? raw ?? {};
+  const list = ensureArray(payload?.dailyProfit ?? payload?.points ?? payload);
+  const dailyProfit = list
+    .filter((p) => p?.date)
+    .map((p) => ({
+      date: String(p.date).slice(0, 10),
+      profit: toNumber(p.profit ?? p.totalProfit ?? p.amount ?? p.value),
+    }));
+  const totalProfit = toNumber(
+    payload?.totalProfit ?? payload?.profit ?? dailyProfit.reduce((sum, p) => sum + Number(p.profit || 0), 0)
+  );
+  return { totalProfit, dailyProfit };
+}
+
+function buildEmptyRevenue(from: string, to: string) {
+  const end = to || from;
+  return [
+    { date: from, pos: 0, onlineConfirmed: 0, total: 0, orders: 0 },
+    { date: end, pos: 0, onlineConfirmed: 0, total: 0, orders: 0 },
+  ];
+}
+
+function buildEmptyProfit(from: string, to: string) {
+  const end = to || from;
+  return [
+    { date: from, profit: 0 },
+    { date: end, profit: 0 },
+  ];
 }
 
 function normalizeReportSummary(raw: any, range: { from: string; to: string }): ReportSummary {
@@ -198,18 +250,33 @@ export default function ReportsCenterPage() {
       setLoading(true);
       setError(null);
       setDateValidationError(null);
-      const [summaryRes, transRes, deadRes] = await Promise.all([
+      const [summaryRes, transRes, deadRes, timeseriesRes, profitRes] = await Promise.all([
         apiRequest(`/admin/reports/summary?from=${from}&to=${to}&source=${source}&bucket=${group}`),
         apiRequest(`/admin/reports/transactions?from=${from}&to=${to}&source=${source}&limit=500`).catch(() => ({ ok: true, items: [] })),
         apiRequest(`/admin/reports/dead-stock?days=120&threshold=2`).catch(() => ({ ok: false })),
+        apiRequest(`/admin/analytics/timeseries?from=${from}&to=${to}&source=${source}&bucket=${group}`).catch(() => ({ ok: true, points: [] })),
+        apiRequest(`/admin/reports/profit?from=${from}&to=${to}`).catch(() => ({ ok: false, totalProfit: 0, dailyProfit: [] })),
       ]);
       const summary = normalizeReportSummary(summaryRes, { from, to });
+      const revenuePoints = normalizeRevenuePoints(timeseriesRes);
+      const profitData = normalizeProfitResponse(profitRes);
+      const merged: ReportSummary = {
+        ...summary,
+        charts: {
+          dailyRevenue: revenuePoints,
+          dailyProfit: profitData.dailyProfit,
+        },
+        profit: {
+          ...summary.profit,
+          totalProfit: profitData.totalProfit,
+        },
+      };
       // Step 2: log raw API data + time-series fields
-      console.log('REPORTS API RAW:', summary);
-      console.log('dailySales:', (summary as any)?.charts?.dailySales);
-      console.log('dailyProfit:', summary?.charts?.dailyProfit);
+      console.log('REPORTS API RAW:', merged);
+      console.log('dailySales:', (merged as any)?.charts?.dailySales);
+      console.log('dailyProfit:', merged?.charts?.dailyProfit);
 
-      setData(summary);
+      setData(merged);
       setTransactions((transRes as { items?: any[] })?.items ?? []);
       setDeadStockData(deadRes as any);
     } catch (e: unknown) {
@@ -386,14 +453,19 @@ export default function ReportsCenterPage() {
     from: new Date(from),
     to: to ? new Date(to) : undefined,
   };
+  const revenueSeries = normalizeDailyRevenue(data?.charts?.dailyRevenue ?? []);
+  const revenueChartData = revenueSeries.length > 0 ? revenueSeries : buildEmptyRevenue(from, to);
+  const profitSeries = normalizeDailyProfit(data?.charts?.dailyProfit ?? []);
+  const profitChartData = profitSeries.length > 0 ? profitSeries : buildEmptyProfit(from, to);
+  const profitValue = data?.profit?.totalProfit ?? 0;
   const hasReportContent = Boolean(
     data &&
       (data.sales.totalRevenue !== 0 ||
         data.sales.ordersCount !== 0 ||
         data.sales.avgOrderValue !== 0 ||
         data.topProducts.length > 0 ||
-        data.charts.dailyRevenue.length > 0 ||
-        (data.profit.available && (data.profit.totalProfit ?? 0) !== 0))
+        revenueSeries.length > 0 ||
+        profitValue !== 0)
   );
 
   return (
@@ -522,14 +594,13 @@ export default function ReportsCenterPage() {
             </div>
           )}
 
-          {data?.ok && !hasReportContent && (
-            <div className="p-8 neon-card rounded-xl text-center text-gray-400 print:hidden">
-              {language === 'ar' ? 'لا توجد بيانات متاحة' : 'No data available'}
-            </div>
-          )}
-
-          {data?.ok && hasReportContent && (
+          {data?.ok && (
             <>
+              {!hasReportContent && (
+                <div className="p-8 neon-card rounded-xl text-center text-gray-400 print:hidden">
+                  {language === 'ar' ? 'لا توجد بيانات متاحة' : 'No data available'}
+                </div>
+              )}
               <div className="p-6 neon-card rounded-xl break-inside-avoid">
                 <h3 className="text-xl font-bold mb-4 text-cyan-200">{t('reports.salesSummary')}</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
@@ -577,8 +648,7 @@ export default function ReportsCenterPage() {
                     </p>
                   </div>
                 </div>
-                {data.charts.dailyRevenue.length > 0 && (
-                  <div className="print:hidden">
+                <div>
                     <div className="flex flex-wrap items-center gap-2 mb-3">
                       <span className="text-sm text-gray-400">{language === 'ar' ? 'عرض' : 'View'}:</span>
                       {(['all', 'total', 'online', 'pos'] as const).map((v) => (
@@ -595,7 +665,7 @@ export default function ReportsCenterPage() {
                       ))}
                     </div>
                     <ResponsiveContainer width="100%" height={260}>
-                      <AreaChart data={normalizeDailyRevenue(data.charts.dailyRevenue)}>
+                      <AreaChart data={revenueChartData}>
                         <defs>
                           <linearGradient id="reportsTotalArea" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#fbbf24" stopOpacity={0.9} />
@@ -681,67 +751,79 @@ export default function ReportsCenterPage() {
                         />
                       </AreaChart>
                     </ResponsiveContainer>
+                    <div className="mt-6">
+                      <h4 className="text-sm text-gray-400 mb-2">
+                        {language === 'ar' ? 'عدد الطلبات اليومي' : 'Daily Orders'}
+                      </h4>
+                      <ResponsiveContainer width="100%" height={180}>
+                        <BarChart data={revenueChartData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                          <XAxis
+                            dataKey="date"
+                            stroke="#94a3b8"
+                            tickFormatter={(d) => formatDateStr(d, language)}
+                          />
+                          <YAxis
+                            stroke="#94a3b8"
+                            tickFormatter={(v) => formatNumber(v as number, language === 'ar' ? 'ar' : 'en')}
+                          />
+                          <Tooltip
+                            contentStyle={{ backgroundColor: '#0b1220', border: '1px solid #22d3ee', borderRadius: '8px' }}
+                            labelFormatter={(d) => formatDateStr(d, language)}
+                            formatter={(val: any) => [formatNumber(Number(val || 0), language === 'ar' ? 'ar' : 'en'), language === 'ar' ? 'طلبات' : 'Orders']}
+                          />
+                          <Bar dataKey="orders" fill="#22d3ee" name={language === 'ar' ? 'طلبات' : 'Orders'} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
-                )}
               </div>
 
               {canSeeProfit && (
                 <div className="p-6 neon-card rounded-xl break-inside-avoid">
                   <h3 className="text-xl font-bold mb-4 text-cyan-200">{t('reports.profitSummary')}</h3>
-                  {data.profit.available ? (
-                    <>
-                      <p className="text-lg font-bold text-fuchsia-400 mb-4">{formatCurrency(data.profit.totalProfit ?? 0, language === 'ar' ? 'ar' : 'en', currency, symbol)}</p>
-                      {data.charts.dailyProfit && normalizeDailyProfit(data.charts.dailyProfit).length > 0 ? (
-                        <ResponsiveContainer width="100%" height={220}>
-                          <AreaChart data={normalizeDailyProfit(data.charts.dailyProfit!)}>
-                            <defs>
-                              <linearGradient id="reportsProfitArea" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#ec4899" stopOpacity={0.9} />
-                                <stop offset="95%" stopColor="#0b1120" stopOpacity={0} />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
-                            <XAxis
-                              dataKey="date"
-                              stroke="#94a3b8"
-                              tickFormatter={(d) => formatDateStr(d, language)}
-                            />
-                            <YAxis
-                              stroke="#94a3b8"
-                              tickFormatter={(v) => formatNumber(v as number, language === 'ar' ? 'ar' : 'en')}
-                            />
-                            <Tooltip
-                              cursor={{ stroke: '#1f2937', strokeWidth: 1 }}
-                              contentStyle={{ backgroundColor: '#0b1220', border: '1px solid #ec4899', borderRadius: '8px' }}
-                              formatter={(val: any) => [
-                                formatCurrency(Number(val || 0), language === 'ar' ? 'ar' : 'en', currency, symbol),
-                              ]}
-                            />
-                            <Legend />
-                            <Area
-                              type="monotone"
-                              dataKey="profit"
-                              name={t('dashboard.profit')}
-                              stroke="#ec4899"
-                              strokeWidth={3}
-                              fill="url(#reportsProfitArea)"
-                              dot={false}
-                              connectNulls
-                              activeDot={{ r: 4 }}
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <p className="text-sm text-gray-500 py-4">
-                          {language === 'ar'
-                            ? 'لا توجد بيانات كافية للرسم'
-                            : 'Not enough data to chart'}
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <p className="text-gray-500">{language === 'ar' ? data.profit.profitNoteAr : data.profit.profitNoteEn}</p>
-                  )}
+                  <p className="text-lg font-bold text-fuchsia-400 mb-4">
+                    {formatCurrency(profitValue, language === 'ar' ? 'ar' : 'en', currency, symbol)}
+                  </p>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <AreaChart data={profitChartData}>
+                      <defs>
+                        <linearGradient id="reportsProfitArea" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#ec4899" stopOpacity={0.9} />
+                          <stop offset="95%" stopColor="#0b1120" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                      <XAxis
+                        dataKey="date"
+                        stroke="#94a3b8"
+                        tickFormatter={(d) => formatDateStr(d, language)}
+                      />
+                      <YAxis
+                        stroke="#94a3b8"
+                        tickFormatter={(v) => formatNumber(v as number, language === 'ar' ? 'ar' : 'en')}
+                      />
+                      <Tooltip
+                        cursor={{ stroke: '#1f2937', strokeWidth: 1 }}
+                        contentStyle={{ backgroundColor: '#0b1220', border: '1px solid #ec4899', borderRadius: '8px' }}
+                        formatter={(val: any) => [
+                          formatCurrency(Number(val || 0), language === 'ar' ? 'ar' : 'en', currency, symbol),
+                        ]}
+                      />
+                      <Legend />
+                      <Area
+                        type="monotone"
+                        dataKey="profit"
+                        name={t('dashboard.profit')}
+                        stroke="#ec4899"
+                        strokeWidth={3}
+                        fill="url(#reportsProfitArea)"
+                        dot={false}
+                        connectNulls
+                        activeDot={{ r: 4 }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
                 </div>
               )}
 

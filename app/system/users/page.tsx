@@ -11,12 +11,17 @@ interface SystemUser {
   id: number;
   username: string;
   email: string | null;
+  phone?: string | null;
   role: string;
-  shop: { id: number; name: string | null; slug: string | null } | null;
+  package?: string | null;
+  shop: { id: number; name: string | null; slug: string | null; package?: string | null; branchCount?: number } | null;
   branch: { id: number; name: string | null } | null;
   last_seen_at: string | null;
+  last_login_at?: string | null;
   created_at: string;
   is_active: number | boolean | null;
+  storeCount?: number | null;
+  branchCount?: number | null;
 }
 
 interface SystemUsersResponse {
@@ -39,6 +44,7 @@ export default function SystemUsersPage() {
   const [resetPassword, setResetPassword] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
+  const [statusUpdatingId, setStatusUpdatingId] = useState<number | null>(null);
 
   const { allowed } = useRouteGuard(user, authLoading, {
     feature: 'admin',
@@ -146,6 +152,36 @@ export default function SystemUsersPage() {
     }
   };
 
+  const handleToggleStatus = async (target: SystemUser) => {
+    if (!target) return;
+    const nextActive = !resolveActive(target.is_active);
+    setStatusUpdatingId(target.id);
+    setError(null);
+    try {
+      const res: { ok?: boolean; is_active?: number | boolean } = await apiRequest(
+        `/system/users/${target.id}/status`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ is_active: nextActive }),
+        }
+      );
+      if (!res?.ok) {
+        throw new Error(language === 'ar' ? 'تعذر تحديث الحالة' : 'Failed to update status');
+      }
+      setItems((prev) =>
+        prev.map((u) =>
+          u.id === target.id
+            ? { ...u, is_active: typeof res.is_active !== 'undefined' ? res.is_active : nextActive }
+            : u
+        )
+      );
+    } catch (err: any) {
+      setError(err?.message || (language === 'ar' ? 'تعذر تحديث الحالة' : 'Failed to update status'));
+    } finally {
+      setStatusUpdatingId(null);
+    }
+  };
+
   const copyToClipboard = async (value: string) => {
     try {
       if (navigator.clipboard?.writeText) {
@@ -174,6 +210,12 @@ export default function SystemUsersPage() {
     if (Number.isNaN(d.getTime())) return false;
     const diffMs = Date.now() - d.getTime();
     return diffMs >= 0 && diffMs <= 15 * 60 * 1000;
+  };
+
+  const resolveActive = (value: SystemUser['is_active']) => {
+    if (value === null || value === undefined) return true;
+    if (typeof value === 'boolean') return value;
+    return Number(value) !== 0;
   };
 
   return (
@@ -239,15 +281,18 @@ export default function SystemUsersPage() {
                     <tr>
                       <th className="py-2 px-3 text-left">{isAr ? 'المستخدم' : 'User'}</th>
                       <th className="py-2 px-3 text-left">{isAr ? 'الدور' : 'Role'}</th>
-                      <th className="py-2 px-3 text-left">{isAr ? 'المتجر / الفرع' : 'Shop / Branch'}</th>
-                      <th className="py-2 px-3 text-left">{isAr ? 'آخر ظهور' : 'Last seen'}</th>
+                      <th className="py-2 px-3 text-left">{isAr ? 'الخطة' : 'Plan'}</th>
+                      <th className="py-2 px-3 text-left">{isAr ? 'المتجر / الفروع' : 'Shop / Branches'}</th>
+                      <th className="py-2 px-3 text-left">{isAr ? 'تاريخ الإنشاء / آخر ظهور' : 'Created / Last seen'}</th>
                       <th className="py-2 px-3 text-left">{isAr ? 'الحالة' : 'Status'}</th>
-                      <th className="py-2 px-3 text-left">{isAr ? 'إجراء' : 'Action'}</th>
+                      <th className="py-2 px-3 text-left">{isAr ? 'إجراءات' : 'Actions'}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {items.map((u) => {
                       const online = isOnline(u.last_seen_at);
+                      const active = resolveActive(u.is_active);
+                      const planLabel = u.package || u.shop?.package || '-';
                       return (
                         <tr key={u.id} className="border-b border-cyan-500/10">
                           <td className="py-2 px-3">
@@ -256,12 +301,20 @@ export default function SystemUsersPage() {
                               {u.email && (
                                 <span className="text-xs text-slate-400 break-words">{u.email}</span>
                               )}
+                              {u.phone && (
+                                <span className="text-xs text-slate-500 break-words">{u.phone}</span>
+                              )}
                             </div>
                           </td>
                           <td className="py-2 px-3">
                             <span className="inline-flex items-center gap-1 text-xs text-slate-200">
                               {u.role === 'super_admin' && <Shield className="h-3.5 w-3.5 text-fuchsia-300" />}
                               {u.role}
+                            </span>
+                          </td>
+                          <td className="py-2 px-3">
+                            <span className="inline-flex items-center gap-2 text-xs text-slate-200">
+                              {planLabel}
                             </span>
                           </td>
                           <td className="py-2 px-3">
@@ -275,6 +328,12 @@ export default function SystemUsersPage() {
                                       {u.branch.name || `#${u.branch.id}`}
                                     </span>
                                   )}
+                                  {typeof u.shop.branchCount === 'number' && (
+                                    <span className="text-slate-500">
+                                      {isAr ? 'عدد الفروع: ' : 'Branches: '}
+                                      {u.shop.branchCount}
+                                    </span>
+                                  )}
                                 </>
                               ) : (
                                 <span className="text-slate-500">{isAr ? 'بدون متجر' : 'No shop'}</span>
@@ -282,35 +341,72 @@ export default function SystemUsersPage() {
                             </div>
                           </td>
                           <td className="py-2 px-3 text-xs text-slate-400">
-                            {formatDateTime(u.last_seen_at)}
+                            <div className="flex flex-col gap-0.5">
+                              <span>
+                                {isAr ? 'تم الإنشاء: ' : 'Created: '}
+                                {formatDateTime(u.created_at)}
+                              </span>
+                              <span className="text-slate-500">
+                                {isAr ? 'آخر تسجيل: ' : 'Last login: '}
+                                {formatDateTime(u.last_login_at ?? u.last_seen_at)}
+                              </span>
+                              <span className="text-slate-500">
+                                {isAr ? 'آخر ظهور: ' : 'Last seen: '}
+                                {formatDateTime(u.last_seen_at)}
+                              </span>
+                            </div>
                           </td>
                           <td className="py-2 px-3">
                             <span
                               className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${
-                                online
+                                active
                                   ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/40'
-                                  : 'bg-slate-700/40 text-slate-300 border border-slate-600/40'
+                                  : 'bg-red-500/15 text-red-300 border border-red-500/40'
                               }`}
                             >
                               <span
                                 className={`inline-block h-2 w-2 rounded-full ${
-                                  online ? 'bg-emerald-400' : 'bg-slate-500'
+                                  active ? 'bg-emerald-400' : 'bg-red-400'
                                 }`}
                               />
-                              {online ? (isAr ? 'متصل' : 'Online') : isAr ? 'غير متصل' : 'Offline'}
+                              {active ? (isAr ? 'نشط' : 'Active') : isAr ? 'معطل' : 'Disabled'}
                             </span>
+                            <div className="mt-1 text-[10px] text-slate-500">
+                              {online ? (isAr ? 'متصل الآن' : 'Online now') : isAr ? 'غير متصل' : 'Offline'}
+                            </div>
                           </td>
                           <td className="py-2 px-3">
-                            <button
-                              onClick={() => {
-                                setResetModal(u);
-                                setResetPassword('');
-                                setGeneratedPassword(null);
-                              }}
-                              className="text-xs text-cyan-300 hover:text-cyan-200"
-                            >
-                              {isAr ? 'إعادة تعيين كلمة المرور' : 'Reset password'}
-                            </button>
+                            <div className="flex flex-col gap-2">
+                              <button
+                                onClick={() => {
+                                  setResetModal(u);
+                                  setResetPassword('');
+                                  setGeneratedPassword(null);
+                                }}
+                                className="text-xs text-cyan-300 hover:text-cyan-200 text-left"
+                              >
+                                {isAr ? 'إعادة تعيين كلمة المرور' : 'Reset password'}
+                              </button>
+                              <button
+                                onClick={() => void handleToggleStatus(u)}
+                                disabled={statusUpdatingId === u.id}
+                                className={`text-xs text-left ${
+                                  active ? 'text-red-300 hover:text-red-200' : 'text-emerald-300 hover:text-emerald-200'
+                                } disabled:opacity-60`}
+                              >
+                                {statusUpdatingId === u.id
+                                  ? isAr
+                                    ? 'جاري التحديث...'
+                                    : 'Updating...'
+                                  : active
+                                  ? isAr
+                                    ? 'تعطيل المستخدم'
+                                    : 'Disable user'
+                                  : isAr
+                                  ? 'تفعيل المستخدم'
+                                  : 'Enable user'}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -323,6 +419,8 @@ export default function SystemUsersPage() {
               <div className="md:hidden space-y-3">
                 {items.map((u) => {
                   const online = isOnline(u.last_seen_at);
+                  const active = resolveActive(u.is_active);
+                  const planLabel = u.package || u.shop?.package || '-';
                   return (
                     <div
                       key={u.id}
@@ -335,31 +433,38 @@ export default function SystemUsersPage() {
                           {u.email && (
                             <div className="text-xs text-slate-400 break-words">{u.email}</div>
                           )}
+                          {u.phone && (
+                            <div className="text-xs text-slate-500 break-words">{u.phone}</div>
+                          )}
                           <div className="mt-1 text-xs text-slate-300 flex flex-wrap items-center gap-1">
                             <span>{u.role}</span>
                             {u.role === 'super_admin' && (
                               <Shield className="h-3 w-3 text-fuchsia-300 inline-block ml-1" />
                             )}
                           </div>
+                          <div className="mt-1 text-[11px] text-slate-400">
+                            {isAr ? 'الخطة: ' : 'Plan: '}
+                            <span className="text-slate-200">{planLabel}</span>
+                          </div>
                         </div>
                         <div className="flex flex-col items-end gap-1">
                           <span
                             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] ${
-                              online
+                              active
                                 ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/40'
-                                : 'bg-slate-700/40 text-slate-300 border border-slate-600/40'
+                                : 'bg-red-500/15 text-red-300 border border-red-500/40'
                             }`}
                           >
                             <span
                               className={`inline-block h-2 w-2 rounded-full ${
-                                online ? 'bg-emerald-400' : 'bg-slate-500'
+                                active ? 'bg-emerald-400' : 'bg-red-400'
                               }`}
                             />
-                            {online ? (isAr ? 'متصل' : 'Online') : isAr ? 'غير متصل' : 'Offline'}
+                            {active ? (isAr ? 'نشط' : 'Active') : isAr ? 'معطل' : 'Disabled'}
                           </span>
                           <div className="text-[10px] text-slate-500 flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            <span>{formatDateTime(u.last_seen_at)}</span>
+                            <span>{online ? (isAr ? 'متصل الآن' : 'Online now') : formatDateTime(u.last_seen_at)}</span>
                           </div>
                         </div>
                       </div>
@@ -376,12 +481,32 @@ export default function SystemUsersPage() {
                                 {u.branch.name || `#${u.branch.id}`}
                               </div>
                             )}
+                            {typeof u.shop.branchCount === 'number' && (
+                              <div>
+                                {isAr ? 'عدد الفروع: ' : 'Branches: '}
+                                {u.shop.branchCount}
+                              </div>
+                            )}
                           </>
                         ) : (
                           <div>{isAr ? 'بدون متجر' : 'No shop'}</div>
                         )}
                       </div>
-                      <div className="mt-3 flex justify-end">
+                      <div className="mt-2 text-[11px] text-slate-500 space-y-1">
+                        <div>
+                          {isAr ? 'تم الإنشاء: ' : 'Created: '}
+                          {formatDateTime(u.created_at)}
+                        </div>
+                        <div>
+                          {isAr ? 'آخر تسجيل: ' : 'Last login: '}
+                          {formatDateTime(u.last_login_at ?? u.last_seen_at)}
+                        </div>
+                        <div>
+                          {isAr ? 'آخر ظهور: ' : 'Last seen: '}
+                          {formatDateTime(u.last_seen_at)}
+                        </div>
+                      </div>
+                      <div className="mt-3 flex justify-end gap-3">
                         <button
                           onClick={() => {
                             setResetModal(u);
@@ -391,6 +516,25 @@ export default function SystemUsersPage() {
                           className="text-xs text-cyan-300 hover:text-cyan-200"
                         >
                           {isAr ? 'إعادة تعيين كلمة المرور' : 'Reset password'}
+                        </button>
+                        <button
+                          onClick={() => void handleToggleStatus(u)}
+                          disabled={statusUpdatingId === u.id}
+                          className={`text-xs ${
+                            active ? 'text-red-300 hover:text-red-200' : 'text-emerald-300 hover:text-emerald-200'
+                          } disabled:opacity-60`}
+                        >
+                          {statusUpdatingId === u.id
+                            ? isAr
+                              ? 'جاري التحديث...'
+                              : 'Updating...'
+                            : active
+                            ? isAr
+                              ? 'تعطيل'
+                              : 'Disable'
+                            : isAr
+                            ? 'تفعيل'
+                            : 'Enable'}
                         </button>
                       </div>
                     </div>

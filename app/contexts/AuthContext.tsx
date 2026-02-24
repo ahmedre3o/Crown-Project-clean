@@ -124,6 +124,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshUser();
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!token) return;
+    let active = true;
+    const ping = async () => {
+      if (!active) return;
+      try {
+        await apiRequest('/system/heartbeat', { method: 'POST' });
+      } catch {
+        // ignore heartbeat failures
+      }
+    };
+    ping();
+    const id = window.setInterval(ping, 60000);
+    return () => {
+      active = false;
+      window.clearInterval(id);
+    };
+  }, [token]);
+
   const login = async (username: string, password: string, shopId?: string) => {
     const response = await apiFetch('/auth/login', {
       method: 'POST',

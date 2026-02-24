@@ -205,6 +205,9 @@ const authenticateToken = async (req: any, res: Response, next: any) => {
     }
 
     const user = userArray[0];
+    if (user?.is_active === 0 || user?.is_active === false) {
+      return res.status(403).json({ error: 'User disabled' });
+    }
     if (!user.shop_id && decoded.shopId) {
       user.shop_id = decoded.shopId;
     }
@@ -270,6 +273,24 @@ function getShopIdOrFail(req: any, res: Response): number | null {
 
 const logEmptyResult = (label: string, context: Record<string, unknown>) => {
   console.warn(`[EMPTY] ${label}`, context);
+};
+
+const columnCache = new Map<string, boolean>();
+const hasColumn = async (table: string, column: string): Promise<boolean> => {
+  const key = `${table}.${column}`;
+  if (columnCache.has(key)) return columnCache.get(key) === true;
+  try {
+    const [rows] = await pool.execute(
+      'SELECT COUNT(*) as c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+      [table, column]
+    );
+    const exists = Number((rows as any[])[0]?.c ?? 0) > 0;
+    columnCache.set(key, exists);
+    return exists;
+  } catch {
+    columnCache.set(key, false);
+    return false;
+  }
 };
 
 // ========== DOMAIN RESOLUTION + VERIFICATION ==========
@@ -1983,17 +2004,46 @@ app.get('/api/admin/analytics/timeseries', authenticateToken, async (req: any, r
 });
 
 // ========== SYSTEM (super_admin dashboard) ==========
+app.post('/api/system/heartbeat', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const canUpdate = await hasColumn('users', 'last_seen_at');
+    if (!canUpdate) return res.json({ ok: false, skipped: 'last_seen_at_missing' });
+    await pool.execute('UPDATE users SET last_seen_at = NOW() WHERE id = ?', [userId]);
+    res.json({ ok: true, userId });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/system/stats', authenticateToken, requireRole('super_admin'), async (_req: any, res: Response) => {
   try {
     const [users] = await pool.execute('SELECT COUNT(*) as c FROM users').catch(() => [[{ c: 0 }]]);
     const [shops] = await pool.execute('SELECT COUNT(*) as c FROM shops').catch(() => [[{ c: 0 }]]);
+    let onlineUsers = 0;
+    let active15m = 0;
+    let active60m = 0;
+    if (await hasColumn('users', 'last_seen_at')) {
+      const hasActiveCol = await hasColumn('users', 'is_active');
+      const activeFilter = hasActiveCol ? 'AND (u.is_active IS NULL OR u.is_active = 1)' : '';
+      const [rows15] = await pool.execute(
+        `SELECT COUNT(*) as c FROM users u WHERE u.last_seen_at >= DATE_SUB(NOW(), INTERVAL 15 MINUTE) ${activeFilter}`
+      );
+      const [rows60] = await pool.execute(
+        `SELECT COUNT(*) as c FROM users u WHERE u.last_seen_at >= DATE_SUB(NOW(), INTERVAL 60 MINUTE) ${activeFilter}`
+      );
+      onlineUsers = Number((rows15 as any[])[0]?.c ?? 0);
+      active15m = onlineUsers;
+      active60m = Number((rows60 as any[])[0]?.c ?? 0);
+    }
     res.json({
       ok: true,
       totalUsers: (users as any[])[0]?.c ?? 0,
       totalShops: (shops as any[])[0]?.c ?? 0,
-      onlineUsers: 0,
-      active15m: 0,
-      active60m: 0,
+      onlineUsers,
+      active15m,
+      active60m,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -2008,6 +2058,12 @@ app.get('/api/system/users', authenticateToken, requireRole('super_admin'), asyn
     const offset = Number.isFinite(offsetRaw) && offsetRaw >= 0 ? Math.floor(offsetRaw) : 0;
     const q = String(req.query.q || '').trim();
 
+    const [hasLastSeen, hasIsActive, hasPhone] = await Promise.all([
+      hasColumn('users', 'last_seen_at'),
+      hasColumn('users', 'is_active'),
+      hasColumn('users', 'phone'),
+    ]);
+
     const conditions: string[] = [];
     const params: any[] = [];
     if (q) {
@@ -2015,11 +2071,23 @@ app.get('/api/system/users', authenticateToken, requireRole('super_admin'), asyn
       params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
     }
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const lastSeenSelect = hasLastSeen ? 'u.last_seen_at as last_seen_at,' : 'NULL as last_seen_at,';
+    const isActiveSelect = hasIsActive ? 'u.is_active as is_active,' : 'NULL as is_active,';
+    const phoneSelect = hasPhone ? 'u.phone as user_phone,' : 'NULL as user_phone,';
     const sql = `
-      SELECT u.id, u.username, u.email, u.role, u.shop_id, u.created_at, u.is_active,
-             s.id as shop_id, s.name as shop_name, s.business_name as shop_business_name
+      SELECT u.id, u.username, u.email, u.role, u.shop_id, u.created_at, u.package as user_package,
+             ${phoneSelect}
+             ${lastSeenSelect}
+             ${isActiveSelect}
+             s.id as shop_id, s.name as shop_name, s.business_name as shop_business_name, s.package as shop_package, s.contact_phone as shop_phone,
+             b.branch_count as branch_count
       FROM users u
       LEFT JOIN shops s ON s.id = u.shop_id
+      LEFT JOIN (
+        SELECT shop_id, COUNT(*) as branch_count
+        FROM branches
+        GROUP BY shop_id
+      ) b ON b.shop_id = u.shop_id
       ${where}
       ORDER BY u.created_at DESC
       LIMIT ${limit} OFFSET ${offset}
@@ -2029,20 +2097,65 @@ app.get('/api/system/users', authenticateToken, requireRole('super_admin'), asyn
       id: r.id,
       username: r.username,
       email: r.email ?? null,
+      phone: r.user_phone ?? r.shop_phone ?? null,
       role: r.role,
+      package: r.user_package ?? r.shop_package ?? null,
       shop: r.shop_id
-        ? { id: r.shop_id, name: r.shop_name || r.shop_business_name || null, slug: null }
+        ? {
+            id: r.shop_id,
+            name: r.shop_name || r.shop_business_name || null,
+            slug: null,
+            package: r.shop_package ?? null,
+            branchCount: Number(r.branch_count ?? 0),
+          }
         : null,
       branch: null,
-      last_seen_at: null,
+      last_seen_at: r.last_seen_at ?? null,
       created_at: r.created_at,
       is_active: r.is_active ?? null,
+      storeCount: r.shop_id ? 1 : 0,
+      branchCount: Number(r.branch_count ?? 0),
     }));
     if (items.length === 0) {
       logEmptyResult('system_users', { q, limit, offset });
     }
     const nextOffset = items.length >= limit ? offset + limit : null;
     res.json({ ok: true, items, nextOffset });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/system/users/:id/status', authenticateToken, requireRole('super_admin'), async (req: any, res: Response) => {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    if (!userId) return res.status(400).json({ error: 'Invalid user id' });
+    const canUpdate = await hasColumn('users', 'is_active');
+    if (!canUpdate) return res.status(400).json({ error: 'User status not supported' });
+    const nextActive =
+      typeof req.body?.is_active === 'boolean'
+        ? req.body.is_active
+        : typeof req.body?.active === 'boolean'
+        ? req.body.active
+        : typeof req.body?.status === 'string'
+        ? req.body.status === 'active'
+        : null;
+    if (nextActive === null) {
+      return res.status(400).json({ error: 'is_active is required' });
+    }
+
+    const [rows] = await pool.execute('SELECT id, role FROM users WHERE id = ?', [userId]);
+    const row = (rows as any[])[0];
+    if (!row) return res.status(404).json({ error: 'User not found' });
+    if (row.role === 'super_admin') {
+      return res.status(403).json({ error: 'Cannot disable super_admin' });
+    }
+    if (req.user?.id === userId && !nextActive) {
+      return res.status(403).json({ error: 'Cannot disable your own account' });
+    }
+
+    await pool.execute('UPDATE users SET is_active = ? WHERE id = ?', [nextActive ? 1 : 0, userId]);
+    res.json({ ok: true, id: userId, is_active: nextActive ? 1 : 0 });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -2445,6 +2558,34 @@ app.get('/api/admin/reports/summary', authenticateToken, async (req: any, res: R
       bucket,
       source,
     });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/reports/profit', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const from = String(req.query.from || '').trim();
+    const to = String(req.query.to || '').trim();
+    const [rows] = await pool.execute(
+      `
+      SELECT 
+        DATE(s.created_at) as date,
+        COALESCE(SUM((si.unit_price - COALESCE(p.buy_price, 0)) * si.quantity), 0) as profit
+      FROM sales s
+      JOIN sale_items si ON s.id = si.sale_id
+      JOIN products p ON si.product_id = p.id
+      WHERE s.shop_id = ? AND s.created_at >= ? AND s.created_at <= ?
+      GROUP BY DATE(s.created_at)
+      ORDER BY date ASC
+      `,
+      [shopId, from || '1970-01-01', to || '9999-12-31']
+    ).catch(() => [[]]);
+    const dailyProfit = (rows as any[]).map((r: any) => ({ date: r.date, profit: Number(r.profit ?? 0) }));
+    const totalProfit = dailyProfit.reduce((sum, p) => sum + Number(p.profit || 0), 0);
+    res.json({ ok: true, totalProfit, dailyProfit });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

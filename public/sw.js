@@ -1,9 +1,15 @@
 /* Crown Services ERP - Service Worker
    Caches static assets. Network-first for HTML/JS. */
-const CACHE_VERSION = 'crown-v1';
+const CACHE_VERSION = 'crown-v2';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 
-const STATIC_ASSETS = ['/icons/icon-192.png', '/icons/icon-512.png'];
+const STATIC_ASSETS = [
+  '/manifest.webmanifest',
+  '/icons/icon-192.png',
+  '/icons/icon-256.png',
+  '/icons/icon-384.png',
+  '/icons/icon-512.png',
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

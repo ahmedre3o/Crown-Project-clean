@@ -3299,6 +3299,8 @@ app.get('/api/notifications', authenticateToken, async (req: any, res: Response)
     `;
     const [rows] = await pool.execute(sql, params).catch(() => [[]]);
     const GENERIC_ERROR_AR = 'حدث خطأ. حاول مرة أخرى.';
+    const FALLBACK_TITLE_AR = 'إشعار جديد';
+    const FALLBACK_BODY_AR = 'تم إنشاء إشعار جديد. افتح التفاصيل.';
     const fixEncoding = (value: string) => {
       if (!value) return value;
       const hasMojibake = /Ã.|Ø.|Ù./.test(value);
@@ -3308,6 +3310,7 @@ app.get('/api/notifications', authenticateToken, async (req: any, res: Response)
       if (value == null) return '';
       const trimmed = String(value).trim();
       if (!trimmed || trimmed === GENERIC_ERROR_AR) return '';
+      if (trimmed.includes('�')) return '';
       return trimmed;
     };
     const normalizeDate = (value: any) => {
@@ -3317,22 +3320,31 @@ app.get('/api/notifications', authenticateToken, async (req: any, res: Response)
       return d.toISOString();
     };
     const items = (rows as any[]).map((row: any) => {
+      const hasCorrupt =
+        typeof row.title_ar === 'string' && row.title_ar.includes('�') ||
+        typeof row.title_en === 'string' && row.title_en.includes('�') ||
+        typeof row.body_ar === 'string' && row.body_ar.includes('�') ||
+        typeof row.body_en === 'string' && row.body_en.includes('�');
+      if (hasCorrupt) {
+        console.warn('[notifications] corrupted text detected', { id: row.id });
+      }
+
       const titleAr = normalizeText(row.title_ar);
       const titleEn = normalizeText(row.title_en);
       const bodyAr = normalizeText(row.body_ar);
       const bodyEn = normalizeText(row.body_en);
-      const titleCandidate = titleAr || titleEn || 'إشعار';
-      const bodyCandidate = bodyAr || bodyEn || '';
+      const titleCandidate = titleAr || titleEn || FALLBACK_TITLE_AR;
+      const bodyCandidate = bodyAr || bodyEn || FALLBACK_BODY_AR;
       return {
         id: Number(row.id),
         source: row.source ?? 'system',
         type: row.type ?? 'system',
-        title_ar: titleAr,
-        title_en: titleEn,
-        body_ar: bodyAr,
-        body_en: bodyEn,
-        title: fixEncoding(titleCandidate),
-        body: fixEncoding(bodyCandidate),
+        title_ar: hasCorrupt ? FALLBACK_TITLE_AR : titleAr,
+        title_en: hasCorrupt ? '' : titleEn,
+        body_ar: hasCorrupt ? FALLBACK_BODY_AR : bodyAr,
+        body_en: hasCorrupt ? '' : bodyEn,
+        title: hasCorrupt ? FALLBACK_TITLE_AR : fixEncoding(titleCandidate),
+        body: hasCorrupt ? FALLBACK_BODY_AR : fixEncoding(bodyCandidate),
         is_read: Number(row.is_read ?? 0),
         meta: row.meta ?? null,
         created_at: normalizeDate(row.created_at),

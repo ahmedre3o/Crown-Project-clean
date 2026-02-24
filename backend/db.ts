@@ -21,11 +21,23 @@ function generatePublicCode(): string {
 }
 
 const MOJIBAKE_MARKERS = ['Ã', 'â€', 'Ø', 'Ù', '�'];
+const FALLBACK_TITLE_AR = 'إشعار جديد';
+const FALLBACK_BODY_AR = 'تم إنشاء إشعار جديد. افتح التفاصيل.';
+const FALLBACK_TITLE_EN = 'New notification';
+const FALLBACK_BODY_EN = 'A new notification was created. Open details.';
 
-function fixMojibakeValue(value: string | null) {
+function containsReplacement(value: string | null) {
+  return typeof value === 'string' && value.includes('�');
+}
+
+function fixMojibakeValue(value: string | null, fallback: string) {
   if (value == null) return value;
+  if (containsReplacement(value)) return fallback;
   if (!looksMojibake(value)) return value;
-  return tryFixLatin1Mojibake(value) ?? value;
+  const fixed = tryFixLatin1Mojibake(value);
+  if (!fixed) return fallback;
+  if (containsReplacement(fixed) || looksMojibake(fixed)) return fallback;
+  return fixed;
 }
 
 async function cleanupNotificationMojibake() {
@@ -42,10 +54,18 @@ async function cleanupNotificationMojibake() {
     const items = rows as any[];
     let fixedCount = 0;
     for (const row of items) {
-      const titleAr = fixMojibakeValue(row.title_ar ?? '');
-      const titleEn = fixMojibakeValue(row.title_en ?? '');
-      const bodyAr = fixMojibakeValue(row.body_ar ?? '');
-      const bodyEn = fixMojibakeValue(row.body_en ?? '');
+      const hasReplacement =
+        containsReplacement(row.title_ar) ||
+        containsReplacement(row.title_en) ||
+        containsReplacement(row.body_ar) ||
+        containsReplacement(row.body_en);
+      const titleAr = fixMojibakeValue(row.title_ar ?? '', FALLBACK_TITLE_AR);
+      const titleEn = fixMojibakeValue(row.title_en ?? '', FALLBACK_TITLE_EN);
+      const bodyAr = fixMojibakeValue(row.body_ar ?? '', FALLBACK_BODY_AR);
+      const bodyEn = fixMojibakeValue(row.body_en ?? '', FALLBACK_BODY_EN);
+      if (hasReplacement) {
+        console.warn('[notifications] replaced corrupted text', { id: row.id });
+      }
       if (
         titleAr !== row.title_ar ||
         titleEn !== row.title_en ||

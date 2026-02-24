@@ -82,10 +82,10 @@ function toNumber(value: any) {
 }
 
 function normalizeRevenuePoints(raw: any) {
-  const points = ensureArray(raw?.points ?? raw);
+  const points = ensureArray<any>(raw?.points ?? raw);
   return points
-    .filter((p) => p?.date)
-    .map((p) => {
+    .filter((p: any) => p?.date)
+    .map((p: any) => {
       const pos = toNumber(p.posAmount ?? p.pos ?? 0);
       const online = toNumber(p.onlineAmount ?? p.onlineConfirmed ?? p.online ?? 0);
       const total = toNumber(p.totalAmount ?? p.total ?? pos + online);
@@ -104,10 +104,10 @@ function normalizeRevenuePoints(raw: any) {
 
 function normalizeProfitResponse(raw: any) {
   const payload = raw?.data ?? raw ?? {};
-  const list = ensureArray(payload?.dailyProfit ?? payload?.points ?? payload);
+  const list = ensureArray<any>(payload?.dailyProfit ?? payload?.points ?? payload);
   const dailyProfit = list
-    .filter((p) => p?.date)
-    .map((p) => ({
+    .filter((p: any) => p?.date)
+    .map((p: any) => ({
       date: String(p.date).slice(0, 10),
       profit: toNumber(p.profit ?? p.totalProfit ?? p.amount ?? p.value),
     }));

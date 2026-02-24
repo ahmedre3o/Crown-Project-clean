@@ -1,7 +1,7 @@
-const BAD_MARKERS = ["Ø", "Ã", "â€", "�", "أک", "™", "Â", "ï»¿"];
+const MOJIBAKE_RE = /Ã.|Ø.|Ù./;
 
 export function looksMojibake(s: string) {
-  return BAD_MARKERS.some((m) => s.includes(m));
+  return MOJIBAKE_RE.test(s);
 }
 
 // محاولة إصلاح النوع الشائع (UTF-8 bytes اتقرت Latin1) -> بيرجع عربي مظبوط في حالات Ø§Ø®Ø...

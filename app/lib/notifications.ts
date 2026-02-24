@@ -16,8 +16,8 @@ export function getNotificationTitle(
   const explicit = cleanText(notification.title);
   const ar = cleanText(notification.title_ar);
   const en = cleanText(notification.title_en);
-  if (language === 'ar') return ar || explicit || en || 'إشعار';
-  return en || explicit || ar || 'Notification';
+  if (language === 'ar') return explicit || ar || en || 'إشعار';
+  return explicit || en || ar || 'Notification';
 }
 
 export function getNotificationBody(

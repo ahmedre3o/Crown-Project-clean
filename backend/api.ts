@@ -4,7 +4,6 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { Readable } from 'stream';
 import { pool, testConnection, initializeDatabase } from './db';
-import { fixMojibakeIfNeeded } from './encodingGuard';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
@@ -3300,10 +3299,14 @@ app.get('/api/notifications', authenticateToken, async (req: any, res: Response)
     `;
     const [rows] = await pool.execute(sql, params).catch(() => [[]]);
     const GENERIC_ERROR_AR = 'حدث خطأ. حاول مرة أخرى.';
+    const fixEncoding = (value: string) => {
+      if (!value) return value;
+      const hasMojibake = /Ã.|Ø.|Ù./.test(value);
+      return hasMojibake ? Buffer.from(value, 'latin1').toString('utf8') : value;
+    };
     const normalizeText = (value: any) => {
       if (value == null) return '';
-      const fixed = fixMojibakeIfNeeded(String(value));
-      const trimmed = fixed.trim();
+      const trimmed = String(value).trim();
       if (!trimmed || trimmed === GENERIC_ERROR_AR) return '';
       return trimmed;
     };
@@ -3318,6 +3321,8 @@ app.get('/api/notifications', authenticateToken, async (req: any, res: Response)
       const titleEn = normalizeText(row.title_en);
       const bodyAr = normalizeText(row.body_ar);
       const bodyEn = normalizeText(row.body_en);
+      const titleCandidate = titleAr || titleEn || 'إشعار';
+      const bodyCandidate = bodyAr || bodyEn || '';
       return {
         id: Number(row.id),
         source: row.source ?? 'system',
@@ -3326,8 +3331,8 @@ app.get('/api/notifications', authenticateToken, async (req: any, res: Response)
         title_en: titleEn,
         body_ar: bodyAr,
         body_en: bodyEn,
-        title: titleAr || titleEn || 'إشعار',
-        body: bodyAr || bodyEn || '',
+        title: fixEncoding(titleCandidate),
+        body: fixEncoding(bodyCandidate),
         is_read: Number(row.is_read ?? 0),
         meta: row.meta ?? null,
         created_at: normalizeDate(row.created_at),

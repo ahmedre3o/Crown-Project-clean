@@ -8,18 +8,21 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { apiRequest, useAuth } from '../contexts/AuthContext';
 import { useRouteGuard } from '../guards/useRouteGuard';
 import { getStoredShopId } from '@/lib/shop';
+import { formatNotificationDate, getNotificationBody, getNotificationTitle } from '../lib/notifications';
 
 interface Notification {
   id: number;
   source: string;
   type: string;
+  title?: string | null;
   title_ar?: string | null;
   title_en?: string | null;
+  body?: string | null;
   body_ar?: string | null;
   body_en?: string | null;
   is_read: number;
   meta?: unknown;
-  created_at: string;
+  created_at: string | null;
 }
 
 export default function NotificationsPage() {
@@ -125,10 +128,8 @@ export default function NotificationsPage() {
     }
   };
 
-  const title = (n: Notification) =>
-    (language === 'ar' ? n.title_ar || n.title_en : n.title_en || n.title_ar) || '';
-  const body = (n: Notification) =>
-    (language === 'ar' ? n.body_ar || n.body_en : n.body_en || n.body_ar) || '';
+  const title = (n: Notification) => getNotificationTitle(n, language);
+  const body = (n: Notification) => getNotificationBody(n, language);
 
   const meta = (n: Notification): { orderId?: number; invoiceId?: number; saleId?: number } => {
     const m = n.meta;
@@ -262,7 +263,9 @@ export default function NotificationsPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {items.map((n) => (
+            {items.map((n) => {
+              const dateLabel = formatNotificationDate(n.created_at, language);
+              return (
               <div
                 key={n.id}
                 id={`notif-${n.id}`}
@@ -286,9 +289,7 @@ export default function NotificationsPage() {
                       </div>
                     )}
                     <div className="text-[11px] md:text-xs text-slate-500 mt-1">
-                      {new Date(n.created_at).toLocaleString(
-                        language === 'ar' ? 'ar-EG' : 'en-US'
-                      )}
+                      {dateLabel || '-'}
                     </div>
                   </div>
                   {expandedId === n.id ? (
@@ -333,7 +334,8 @@ export default function NotificationsPage() {
                   </div>
                 )}
               </div>
-            ))}
+            );
+            })}
           </div>
         )}
 

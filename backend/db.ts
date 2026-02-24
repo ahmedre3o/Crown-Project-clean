@@ -9,6 +9,7 @@ dotenv.config({ path: path.resolve(backendDir, '..', '.env') });
 import mysql from 'mysql2/promise';
 import type { RowDataPacket } from 'mysql2/promise';
 import crypto from 'crypto';
+import { looksMojibake, tryFixLatin1Mojibake } from './encodingGuard';
 
 type UserRow = RowDataPacket & { id: number; email: string | null };
 
@@ -17,6 +18,53 @@ function generatePublicCode(): string {
   let s = '';
   for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
   return s;
+}
+
+const MOJIBAKE_MARKERS = ['Ã', 'â€', 'Ø', 'Ù', '�'];
+
+function fixMojibakeValue(value: string | null) {
+  if (value == null) return value;
+  if (!looksMojibake(value)) return value;
+  return tryFixLatin1Mojibake(value) ?? value;
+}
+
+async function cleanupNotificationMojibake() {
+  try {
+    if (!MOJIBAKE_MARKERS.length) return;
+    const where = MOJIBAKE_MARKERS.map(
+      () => '(title_ar LIKE ? OR title_en LIKE ? OR body_ar LIKE ? OR body_en LIKE ?)'
+    ).join(' OR ');
+    const params = MOJIBAKE_MARKERS.flatMap((m) => [`%${m}%`, `%${m}%`, `%${m}%`, `%${m}%`]);
+    const [rows] = await pool.execute(
+      `SELECT id, title_ar, title_en, body_ar, body_en FROM notifications WHERE ${where} LIMIT 5000`,
+      params
+    );
+    const items = rows as any[];
+    let fixedCount = 0;
+    for (const row of items) {
+      const titleAr = fixMojibakeValue(row.title_ar ?? '');
+      const titleEn = fixMojibakeValue(row.title_en ?? '');
+      const bodyAr = fixMojibakeValue(row.body_ar ?? '');
+      const bodyEn = fixMojibakeValue(row.body_en ?? '');
+      if (
+        titleAr !== row.title_ar ||
+        titleEn !== row.title_en ||
+        bodyAr !== row.body_ar ||
+        bodyEn !== row.body_en
+      ) {
+        await pool.execute(
+          'UPDATE notifications SET title_ar = ?, title_en = ?, body_ar = ?, body_en = ? WHERE id = ?',
+          [titleAr, titleEn, bodyAr, bodyEn, row.id]
+        );
+        fixedCount++;
+      }
+    }
+    if (fixedCount > 0) {
+      console.log(`[notifications] mojibake cleanup: fixed ${fixedCount} records`);
+    }
+  } catch (err) {
+    console.error('[notifications] mojibake cleanup failed:', (err as any)?.message || err);
+  }
 }
 
 // Connection mode: socket if DB_MODE=socket OR DB_HOST starts with /cloudsql/; else IP (no throw so Cloud Shell etc can start)
@@ -1148,6 +1196,50 @@ export async function initializeDatabase() {
     } catch (m: any) {
       if (m?.code !== 'ER_DUP_FIELDNAME') {}
     }
+    try {
+      await pool.execute('ALTER TABLE notifications CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci');
+    } catch (m: any) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('notifications.collation:', m?.message || m);
+      }
+    }
+    try {
+      await pool.execute(
+        "ALTER TABLE notifications MODIFY COLUMN title_ar VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT ''"
+      );
+    } catch (m: any) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('notifications.title_ar:', m?.message || m);
+      }
+    }
+    try {
+      await pool.execute(
+        "ALTER TABLE notifications MODIFY COLUMN title_en VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT ''"
+      );
+    } catch (m: any) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('notifications.title_en:', m?.message || m);
+      }
+    }
+    try {
+      await pool.execute(
+        'ALTER TABLE notifications MODIFY COLUMN body_ar TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL'
+      );
+    } catch (m: any) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('notifications.body_ar:', m?.message || m);
+      }
+    }
+    try {
+      await pool.execute(
+        'ALTER TABLE notifications MODIFY COLUMN body_en TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL'
+      );
+    } catch (m: any) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('notifications.body_en:', m?.message || m);
+      }
+    }
+    await cleanupNotificationMojibake();
 
     // Stock reservations for online orders (prevent overselling)
     // Ensure PK/FK types match INT IDs in shops / online_orders / products

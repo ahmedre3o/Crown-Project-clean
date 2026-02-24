@@ -137,6 +137,34 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
+-- 10.3) notifications: enforce utf8mb4 collation on table/columns
+SET @tbl = (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'notifications');
+
+SET @sql = IF(@tbl = 1, 'ALTER TABLE notifications CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(@tbl = 1, 'ALTER TABLE notifications MODIFY COLUMN title_ar VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT ''''', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(@tbl = 1, 'ALTER TABLE notifications MODIFY COLUMN title_en VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT ''''', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(@tbl = 1, 'ALTER TABLE notifications MODIFY COLUMN body_ar TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(@tbl = 1, 'ALTER TABLE notifications MODIFY COLUMN body_en TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
 SET @col = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'licenses' AND COLUMN_NAME = 'permissions_json');
 SET @sql = IF(@tbl = 1 AND @col = 0, 'ALTER TABLE licenses ADD COLUMN permissions_json JSON NULL', 'SELECT 1');
 PREPARE stmt FROM @sql;
@@ -215,5 +243,12 @@ CREATE TABLE IF NOT EXISTS sale_items (
   INDEX idx_sale_id (sale_id),
   INDEX idx_product_id (product_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 17) notifications: enforce utf8mb4 table/columns (mojibake guard)
+SET @tbl = (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'notifications');
+SET @sql = IF(@tbl = 1, 'ALTER TABLE notifications CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 

@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { Readable } from 'stream';
 import { pool, testConnection, initializeDatabase } from './db';
-import { sanitizeDeep } from './encodingGuard';
+import { fixMojibakeIfNeeded } from './encodingGuard';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
@@ -3249,6 +3249,7 @@ app.get('/api/admin/reports/day-details', authenticateToken, requirePackageFeatu
 // Notifications unread count (frontend NotificationsBell). Returns 0 if notifications table missing. Uses shop_id (schema has shop_id, not user_id).
 app.get('/api/notifications/unread-count', authenticateToken, async (req: any, res: Response) => {
   try {
+    res.set('Content-Type', 'application/json; charset=utf-8');
     const allowNotifications = getPlanDefinition(normalizePlan(req.user?.package)).features.notifications;
     if (!allowNotifications) return res.json({ count: 0 });
     const shopId = getShopId(req).shopId;
@@ -3267,6 +3268,7 @@ app.get('/api/notifications/unread-count', authenticateToken, async (req: any, r
 // Notifications list (Activity & Notifications page)
 app.get('/api/notifications', authenticateToken, async (req: any, res: Response) => {
   try {
+    res.set('Content-Type', 'application/json; charset=utf-8');
     const allowNotifications = getPlanDefinition(normalizePlan(req.user?.package)).features.notifications;
     if (!allowNotifications) return res.json({ ok: true, items: [], unreadCount: 0, nextOffset: null });
     const shopId = getShopIdOrFail(req, res);
@@ -3297,7 +3299,41 @@ app.get('/api/notifications', authenticateToken, async (req: any, res: Response)
       LIMIT ${limit} OFFSET ${offset}
     `;
     const [rows] = await pool.execute(sql, params).catch(() => [[]]);
-    const items = sanitizeDeep(rows as any[]) as any[];
+    const GENERIC_ERROR_AR = 'حدث خطأ. حاول مرة أخرى.';
+    const normalizeText = (value: any) => {
+      if (value == null) return '';
+      const fixed = fixMojibakeIfNeeded(String(value));
+      const trimmed = fixed.trim();
+      if (!trimmed || trimmed === GENERIC_ERROR_AR) return '';
+      return trimmed;
+    };
+    const normalizeDate = (value: any) => {
+      if (!value) return null;
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return null;
+      return d.toISOString();
+    };
+    const items = (rows as any[]).map((row: any) => {
+      const titleAr = normalizeText(row.title_ar);
+      const titleEn = normalizeText(row.title_en);
+      const bodyAr = normalizeText(row.body_ar);
+      const bodyEn = normalizeText(row.body_en);
+      return {
+        id: Number(row.id),
+        source: row.source ?? 'system',
+        type: row.type ?? 'system',
+        title_ar: titleAr,
+        title_en: titleEn,
+        body_ar: bodyAr,
+        body_en: bodyEn,
+        title: titleAr || titleEn || 'إشعار',
+        body: bodyAr || bodyEn || '',
+        is_read: Number(row.is_read ?? 0),
+        meta: row.meta ?? null,
+        created_at: normalizeDate(row.created_at),
+        read_at: row.read_at ?? null,
+      };
+    });
     if (items.length === 0) {
       logEmptyResult('notifications', { shopId, source, q, limit, offset });
     }
@@ -3316,6 +3352,7 @@ app.get('/api/notifications', authenticateToken, async (req: any, res: Response)
 
 app.patch('/api/notifications/:id/read', authenticateToken, async (req: any, res: Response) => {
   try {
+    res.set('Content-Type', 'application/json; charset=utf-8');
     const allowNotifications = getPlanDefinition(normalizePlan(req.user?.package)).features.notifications;
     if (!allowNotifications) return res.json({ ok: true });
     const id = parseInt(req.params.id, 10);
@@ -3331,6 +3368,7 @@ app.patch('/api/notifications/:id/read', authenticateToken, async (req: any, res
 
 app.patch('/api/notifications/mark-all-read', authenticateToken, async (req: any, res: Response) => {
   try {
+    res.set('Content-Type', 'application/json; charset=utf-8');
     const allowNotifications = getPlanDefinition(normalizePlan(req.user?.package)).features.notifications;
     if (!allowNotifications) return res.json({ ok: true, updated: 0 });
     const shopId = getShopIdOrFail(req, res);

@@ -6,18 +6,21 @@ import { useRouter } from 'next/navigation';
 import { Bell } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { apiRequest } from '../contexts/AuthContext';
+import { formatNotificationDate, getNotificationBody, getNotificationTitle } from '../lib/notifications';
 
 interface Notification {
   id: number;
   type: string;
   source?: string;
+  title?: string | null;
   title_ar?: string | null;
   title_en?: string | null;
+  body?: string | null;
   body_ar?: string | null;
   body_en?: string | null;
   is_read: number;
   meta?: { orderId?: number; invoiceId?: number; saleId?: number; publicCode?: string };
-  created_at: string;
+  created_at: string | null;
 }
 
 export function NotificationsBell() {
@@ -71,9 +74,13 @@ export function NotificationsBell() {
       setLoadError(false);
       apiRequest('/notifications?limit=10')
         .then((res: any) => {
+          if (res?.ok === false) {
+            setNotifications([]);
+            setLoadError(true);
+            return;
+          }
           const items = Array.isArray(res?.items) ? res.items : (Array.isArray(res) ? res : []);
           setNotifications(items);
-          if (res?.ok === false) setLoadError(true);
         })
         .catch(() => {
           setNotifications([]);
@@ -97,8 +104,8 @@ export function NotificationsBell() {
     }
   };
 
-  const title = (n: Notification) => (language === 'ar' ? n.title_ar || n.title_en : n.title_en || n.title_ar) || '';
-  const body = (n: Notification) => (language === 'ar' ? n.body_ar || n.body_en : n.body_en || n.body_ar) || '';
+  const title = (n: Notification) => getNotificationTitle(n, language);
+  const body = (n: Notification) => getNotificationBody(n, language);
   const meta = (n: Notification): { orderId?: number; invoiceId?: number; saleId?: number } => {
     const m = n.meta;
     if (typeof m === 'object' && m) {
@@ -168,7 +175,9 @@ export function NotificationsBell() {
                       {language === 'ar' ? 'لا توجد إشعارات' : 'No notifications'}
                     </div>
                   ) : (
-                    notifications.map((n) => (
+                    notifications.map((n) => {
+                      const dateLabel = formatNotificationDate(n.created_at, language);
+                      return (
                       <div
                         key={n.id}
                         dir={language === 'ar' ? 'rtl' : 'ltr'}
@@ -182,9 +191,7 @@ export function NotificationsBell() {
                               {title(n)}
                             </div>
                             <div className="text-[11px] text-slate-500 shrink-0">
-                              {new Date(n.created_at).toLocaleString(
-                                language === 'ar' ? 'ar-EG' : 'en-US'
-                              )}
+                              {dateLabel || '-'}
                             </div>
                           </div>
                           {body(n) ? (
@@ -206,7 +213,8 @@ export function NotificationsBell() {
                           </div>
                         </div>
                       </div>
-                    ))
+                    );
+                    })
                   )}
                 </div>
                 <button
@@ -239,7 +247,9 @@ export function NotificationsBell() {
                       {language === 'ar' ? 'لا توجد إشعارات' : 'No notifications'}
                     </div>
                   ) : (
-                    notifications.map((n) => (
+                    notifications.map((n) => {
+                      const dateLabel = formatNotificationDate(n.created_at, language);
+                      return (
                       <div
                         key={n.id}
                         dir={language === 'ar' ? 'rtl' : 'ltr'}
@@ -253,9 +263,7 @@ export function NotificationsBell() {
                               {title(n)}
                             </div>
                             <div className="text-[11px] text-slate-500 shrink-0">
-                              {new Date(n.created_at).toLocaleString(
-                                language === 'ar' ? 'ar-EG' : 'en-US'
-                              )}
+                              {dateLabel || '-'}
                             </div>
                           </div>
                           {body(n) ? (
@@ -277,7 +285,8 @@ export function NotificationsBell() {
                           </div>
                         </div>
                       </div>
-                    ))
+                    );
+                    })
                   )}
                   <button
                     className="w-full px-4 py-3 text-xs font-semibold text-cyan-300 hover:text-cyan-100 hover:bg-cyan-500/10 border-t border-cyan-500/20"

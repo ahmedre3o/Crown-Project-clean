@@ -13,6 +13,29 @@ export function tryFixLatin1Mojibake(s: string) {
   return null;
 }
 
+export function fixMojibakeIfNeeded(s: string) {
+  if (!looksMojibake(s)) return s;
+  return tryFixLatin1Mojibake(s) ?? s;
+}
+
+export function fixMojibakeDeep(x: any): any {
+  if (x == null) return x;
+
+  if (typeof x === "string") {
+    return fixMojibakeIfNeeded(x);
+  }
+
+  if (Array.isArray(x)) return x.map(fixMojibakeDeep);
+
+  if (typeof x === "object") {
+    const out: any = {};
+    for (const k of Object.keys(x)) out[k] = fixMojibakeDeep(x[k]);
+    return out;
+  }
+
+  return x;
+}
+
 export function sanitizeDeep(x: any): any {
   if (x == null) return x;
 

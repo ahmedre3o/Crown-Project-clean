@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { LanguageProvider } from './contexts/LanguageContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { CurrencyProvider } from './contexts/CurrencyContext';
 import { BranchProvider } from './contexts/BranchContext';
@@ -13,22 +14,24 @@ import { RoleTestBar } from './components/RoleTestBar';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <LanguageProvider>
-      <CurrencyProvider>
-        <AuthProvider>
-          <BranchProvider>
-            <OfflineProvider>
-              <PwaProvider>
-                <OfflineBanner />
-                {children}
-                <InstallPrompt />
-                <RoleTestBar />
-              </PwaProvider>
-            </OfflineProvider>
-          </BranchProvider>
-        </AuthProvider>
-      </CurrencyProvider>
-    </LanguageProvider>
+    <ThemeProvider>
+      <LanguageProvider>
+        <CurrencyProvider>
+          <AuthProvider>
+            <BranchProvider>
+              <OfflineProvider>
+                <PwaProvider>
+                  <OfflineBanner />
+                  {children}
+                  <InstallPrompt />
+                  <RoleTestBar />
+                </PwaProvider>
+              </OfflineProvider>
+            </BranchProvider>
+          </AuthProvider>
+        </CurrencyProvider>
+      </LanguageProvider>
+    </ThemeProvider>
   );
 }
 

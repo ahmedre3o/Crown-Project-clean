@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { NeonCrownIcon } from './NeonCrownIcon';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useBranch, getBranchDisplayName } from '../contexts/BranchContext';
 import { NotificationsBell } from './NotificationsBell';
@@ -60,6 +61,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
 export function Sidebar() {
   const pathname = usePathname();
   const { t, direction, language, setLanguage } = useLanguage();
+  const { theme, setTheme } = useTheme();
   const { logout, user, effectiveRole } = useAuth();
   const branchContext = useBranch();
   const router = useRouter();
@@ -253,6 +255,27 @@ export function Sidebar() {
                             }`}
                           >
                             EN
+                          </button>
+                        </div>
+                        {/* Theme Switcher */}
+                        <div className="inline-flex items-center gap-1 rounded-full border border-cyan-500/30 bg-black/25 p-1 shadow-[0_0_14px_rgba(0,243,255,0.10)]">
+                          <button
+                            type="button"
+                            onClick={() => setTheme('dark')}
+                            className={`px-3 py-1 rounded-full text-[11px] font-extrabold transition ${
+                              theme === 'dark' ? 'bg-cyan-400 text-black' : 'text-cyan-100 hover:bg-white/5'
+                            }`}
+                          >
+                            {language === 'ar' ? 'داكن' : 'Dark'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTheme('light')}
+                            className={`px-3 py-1 rounded-full text-[11px] font-extrabold transition ${
+                              theme === 'light' ? 'bg-cyan-400 text-black' : 'text-cyan-100 hover:bg-white/5'
+                            }`}
+                          >
+                            {language === 'ar' ? 'فاتح' : 'Light'}
                           </button>
                         </div>
                       </div>

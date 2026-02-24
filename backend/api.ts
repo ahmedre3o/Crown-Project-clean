@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { Readable } from 'stream';
 import { pool, testConnection, initializeDatabase } from './db';
+import { sanitizeDeep } from './encodingGuard';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
@@ -3296,7 +3297,7 @@ app.get('/api/notifications', authenticateToken, async (req: any, res: Response)
       LIMIT ${limit} OFFSET ${offset}
     `;
     const [rows] = await pool.execute(sql, params).catch(() => [[]]);
-    const items = rows as any[];
+    const items = sanitizeDeep(rows as any[]) as any[];
     if (items.length === 0) {
       logEmptyResult('notifications', { shopId, source, q, limit, offset });
     }

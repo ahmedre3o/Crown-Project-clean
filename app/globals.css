@@ -13,6 +13,11 @@ body {
   font-family: "Cairo", system-ui, -apple-system, sans-serif;
 }
 
+:root[data-theme='light'] body {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
 /* أنوار النيون لتاج الخدمات */
 .neon-box {
   border: 1px solid #00f3ff;
@@ -34,6 +39,47 @@ body {
   border: 1px solid rgba(0, 243, 255, 0.35);
   box-shadow: 0 0 18px rgba(0, 243, 255, 0.18);
   background: rgba(8, 10, 16, 0.95);
+}
+
+:root[data-theme='light'] .neon-box {
+  border-color: rgba(6, 182, 212, 0.45);
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.18);
+  background: #ffffff;
+}
+
+:root[data-theme='light'] .neon-card {
+  border-color: rgba(6, 182, 212, 0.35);
+  box-shadow: 0 0 18px rgba(6, 182, 212, 0.12);
+  background: #ffffff;
+}
+
+:root[data-theme='light'] .sidebar-link:hover {
+  background: linear-gradient(90deg, rgba(6, 182, 212, 0.2), transparent);
+  border-left: 4px solid #06b6d4;
+}
+
+:root[data-theme='light'] .bg-black {
+  background-color: #ffffff !important;
+}
+
+:root[data-theme='light'] [class*="bg-black/"] {
+  background-color: rgba(15, 23, 42, 0.04) !important;
+}
+
+:root[data-theme='light'] [class*="bg-[#0a0f18]"],
+:root[data-theme='light'] [class*="bg-[#0b1220]"],
+:root[data-theme='light'] [class*="bg-[#020617]"],
+:root[data-theme='light'] [class*="bg-[#0f172a]"],
+:root[data-theme='light'] [class*="bg-[#0b0f1a]"] {
+  background-color: #ffffff !important;
+}
+
+:root[data-theme='light'] .text-white {
+  color: #0f172a !important;
+}
+
+:root[data-theme='light'] [class*="text-slate-"] {
+  color: #334155 !important;
 }
 
 .neon-glow-cyan {

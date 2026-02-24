@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Bar,
   BarChart,
@@ -101,7 +101,22 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+  }, [loadDashboardData]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = () => loadDashboardData();
+    window.addEventListener('crown-dashboard-refresh', handler);
+    return () => window.removeEventListener('crown-dashboard-refresh', handler);
+  }, [loadDashboardData]);
+
+  useEffect(() => {
+    if (!allowed || authLoading) return;
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') loadDashboardData();
+    }, 20000);
+    return () => clearInterval(interval);
+  }, [allowed, authLoading, loadDashboardData]);
 
   useEffect(() => {
     try {
@@ -144,9 +159,12 @@ export default function DashboardPage() {
     }
   }, [language]);
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
+      if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+        console.log('[DASHBOARD] loadDashboardData fetch started');
+      }
       const today = new Date().toISOString().slice(0, 10);
       const firstDay = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
       const [
@@ -218,7 +236,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [language]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);

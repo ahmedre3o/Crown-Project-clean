@@ -2523,6 +2523,7 @@ app.get('/api/admin/inventory/slow-moving', authenticateToken, async (req: any, 
 
 // ========== ADMIN ANALYTICS (dashboard summary/timeseries) ==========
 app.get('/api/admin/analytics/summary', authenticateToken, async (req: any, res: Response) => {
+  setNoCacheHeaders(res);
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -2533,22 +2534,25 @@ app.get('/api/admin/analytics/summary', authenticateToken, async (req: any, res:
       [shopId, 'pos', from || '1970-01-01', to || '9999-12-31']
     ).catch(() => [[{ amount: 0, count: 0 }]]);
     const [online] = await pool.execute(
-      'SELECT COALESCE(SUM(total), 0) as amount, COUNT(*) as count FROM online_orders WHERE shop_id = ? AND created_at >= ? AND created_at <= ?',
+      "SELECT COALESCE(SUM(total), 0) as amount, COUNT(*) as count FROM online_orders WHERE shop_id = ? AND status IN ('confirmed','completed') AND created_at >= ? AND created_at <= ?",
       [shopId, from || '1970-01-01', to || '9999-12-31']
     ).catch(() => [[{ amount: 0, count: 0 }]]);
     const posRow = (pos as any[])[0] || {};
     const onlineRow = (online as any[])[0] || {};
-    res.json({
+    const payload = {
       ok: true,
       pos: { total: Number(posRow.amount ?? 0), count: Number(posRow.count ?? 0) },
       online: { total: Number(onlineRow.amount ?? 0), count: Number(onlineRow.count ?? 0) },
-    });
+    };
+    console.log('[DASHBOARD] analytics/summary shopId=%s onlineCount=%s onlineTotal=%s', shopId, payload.online.count, payload.online.total);
+    res.json(payload);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
 
 app.get('/api/admin/analytics/timeseries', authenticateToken, async (req: any, res: Response) => {
+  setNoCacheHeaders(res);
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -2558,7 +2562,7 @@ app.get('/api/admin/analytics/timeseries', authenticateToken, async (req: any, r
     const bucket = String(req.query.bucket || 'day').toLowerCase();
     if (source === 'online') {
       const [rows] = await pool.execute(
-        `SELECT DATE(created_at) as date, COALESCE(SUM(total), 0) as onlineAmount, COUNT(*) as onlineCount FROM online_orders WHERE shop_id = ? AND created_at >= ? AND created_at <= ? GROUP BY DATE(created_at) ORDER BY date ASC`,
+        `SELECT DATE(created_at) as date, COALESCE(SUM(total), 0) as onlineAmount, COUNT(*) as onlineCount FROM online_orders WHERE shop_id = ? AND status IN ('confirmed','completed') AND created_at >= ? AND created_at <= ? GROUP BY DATE(created_at) ORDER BY date ASC`,
         [shopId, from || '1970-01-01', to || '9999-12-31']
       ).catch(() => [[]]);
       res.json({ ok: true, points: (rows as any[]).map((r: any) => ({ date: r.date, onlineAmount: r.onlineAmount, onlineCount: r.onlineCount, totalAmount: r.onlineAmount, totalCount: r.onlineCount })) });
@@ -2577,7 +2581,7 @@ app.get('/api/admin/analytics/timeseries', authenticateToken, async (req: any, r
       [shopId, from || '1970-01-01', to || '9999-12-31']
     ).catch(() => [[]]);
     const [onlineRows] = await pool.execute(
-      `SELECT DATE(created_at) as date, COALESCE(SUM(total), 0) as onlineAmount, COUNT(*) as onlineCount FROM online_orders WHERE shop_id = ? AND created_at >= ? AND created_at <= ? GROUP BY DATE(created_at)`,
+      `SELECT DATE(created_at) as date, COALESCE(SUM(total), 0) as onlineAmount, COUNT(*) as onlineCount FROM online_orders WHERE shop_id = ? AND status IN ('confirmed','completed') AND created_at >= ? AND created_at <= ? GROUP BY DATE(created_at)`,
       [shopId, from || '1970-01-01', to || '9999-12-31']
     ).catch(() => [[]]);
     const points: Record<string, any> = {};
@@ -3023,6 +3027,9 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requirePackageFeatu
         toStatus: status,
       },
     });
+    if (status === 'confirmed' || status === 'completed') {
+      console.log('[DASHBOARD] order_confirmed shopId=%s orderId=%s status=%s — dashboard metrics will reflect on next fetch', shopId, id, status);
+    }
     res.json({ ok: true, status });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -5738,8 +5745,14 @@ app.post('/api/audit-logs', authenticateToken, requireRole('super_admin', 'shop_
   }
 });
 
+const setNoCacheHeaders = (res: Response) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+};
+
 // ========== DASHBOARD STATISTICS ==========
 app.get('/api/dashboard/stats', authenticateToken, requirePackageFeature('dashboard'), async (req: any, res: Response) => {
+  setNoCacheHeaders(res);
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -5787,6 +5800,7 @@ app.get('/api/dashboard/stats', authenticateToken, requirePackageFeature('dashbo
 });
 
 app.get('/api/dashboard/sales-chart', authenticateToken, requirePackageFeature('dashboard'), async (req: any, res: Response) => {
+  setNoCacheHeaders(res);
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -5814,6 +5828,7 @@ app.get('/api/dashboard/sales-chart', authenticateToken, requirePackageFeature('
 });
 
 app.get('/api/dashboard/profit-chart', authenticateToken, requirePackageFeature('dashboard'), async (req: any, res: Response) => {
+  setNoCacheHeaders(res);
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;

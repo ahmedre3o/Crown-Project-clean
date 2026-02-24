@@ -310,6 +310,7 @@ export const apiFetch = async (url: string, options: RequestInit = {}) => {
     ...options,
     credentials: 'include',
     headers,
+    cache: 'no-store',
   });
 };
 

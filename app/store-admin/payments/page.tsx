@@ -245,6 +245,9 @@ function PaymentsPageContent() {
       });
       setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, status } : o)));
       if (drawerOrder?.id === order.id) setDrawerOrder((o) => (o ? { ...o, status } : null));
+      if (status === 'confirmed' || status === 'completed') {
+        window.dispatchEvent(new CustomEvent('crown-dashboard-refresh', { detail: { orderId: order.id, status } }));
+      }
     } catch (err: any) {
       setError(err.message || t('فشل تحديث الحالة', 'Failed to update status'));
     } finally {

@@ -125,6 +125,9 @@ function OnlineOrdersPageContent() {
         body: JSON.stringify({ status }),
       });
       setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
+      if (status === 'confirmed' || status === 'completed') {
+        window.dispatchEvent(new CustomEvent('crown-dashboard-refresh', { detail: { orderId, status } }));
+      }
     } catch (err: any) {
       setError(err.message || (language === 'ar' ? 'فشل تحديث الحالة' : 'Failed to update status'));
     } finally {

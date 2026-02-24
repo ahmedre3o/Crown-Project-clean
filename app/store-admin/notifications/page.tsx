@@ -24,6 +24,7 @@ interface Notification {
   is_read: number;
   meta?: unknown;
   created_at: string | null;
+  createdAt?: string | null;
 }
 
 export default function NotificationsPage() {
@@ -210,7 +211,7 @@ export default function NotificationsPage() {
           ) : (
             <div className="space-y-3">
               {items.map((n) => {
-                const dateLabel = formatNotificationDate(n.created_at, language);
+                const dateLabel = formatNotificationDate(n.createdAt ?? n.created_at, language);
                 return (
                 <div
                   key={n.id}

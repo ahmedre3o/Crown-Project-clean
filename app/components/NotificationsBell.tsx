@@ -21,6 +21,7 @@ interface Notification {
   is_read: number;
   meta?: { orderId?: number; invoiceId?: number; saleId?: number; publicCode?: string };
   created_at: string | null;
+  createdAt?: string | null;
 }
 
 export function NotificationsBell() {
@@ -176,7 +177,7 @@ export function NotificationsBell() {
                     </div>
                   ) : (
                     notifications.map((n) => {
-                      const dateLabel = formatNotificationDate(n.created_at, language);
+                      const dateLabel = formatNotificationDate(n.createdAt ?? n.created_at, language);
                       return (
                       <div
                         key={n.id}
@@ -248,7 +249,7 @@ export function NotificationsBell() {
                     </div>
                   ) : (
                     notifications.map((n) => {
-                      const dateLabel = formatNotificationDate(n.created_at, language);
+                      const dateLabel = formatNotificationDate(n.createdAt ?? n.created_at, language);
                       return (
                       <div
                         key={n.id}

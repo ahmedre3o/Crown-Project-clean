@@ -4,6 +4,9 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { Readable } from 'stream';
 import { pool, testConnection, initializeDatabase } from './db';
+import { resolveNotificationText, isCorruptedText, getFallbackText, buildNotificationText } from './notifications';
+import { buildNotificationContent, parseNotificationPayload } from './notificationTemplates';
+import { looksMojibake } from './encodingGuard';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
@@ -31,6 +34,18 @@ dotenv.config({ path: rootEnvPath });
 const app = express();
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+
+let notificationsPayloadColumn: boolean | null = null;
+const hasNotificationsPayloadColumn = async () => {
+  if (notificationsPayloadColumn !== null) return notificationsPayloadColumn;
+  try {
+    const [rows] = await pool.execute("SHOW COLUMNS FROM notifications LIKE 'payload'");
+    notificationsPayloadColumn = (rows as any[]).length > 0;
+  } catch {
+    notificationsPayloadColumn = false;
+  }
+  return notificationsPayloadColumn;
+};
 
 // CORS: allow only specific origins (required when using credentials: true — no wildcard).
 // Defaults: crowncs.org, www, localhost:3000. Add crown-web Cloud Run URL via CORS_ORIGIN or CORS_FRONTEND_URL.
@@ -1059,6 +1074,44 @@ const generateInvoiceNumber = async (shopId?: number) => {
   return `${prefix}${next}`;
 };
 
+const insertNotification = async (
+  payload: {
+    shopId: number;
+    source: 'pos' | 'online' | 'system';
+    type: string;
+    data?: Record<string, any> | null;
+  },
+  connection?: any
+) => {
+  try {
+    const exec = connection?.execute ? connection.execute.bind(connection) : pool.execute.bind(pool);
+    const text = buildNotificationText(payload.type, payload.data || null) || getFallbackText();
+    const titleAr = text.titleAr || 'إشعار جديد';
+    const titleEn = text.titleEn || 'New notification';
+    const bodyAr = text.bodyAr || 'تم إنشاء إشعار جديد. افتح التفاصيل.';
+    const bodyEn = text.bodyEn || 'A new notification was created. Open details.';
+    const meta = payload.data ? JSON.stringify(payload.data) : null;
+    try {
+      await exec(
+        `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta, payload)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+        [payload.shopId, payload.source, payload.type, titleAr, titleEn, bodyAr, bodyEn, meta, meta]
+      );
+    } catch (err: any) {
+      // Backward compatibility: payload column may not exist yet.
+      await exec(
+        `INSERT INTO notifications (shop_id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+        [payload.shopId, payload.source, payload.type, titleAr, titleEn, bodyAr, bodyEn, meta]
+      );
+    }
+  } catch (err) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[notifications] insert failed:', (err as any)?.message || err);
+    }
+  }
+};
+
 const createSaleAndItems = async (req: any, paymentMethodOverride?: string, shopIdOverride?: number) => {
   const { items, paymentMethod, customerName, customerPhone, customerAddress } = req.body;
   const shopId = shopIdOverride ?? getShopId(req).shopId ?? (resolveShopId(req) ? Number(resolveShopId(req)) : null);
@@ -1132,6 +1185,23 @@ const createSaleAndItems = async (req: any, paymentMethodOverride?: string, shop
         JSON.stringify({ invoiceNumber, totalAmount, paymentMethod: paymentMethodOverride || paymentMethod || 'cash' }),
         req.ip || null,
       ]
+    );
+
+    const itemsCount = items.length;
+    await insertNotification(
+      {
+        shopId,
+        source: 'pos',
+        type: 'pos_sale_created',
+        data: {
+          invoiceId: saleId,
+          saleId,
+          invoiceNumber,
+          total: totalAmount,
+          itemsCount,
+        },
+      },
+      connection
     );
 
     await connection.commit();
@@ -2789,6 +2859,14 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requirePackageFeatu
     if (!id) return res.status(400).json({ error: 'Invalid order id' });
     const status = String(req.body?.status || '').trim();
     if (!status) return res.status(400).json({ error: 'status is required' });
+    const [prevRows] = await pool.execute('SELECT status, total, public_code FROM online_orders WHERE id = ? AND shop_id = ?', [
+      id,
+      shopId,
+    ]);
+    const prevOrder = (prevRows as any[])[0];
+    if (!prevOrder) return res.status(404).json({ error: 'Order not found' });
+    const [itemsRows] = await pool.execute('SELECT COUNT(*) as cnt FROM online_order_items WHERE order_id = ?', [id]);
+    const itemsCount = Number((itemsRows as any[])[0]?.cnt ?? 0);
     const orderStatus =
       status === 'pending'
         ? 'NEW'
@@ -2803,6 +2881,27 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requirePackageFeatu
       'UPDATE online_orders SET status = ?, order_status = ? WHERE id = ? AND shop_id = ?',
       [status, orderStatus, id, shopId]
     );
+    const type =
+      status === 'confirmed'
+        ? 'online_order_confirmed'
+        : status === 'completed'
+        ? 'online_order_completed'
+        : status === 'cancelled'
+        ? 'online_order_cancelled'
+        : 'online_order_status_changed';
+    await insertNotification({
+      shopId,
+      source: 'online',
+      type,
+      data: {
+        orderId: id,
+        total: Number(prevOrder?.total || 0),
+        itemsCount,
+        publicCode: prevOrder?.public_code ?? null,
+        fromStatus: prevOrder?.status ?? null,
+        toStatus: status,
+      },
+    });
     res.json({ ok: true, status });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -3291,27 +3390,17 @@ app.get('/api/notifications', authenticateToken, async (req: any, res: Response)
     }
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const sql = `
-      SELECT id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta, created_at
+      SELECT id, source, type, title_ar, title_en, body_ar, body_en, is_read, meta, payload, created_at
       FROM notifications
       ${where}
       ORDER BY created_at DESC
       LIMIT ${limit} OFFSET ${offset}
     `;
     const [rows] = await pool.execute(sql, params).catch(() => [[]]);
-    const GENERIC_ERROR_AR = 'حدث خطأ. حاول مرة أخرى.';
-    const FALLBACK_TITLE_AR = 'إشعار جديد';
-    const FALLBACK_BODY_AR = 'تم إنشاء إشعار جديد. افتح التفاصيل.';
     const fixEncoding = (value: string) => {
       if (!value) return value;
       const hasMojibake = /Ã.|Ø.|Ù./.test(value);
       return hasMojibake ? Buffer.from(value, 'latin1').toString('utf8') : value;
-    };
-    const normalizeText = (value: any) => {
-      if (value == null) return '';
-      const trimmed = String(value).trim();
-      if (!trimmed || trimmed === GENERIC_ERROR_AR) return '';
-      if (trimmed.includes('�')) return '';
-      return trimmed;
     };
     const normalizeDate = (value: any) => {
       if (!value) return null;
@@ -3319,35 +3408,36 @@ app.get('/api/notifications', authenticateToken, async (req: any, res: Response)
       if (Number.isNaN(d.getTime())) return null;
       return d.toISOString();
     };
+    const fallbackText = getFallbackText();
     const items = (rows as any[]).map((row: any) => {
       const hasCorrupt =
-        typeof row.title_ar === 'string' && row.title_ar.includes('�') ||
-        typeof row.title_en === 'string' && row.title_en.includes('�') ||
-        typeof row.body_ar === 'string' && row.body_ar.includes('�') ||
-        typeof row.body_en === 'string' && row.body_en.includes('�');
+        isCorruptedText(row.title_ar) ||
+        isCorruptedText(row.title_en) ||
+        isCorruptedText(row.body_ar) ||
+        isCorruptedText(row.body_en);
       if (hasCorrupt) {
         console.warn('[notifications] corrupted text detected', { id: row.id });
       }
 
-      const titleAr = normalizeText(row.title_ar);
-      const titleEn = normalizeText(row.title_en);
-      const bodyAr = normalizeText(row.body_ar);
-      const bodyEn = normalizeText(row.body_en);
-      const titleCandidate = titleAr || titleEn || FALLBACK_TITLE_AR;
-      const bodyCandidate = bodyAr || bodyEn || FALLBACK_BODY_AR;
+      const resolved = resolveNotificationText(row);
+      const titleCandidate = resolved.titleAr || resolved.titleEn || fallbackText.titleAr;
+      const bodyCandidate = resolved.bodyAr || resolved.bodyEn || fallbackText.bodyAr;
+
       return {
         id: Number(row.id),
         source: row.source ?? 'system',
         type: row.type ?? 'system',
-        title_ar: hasCorrupt ? FALLBACK_TITLE_AR : titleAr,
-        title_en: hasCorrupt ? '' : titleEn,
-        body_ar: hasCorrupt ? FALLBACK_BODY_AR : bodyAr,
-        body_en: hasCorrupt ? '' : bodyEn,
-        title: hasCorrupt ? FALLBACK_TITLE_AR : fixEncoding(titleCandidate),
-        body: hasCorrupt ? FALLBACK_BODY_AR : fixEncoding(bodyCandidate),
+        title_ar: resolved.titleAr,
+        title_en: resolved.titleEn,
+        body_ar: resolved.bodyAr,
+        body_en: resolved.bodyEn,
+        title: fixEncoding(titleCandidate),
+        body: fixEncoding(bodyCandidate),
         is_read: Number(row.is_read ?? 0),
         meta: row.meta ?? null,
+        payload: resolved.payload ?? null,
         created_at: normalizeDate(row.created_at),
+        createdAt: normalizeDate(row.created_at),
         read_at: row.read_at ?? null,
       };
     });
@@ -5218,6 +5308,21 @@ const incrementInvoicePrintCount = async (req: any, saleId: number) => {
       }),
       ipAddress: req.ip,
     });
+
+    await insertNotification(
+      {
+        shopId,
+        source: 'pos',
+        type: 'pos_invoice_printed',
+        data: {
+          invoiceId: saleId,
+          saleId,
+          invoiceNumber: invoiceRow?.invoice_number ?? null,
+          printCount: Number(invoiceRow?.print_count || 0),
+        },
+      },
+      connection
+    );
 
     await connection.commit();
     return {

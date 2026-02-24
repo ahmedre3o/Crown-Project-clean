@@ -165,6 +165,18 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
+-- notifications: add payload JSON if missing + backfill from meta
+SET @col = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'notifications' AND COLUMN_NAME = 'payload');
+SET @sql = IF(@tbl = 1 AND @col = 0, 'ALTER TABLE notifications ADD COLUMN payload JSON NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(@tbl = 1, 'UPDATE notifications SET payload = meta WHERE payload IS NULL AND meta IS NOT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
 SET @col = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'licenses' AND COLUMN_NAME = 'permissions_json');
 SET @sql = IF(@tbl = 1 AND @col = 0, 'ALTER TABLE licenses ADD COLUMN permissions_json JSON NULL', 'SELECT 1');
 PREPARE stmt FROM @sql;

@@ -9,7 +9,7 @@ dotenv.config({ path: path.resolve(backendDir, '..', '.env') });
 import mysql from 'mysql2/promise';
 import type { RowDataPacket } from 'mysql2/promise';
 import crypto from 'crypto';
-import { looksMojibake, tryFixLatin1Mojibake } from './encodingGuard';
+import { resolveNotificationText, isCorruptedText } from './notifications';
 
 type UserRow = RowDataPacket & { id: number; email: string | null };
 
@@ -21,23 +21,9 @@ function generatePublicCode(): string {
 }
 
 const MOJIBAKE_MARKERS = ['Ã', 'â€', 'Ø', 'Ù', '�'];
-const FALLBACK_TITLE_AR = 'إشعار جديد';
-const FALLBACK_BODY_AR = 'تم إنشاء إشعار جديد. افتح التفاصيل.';
-const FALLBACK_TITLE_EN = 'New notification';
-const FALLBACK_BODY_EN = 'A new notification was created. Open details.';
 
 function containsReplacement(value: string | null) {
   return typeof value === 'string' && value.includes('�');
-}
-
-function fixMojibakeValue(value: string | null, fallback: string) {
-  if (value == null) return value;
-  if (containsReplacement(value)) return fallback;
-  if (!looksMojibake(value)) return value;
-  const fixed = tryFixLatin1Mojibake(value);
-  if (!fixed) return fallback;
-  if (containsReplacement(fixed) || looksMojibake(fixed)) return fallback;
-  return fixed;
 }
 
 async function cleanupNotificationMojibake() {
@@ -48,7 +34,7 @@ async function cleanupNotificationMojibake() {
     ).join(' OR ');
     const params = MOJIBAKE_MARKERS.flatMap((m) => [`%${m}%`, `%${m}%`, `%${m}%`, `%${m}%`]);
     const [rows] = await pool.execute(
-      `SELECT id, title_ar, title_en, body_ar, body_en FROM notifications WHERE ${where} LIMIT 5000`,
+      `SELECT id, type, title_ar, title_en, body_ar, body_en, payload, meta FROM notifications WHERE ${where} LIMIT 5000`,
       params
     );
     const items = rows as any[];
@@ -59,31 +45,36 @@ async function cleanupNotificationMojibake() {
         containsReplacement(row.title_en) ||
         containsReplacement(row.body_ar) ||
         containsReplacement(row.body_en);
-      const titleAr = fixMojibakeValue(row.title_ar ?? '', FALLBACK_TITLE_AR);
-      const titleEn = fixMojibakeValue(row.title_en ?? '', FALLBACK_TITLE_EN);
-      const bodyAr = fixMojibakeValue(row.body_ar ?? '', FALLBACK_BODY_AR);
-      const bodyEn = fixMojibakeValue(row.body_en ?? '', FALLBACK_BODY_EN);
+      const hasMojibake =
+        isCorruptedText(row.title_ar) ||
+        isCorruptedText(row.title_en) ||
+        isCorruptedText(row.body_ar) ||
+        isCorruptedText(row.body_en);
+      if (!hasReplacement && !hasMojibake) continue;
+
+      const resolved = resolveNotificationText(row);
       if (hasReplacement) {
         console.warn('[notifications] replaced corrupted text', { id: row.id });
       }
-      if (
-        titleAr !== row.title_ar ||
-        titleEn !== row.title_en ||
-        bodyAr !== row.body_ar ||
-        bodyEn !== row.body_en
-      ) {
-        await pool.execute(
-          'UPDATE notifications SET title_ar = ?, title_en = ?, body_ar = ?, body_en = ? WHERE id = ?',
-          [titleAr, titleEn, bodyAr, bodyEn, row.id]
-        );
-        fixedCount++;
-      }
+      await pool.execute(
+        'UPDATE notifications SET title_ar = ?, title_en = ?, body_ar = ?, body_en = ?, payload = COALESCE(payload, ?) WHERE id = ?',
+        [resolved.titleAr, resolved.titleEn, resolved.bodyAr, resolved.bodyEn, resolved.payload ? JSON.stringify(resolved.payload) : null, row.id]
+      );
+      fixedCount++;
     }
     if (fixedCount > 0) {
       console.log(`[notifications] mojibake cleanup: fixed ${fixedCount} records`);
     }
   } catch (err) {
     console.error('[notifications] mojibake cleanup failed:', (err as any)?.message || err);
+  }
+}
+
+async function backfillNotificationPayload() {
+  try {
+    await pool.execute('UPDATE notifications SET payload = meta WHERE payload IS NULL AND meta IS NOT NULL');
+  } catch (err) {
+    console.error('[notifications] payload backfill failed:', (err as any)?.message || err);
   }
 }
 
@@ -1193,6 +1184,7 @@ export async function initializeDatabase() {
         body_en TEXT NOT NULL,
         is_read TINYINT(1) NOT NULL DEFAULT 0,
         meta JSON NULL,
+        payload JSON NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE,
         INDEX idx_notifications_shop_created (shop_id, created_at DESC),
@@ -1213,6 +1205,11 @@ export async function initializeDatabase() {
     }
     try {
       await pool.execute('ALTER TABLE notifications ADD COLUMN branch_id BIGINT UNSIGNED NULL');
+    } catch (m: any) {
+      if (m?.code !== 'ER_DUP_FIELDNAME') {}
+    }
+    try {
+      await pool.execute('ALTER TABLE notifications ADD COLUMN payload JSON NULL');
     } catch (m: any) {
       if (m?.code !== 'ER_DUP_FIELDNAME') {}
     }
@@ -1259,6 +1256,7 @@ export async function initializeDatabase() {
         console.error('notifications.body_en:', m?.message || m);
       }
     }
+    await backfillNotificationPayload();
     await cleanupNotificationMojibake();
 
     // Stock reservations for online orders (prevent overselling)

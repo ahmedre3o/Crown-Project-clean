@@ -1376,7 +1376,7 @@ app.post('/api/auth/register-shop', async (req: Request, res: Response) => {
           id: userInsert.insertId,
           username,
           role: 'shop_owner',
-          package: pkg || 'bronze',
+          package: trialPlan,
           shopId: shopInsert.insertId,
         },
       });

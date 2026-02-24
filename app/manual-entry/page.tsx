@@ -47,7 +47,7 @@ export default function ManualEntryPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerTarget, setScannerTarget] = useState<'barcode' | 'qr' | null>(null);
 
   useEffect(() => {
     loadProducts();
@@ -64,8 +64,8 @@ export default function ManualEntryPage() {
     }
   };
 
-  const handleBarcodeDetected = (value: string) => {
-    setForm((prev) => ({ ...prev, barcode: value }));
+  const handleBarcodeDetected = (value: string, target: 'barcode' | 'qr') => {
+    setForm((prev) => ({ ...prev, [target === 'barcode' ? 'barcode' : 'qrCode']: value }));
     const existing = products.find(
       (p) => p.barcode === value || p.sku === value || p.qr_code === value
     );
@@ -76,7 +76,7 @@ export default function ManualEntryPage() {
         brand: existing.brand || '',
         sku: existing.sku || '',
         barcode: existing.barcode || value,
-        qrCode: existing.qr_code || '',
+        qrCode: existing.qr_code || (target === 'qr' ? value : ''),
         buyPrice: String(existing.buy_price),
         sellPrice: String(existing.sell_price),
         stockQuantity: String(existing.stock_quantity),
@@ -197,18 +197,27 @@ export default function ManualEntryPage() {
               />
               <button
                 type="button"
-                onClick={() => setScannerOpen(true)}
-                className="px-3 py-2 rounded-lg border border-cyan-500/30 text-cyan-300 text-xs"
+                onClick={() => setScannerTarget('barcode')}
+                className="px-3 py-2 rounded-lg border border-cyan-500/30 text-cyan-300 text-xs whitespace-nowrap"
               >
-                Scan
+                {language === 'ar' ? 'مسح بالكاميرا' : 'Scan'}
               </button>
             </div>
-            <input
-              className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-              placeholder="QR Code"
-              value={form.qrCode}
-              onChange={(e) => setForm((prev) => ({ ...prev, qrCode: e.target.value }))}
-            />
+            <div className="flex gap-2">
+              <input
+                className="flex-1 bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                placeholder="QR Code"
+                value={form.qrCode}
+                onChange={(e) => setForm((prev) => ({ ...prev, qrCode: e.target.value }))}
+              />
+              <button
+                type="button"
+                onClick={() => setScannerTarget('qr')}
+                className="px-3 py-2 rounded-lg border border-cyan-500/30 text-cyan-300 text-xs whitespace-nowrap"
+              >
+                {language === 'ar' ? 'مسح بالكاميرا' : 'Scan'}
+              </button>
+            </div>
             <input
               className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
               placeholder={t('inventory.buyPrice')}
@@ -245,9 +254,12 @@ export default function ManualEntryPage() {
       </div>
 
       <BarcodeScanner
-        open={scannerOpen}
-        onClose={() => setScannerOpen(false)}
-        onDetected={handleBarcodeDetected}
+        open={scannerTarget !== null}
+        onClose={() => setScannerTarget(null)}
+        onDetected={(value) => {
+          if (scannerTarget) handleBarcodeDetected(value, scannerTarget);
+        }}
+        language={language}
       />
     </div>
   );

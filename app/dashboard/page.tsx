@@ -34,10 +34,17 @@ interface AnalyticsSummary {
   combined: { total: number; count: number };
 }
 
-interface TimeseriesPoint {
+interface OnlineChartPoint {
   date: string;
-  total: number;
+  amount: number;
   count: number;
+}
+
+interface OperationsChartPoint {
+  date: string;
+  posCount: number;
+  onlineCount: number;
+  totalCount: number;
 }
 
 interface ChartData {
@@ -80,7 +87,8 @@ export default function DashboardPage() {
   const [profitChartData, setProfitChartData] = useState<ChartData[]>([]);
   const [onlineStats, setOnlineStats] = useState<{ total: number; count: number }>({ total: 0, count: 0 });
   const [operationsCount, setOperationsCount] = useState(0);
-  const [onlineChartData, setOnlineChartData] = useState<TimeseriesPoint[]>([]);
+  const [onlineChartData, setOnlineChartData] = useState<OnlineChartPoint[]>([]);
+  const [operationsChartData, setOperationsChartData] = useState<OperationsChartPoint[]>([]);
   const [deadSlowStats, setDeadSlowStats] = useState<{ deadCount: number; slowCount: number; deadValue: number; slowValue: number } | null>(null);
   const [lowStockProducts, setLowStockProducts] = useState<LowStockProduct[]>([]);
   const [recentProducts, setRecentProducts] = useState<RecentProduct[]>([]);
@@ -141,7 +149,17 @@ export default function DashboardPage() {
       setLoading(true);
       const today = new Date().toISOString().slice(0, 10);
       const firstDay = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
-      const [statsData, salesData, profitData, lowStockData, recentData, summaryRes, onlineTimeseriesRes, slowMovingRes] = await Promise.all([
+      const [
+        statsData,
+        salesData,
+        profitData,
+        lowStockData,
+        recentData,
+        summaryRes,
+        onlineTimeseriesRes,
+        combinedTimeseriesRes,
+        slowMovingRes,
+      ] = await Promise.all([
         apiRequest('/dashboard/stats'),
         apiRequest('/dashboard/sales-chart?days=30'),
         apiRequest('/dashboard/profit-chart?days=30'),
@@ -149,6 +167,7 @@ export default function DashboardPage() {
         apiRequest('/products'),
         apiRequest(`/admin/analytics/summary?from=${firstDay}&to=${today}`).catch(() => ({ ok: false, online: { total: 0, count: 0 } })),
         apiRequest(`/admin/analytics/timeseries?from=${firstDay}&to=${today}&source=online`).catch(() => ({ ok: true, points: [] })),
+        apiRequest(`/admin/analytics/timeseries?from=${firstDay}&to=${today}`).catch(() => ({ ok: true, points: [] })),
         apiRequest('/admin/inventory/slow-moving/summary?days=120&threshold=2').catch(() => ({ ok: false, deadCount: 0, slowCount: 0, deadValue: 0, slowValue: 0 })),
       ]);
 
@@ -162,7 +181,19 @@ export default function DashboardPage() {
       const summary = summaryRes as AnalyticsSummary;
       setOnlineStats(summary?.ok ? summary.online : { total: 0, count: 0 });
       setOperationsCount(summary?.ok ? (Number(summary.pos?.count ?? 0) + Number(summary.online?.count ?? 0)) : 0);
-      setOnlineChartData((onlineTimeseriesRes as { ok?: boolean; points?: TimeseriesPoint[] })?.points ?? []);
+      const onlinePoints = ((onlineTimeseriesRes as { ok?: boolean; points?: any[] })?.points ?? []).map((p: any) => ({
+        date: String(p.date || ''),
+        amount: Number(p.onlineAmount ?? p.totalAmount ?? p.total ?? p.amount ?? 0),
+        count: Number(p.onlineCount ?? p.totalCount ?? p.count ?? 0),
+      }));
+      const operationsPoints = ((combinedTimeseriesRes as { ok?: boolean; points?: any[] })?.points ?? []).map((p: any) => ({
+        date: String(p.date || ''),
+        posCount: Number(p.posCount ?? 0),
+        onlineCount: Number(p.onlineCount ?? 0),
+        totalCount: Number(p.totalCount ?? (Number(p.posCount ?? 0) + Number(p.onlineCount ?? 0))),
+      }));
+      setOnlineChartData(onlinePoints);
+      setOperationsChartData(operationsPoints);
       const sm = slowMovingRes as { ok?: boolean; deadCount?: number; slowCount?: number; deadValue?: number; slowValue?: number };
       setDeadSlowStats(sm?.ok ? { deadCount: sm.deadCount ?? 0, slowCount: sm.slowCount ?? 0, deadValue: sm.deadValue ?? 0, slowValue: sm.slowValue ?? 0 } : null);
       try {
@@ -178,6 +209,8 @@ export default function DashboardPage() {
         setRecentProducts([]);
         setSalesChartData([]);
         setProfitChartData([]);
+        setOnlineChartData([]);
+        setOperationsChartData([]);
       } else {
         console.error('Failed to load dashboard data:', error);
         setError(language === 'ar' ? 'فشل تحميل البيانات' : 'Failed to load data');
@@ -197,6 +230,8 @@ export default function DashboardPage() {
 
   const chartSalesData = salesChartData;
   const chartProfitData = profitChartData;
+  const chartOnlineData = onlineChartData;
+  const chartOperationsData = operationsChartData;
 
   if (authLoading || !allowed) return null;
 
@@ -205,7 +240,7 @@ export default function DashboardPage() {
       <Sidebar />
 
       {/* Main Content */}
-      <div className="flex-1 p-8 pt-20 md:pt-8 overflow-y-auto">
+      <div className="flex-1 p-8 pt-20 md:pt-8 overflow-y-auto overflow-x-hidden">
         {trialToast && (
           <div className="mb-6 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-200 flex items-start justify-between gap-4">
             <div>{trialToast}</div>
@@ -325,8 +360,8 @@ export default function DashboardPage() {
         </div>
 
         {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Sales Chart - grouped bars: POS amount + operations (transactions count) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+          {/* POS Sales Chart - grouped bars: revenue + POS operations */}
           <div className="p-6 neon-card rounded-xl">
             <h3 className="text-xl font-bold mb-4 text-cyan-200">{t('dashboard.salesChart')}</h3>
             {loading ? (
@@ -373,6 +408,46 @@ export default function DashboardPage() {
             )}
           </div>
 
+          {/* Operations Chart - POS vs Online counts */}
+          <div className="p-6 neon-card rounded-xl">
+            <h3 className="text-xl font-bold mb-4 text-cyan-200">
+              {language === 'ar' ? 'العمليات (نقاط البيع + أونلاين)' : 'Operations (POS + Online)'}
+            </h3>
+            {loading ? (
+              <div className="h-64 flex items-center justify-center">
+                <p className="text-gray-500">{t('common.loading')}</p>
+              </div>
+            ) : chartOperationsData.length === 0 ? (
+              <div className="h-64 flex items-center justify-center">
+                <p className="text-gray-500">{language === 'ar' ? 'لا توجد بيانات' : 'No data available'}</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={chartOperationsData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                  <XAxis dataKey="date" stroke="#94a3b8" tickFormatter={formatDate} />
+                  <YAxis
+                    stroke="#94a3b8"
+                    tickFormatter={(v) => formatNumber(v as number, language === 'ar' ? 'ar' : 'en')}
+                  />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#0b1220', border: '1px solid #00f3ff', borderRadius: '8px' }}
+                    labelStyle={{ color: '#00f3ff' }}
+                    formatter={(val: number, name: string) => [
+                      formatNumber(val, language === 'ar' ? 'ar' : 'en'),
+                      name === 'posCount'
+                        ? (language === 'ar' ? 'نقاط البيع' : 'POS')
+                        : (language === 'ar' ? 'أونلاين' : 'Online'),
+                    ]}
+                  />
+                  <Legend />
+                  <Bar dataKey="posCount" fill="#00f3ff" name={language === 'ar' ? 'نقاط البيع' : 'POS'} />
+                  <Bar dataKey="onlineCount" fill="#ec4899" name={language === 'ar' ? 'أونلاين' : 'Online'} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
           {/* Online Sales Chart - grouped bars: amount + confirmed orders count */}
           <div className="p-6 neon-card rounded-xl">
             <h3 className="text-xl font-bold mb-4 text-cyan-200">{t('dashboard.onlineSalesChart')}</h3>
@@ -380,13 +455,13 @@ export default function DashboardPage() {
               <div className="h-64 flex items-center justify-center">
                 <p className="text-gray-500">{t('common.loading')}</p>
               </div>
-            ) : onlineChartData.length === 0 ? (
+            ) : chartOnlineData.length === 0 ? (
               <div className="h-64 flex items-center justify-center">
                 <p className="text-gray-500">{language === 'ar' ? 'لا توجد بيانات' : 'No data available'}</p>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={onlineChartData}>
+                <BarChart data={chartOnlineData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
                   <XAxis dataKey="date" stroke="#94a3b8" tickFormatter={formatDate} />
                   <YAxis
@@ -404,16 +479,16 @@ export default function DashboardPage() {
                     contentStyle={{ backgroundColor: '#0b1220', border: '1px solid #ec4899', borderRadius: '8px' }}
                     labelStyle={{ color: '#ec4899' }}
                     formatter={(val: number, name: string) => [
-                      name === 'total'
+                      name === 'amount'
                         ? formatCurrency(val, language === 'ar' ? 'ar' : 'en', currency, symbol)
                         : formatNumber(val, language === 'ar' ? 'ar' : 'en'),
-                      name === 'total'
+                      name === 'amount'
                         ? (language === 'ar' ? 'المبيعات' : 'Sales')
                         : (language === 'ar' ? 'العمليات' : 'Operations'),
                     ]}
                   />
                   <Legend />
-                  <Bar dataKey="total" yAxisId="left" fill="#ec4899" name={language === 'ar' ? 'المبيعات' : 'Sales'} />
+                  <Bar dataKey="amount" yAxisId="left" fill="#ec4899" name={language === 'ar' ? 'المبيعات' : 'Sales'} />
                   <Bar dataKey="count" yAxisId="right" fill="#00f3ff" name={language === 'ar' ? 'العمليات' : 'Operations'} />
                 </BarChart>
               </ResponsiveContainer>

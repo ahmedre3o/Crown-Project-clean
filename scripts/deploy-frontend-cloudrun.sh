@@ -4,7 +4,7 @@ set -euo pipefail
 PROJECT="${PROJECT:-gen-lang-client-0711622878}"
 REGION="${REGION:-us-central1}"
 SERVICE="${SERVICE:-crown-web}"
-NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-https://crown-api-756273570281.us-central1.run.app}"
+NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-https://api.crowncs.org}"
 
 git fetch origin
 git checkout master

@@ -257,8 +257,8 @@ function InvoicesPageContent() {
               * { margin: 0; padding: 0; box-sizing: border-box; }
               body {
                 font-family: 'Inter', sans-serif;
-                background: #05070c;
-                color: #e2e8f0;
+                background: #ffffff;
+                color: #0f172a;
                 padding: 24px;
                 line-height: 1.6;
                 -webkit-print-color-adjust: exact;
@@ -268,8 +268,8 @@ function InvoicesPageContent() {
                 width: 100%;
                 max-width: 820px;
                 margin: 0 auto;
-                background: #0b1220;
-                border: 1px solid rgba(0, 243, 255, 0.35);
+                background: #ffffff;
+                border: 1px solid #22d3ee;
                 border-radius: 16px;
                 padding: 28px;
                 position: relative;
@@ -277,20 +277,12 @@ function InvoicesPageContent() {
                 display: flex;
                 flex-direction: column;
                 min-height: 70vh;
-                box-shadow: 0 0 30px rgba(0, 243, 255, 0.18), 0 0 60px rgba(236, 72, 153, 0.08);
-              }
-              .receipt:before {
-                content: '';
-                position: absolute;
-                inset: 0;
-                border: 1px solid rgba(236, 72, 153, 0.15);
-                border-radius: 16px;
-                pointer-events: none;
+                box-shadow: 0 0 24px rgba(34, 211, 238, 0.12);
               }
               .header {
                 text-align: center;
                 margin-bottom: 30px;
-                border-bottom: 1px solid rgba(0, 243, 255, 0.2);
+                border-bottom: 1px solid #22d3ee;
                 padding-bottom: 20px;
               }
               .header h1 {
@@ -300,12 +292,12 @@ function InvoicesPageContent() {
                 text-transform: uppercase;
                 letter-spacing: 4px;
                 margin-bottom: 10px;
-                color: #e6feff;
-                text-shadow: 0 0 12px rgba(0, 243, 255, 0.5);
+                color: #0ea5e9;
+                text-shadow: 0 0 12px rgba(14, 165, 233, 0.35);
               }
               .header p {
                 font-size: 12px;
-                color: #94a3b8;
+                color: #64748b;
                 text-transform: uppercase;
                 letter-spacing: 2px;
               }
@@ -314,53 +306,53 @@ function InvoicesPageContent() {
                 margin-top: 10px;
                 padding: 6px 14px;
                 border-radius: 999px;
-                border: 1px solid rgba(236, 72, 153, 0.6);
-                color: #f472b6;
-                background: rgba(236, 72, 153, 0.12);
+                border: 1px solid #e2e8f0;
+                color: #0ea5e9;
+                background: #f8fafc;
                 font-weight: 700;
                 font-size: 12px;
                 letter-spacing: 1px;
                 text-transform: uppercase;
-                box-shadow: 0 0 14px rgba(236, 72, 153, 0.18);
               }
               .info {
                 margin-bottom: 25px;
                 font-size: 12px;
-                color: #cbd5f5;
+                color: #475569;
               }
               .items { margin-bottom: 25px; }
               .item {
                 display: flex;
                 justify-content: space-between;
                 padding: 12px 0;
-                border-bottom: 1px dashed rgba(148, 163, 184, 0.3);
+                border-bottom: 1px dashed #e2e8f0;
                 font-size: 13px;
               }
-              .item-name { flex: 1; color: #e2e8f0; }
-              .item-qty { margin: 0 15px; color: #94a3b8; }
-              .item-price { color: #67e8f9; font-weight: 700; }
+              .item-name { flex: 1; color: #0f172a; }
+              .item-qty { margin: 0 15px; color: #0ea5e9; font-weight: 600; }
+              .item-price { color: #0ea5e9; font-weight: 700; }
               .total {
                 margin-top: 20px;
                 padding-top: 20px;
-                border-top: 1px solid rgba(0, 243, 255, 0.35);
+                border-top: 2px solid #22d3ee;
                 display: flex;
                 justify-content: space-between;
                 font-size: 20px;
                 font-weight: 700;
                 text-transform: uppercase;
-                color: #e6feff;
               }
+              .total span:first-child { color: #0ea5e9; }
+              .total span:last-child { color: #ec4899; }
               .footer {
                 margin-top: 30px;
                 text-align: center;
                 font-size: 10px;
-                color: #94a3b8;
+                color: #6b7280;
                 text-transform: uppercase;
                 letter-spacing: 1px;
               }
               @media print {
                 @page { size: auto portrait; margin: 8mm; }
-                body { padding: 0; background: #0b1220; }
+                body { padding: 0; background: #ffffff; }
                 .receipt {
                   box-shadow: none;
                   width: 100%;
@@ -444,7 +436,7 @@ function InvoicesPageContent() {
   return (
     <div className="min-h-screen bg-black text-white flex" dir={direction}>
       <Sidebar />
-      <div className="flex-1 p-8 pt-20 md:pt-8 overflow-y-auto">
+      <div className="flex-1 p-8 pt-20 md:pt-8 overflow-y-auto overflow-x-hidden">
           <h1 className="text-2xl font-bold text-cyan-200 mb-6">{t('invoices.title')}</h1>
         <div className="flex flex-wrap gap-2 mb-4">
           <button

@@ -71,6 +71,7 @@ export default function InventoryPage() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [formScannerTarget, setFormScannerTarget] = useState<'barcode' | 'qr' | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
@@ -334,7 +335,7 @@ export default function InventoryPage() {
   return (
     <div className="min-h-screen bg-black text-white flex" dir={direction}>
       <Sidebar />
-      <div className="flex-1 p-8 pt-20 md:pt-8 overflow-y-auto">
+      <div className="flex-1 p-8 pt-20 md:pt-8 overflow-y-auto overflow-x-hidden">
         <h1 className="text-2xl font-bold text-cyan-200 mb-6">{t('inventory.title')}</h1>
         <div className="neon-card rounded-xl p-6">
           <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
@@ -528,87 +529,112 @@ export default function InventoryPage() {
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="w-full max-w-2xl rounded-2xl bg-[#0b1220] border border-cyan-500/30 p-6">
-            <div className="flex items-center justify-between mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-2xl max-h-[calc(100vh-2rem)] rounded-2xl bg-[#0b1220] border border-cyan-500/30 flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-cyan-500/20">
               <h2 className="text-lg font-bold text-cyan-200">
                 {editingId ? (language === 'ar' ? 'تعديل المنتج' : 'Edit Product') : t('inventory.addProduct')}
               </h2>
-              <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-white">
+              <button
+                onClick={() => {
+                  setShowForm(false);
+                  setFormScannerTarget(null);
+                }}
+                className="text-slate-400 hover:text-white"
+              >
                 ✕
               </button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input
-                className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-                placeholder={t('inventory.productName')}
-                value={form.nameEn}
-                onChange={(e) => setForm((prev) => ({ ...prev, nameEn: e.target.value }))}
-              />
-              <input
-                className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-                placeholder={`${t('inventory.productName')} (AR)`}
-                value={form.nameAr}
-                onChange={(e) => setForm((prev) => ({ ...prev, nameAr: e.target.value }))}
-              />
-              <input
-                className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-                placeholder={t('inventory.brand')}
-                value={form.brand}
-                onChange={(e) => setForm((prev) => ({ ...prev, brand: e.target.value }))}
-              />
-              <input
-                className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-                placeholder="SKU"
-                value={form.sku}
-                onChange={(e) => setForm((prev) => ({ ...prev, sku: e.target.value }))}
-              />
-              <input
-                className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-                placeholder="Barcode"
-                value={form.barcode}
-                onChange={(e) => setForm((prev) => ({ ...prev, barcode: e.target.value }))}
-              />
-              <input
-                className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-                placeholder="QR Code"
-                value={form.qrCode}
-                onChange={(e) => setForm((prev) => ({ ...prev, qrCode: e.target.value }))}
-              />
-              <input
-                className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-                placeholder={t('inventory.productImage') || 'Image URL'}
-                value={form.imageUrl}
-                onChange={(e) => setForm((prev) => ({ ...prev, imageUrl: e.target.value }))}
-              />
-              <input
-                className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-                placeholder={t('inventory.buyPrice')}
-                value={form.buyPrice}
-                onChange={(e) => setForm((prev) => ({ ...prev, buyPrice: e.target.value }))}
-              />
-              <input
-                className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-                placeholder={t('inventory.sellPrice')}
-                value={form.sellPrice}
-                onChange={(e) => setForm((prev) => ({ ...prev, sellPrice: e.target.value }))}
-              />
-              <input
-                className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-                placeholder={t('inventory.stock')}
-                value={form.stockQuantity}
-                onChange={(e) => setForm((prev) => ({ ...prev, stockQuantity: e.target.value }))}
-              />
-              <input
-                className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-                placeholder={t('inventory.minStock')}
-                value={form.minStockLevel}
-                onChange={(e) => setForm((prev) => ({ ...prev, minStockLevel: e.target.value }))}
-              />
-            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                  placeholder={t('inventory.productName')}
+                  value={form.nameEn}
+                  onChange={(e) => setForm((prev) => ({ ...prev, nameEn: e.target.value }))}
+                />
+                <input
+                  className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                  placeholder={`${t('inventory.productName')} (AR)`}
+                  value={form.nameAr}
+                  onChange={(e) => setForm((prev) => ({ ...prev, nameAr: e.target.value }))}
+                />
+                <input
+                  className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                  placeholder={t('inventory.brand')}
+                  value={form.brand}
+                  onChange={(e) => setForm((prev) => ({ ...prev, brand: e.target.value }))}
+                />
+                <input
+                  className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                  placeholder="SKU"
+                  value={form.sku}
+                  onChange={(e) => setForm((prev) => ({ ...prev, sku: e.target.value }))}
+                />
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                    placeholder="Barcode"
+                    value={form.barcode}
+                    onChange={(e) => setForm((prev) => ({ ...prev, barcode: e.target.value }))}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setFormScannerTarget('barcode')}
+                    className="px-3 py-2 rounded-lg border border-cyan-500/30 text-cyan-300 text-xs whitespace-nowrap"
+                  >
+                    {language === 'ar' ? 'مسح بالكاميرا' : 'Scan'}
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                    placeholder="QR Code"
+                    value={form.qrCode}
+                    onChange={(e) => setForm((prev) => ({ ...prev, qrCode: e.target.value }))}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setFormScannerTarget('qr')}
+                    className="px-3 py-2 rounded-lg border border-cyan-500/30 text-cyan-300 text-xs whitespace-nowrap"
+                  >
+                    {language === 'ar' ? 'مسح بالكاميرا' : 'Scan'}
+                  </button>
+                </div>
+                <input
+                  className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                  placeholder={t('inventory.productImage') || 'Image URL'}
+                  value={form.imageUrl}
+                  onChange={(e) => setForm((prev) => ({ ...prev, imageUrl: e.target.value }))}
+                />
+                <input
+                  className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                  placeholder={t('inventory.buyPrice')}
+                  value={form.buyPrice}
+                  onChange={(e) => setForm((prev) => ({ ...prev, buyPrice: e.target.value }))}
+                />
+                <input
+                  className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                  placeholder={t('inventory.sellPrice')}
+                  value={form.sellPrice}
+                  onChange={(e) => setForm((prev) => ({ ...prev, sellPrice: e.target.value }))}
+                />
+                <input
+                  className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                  placeholder={t('inventory.stock')}
+                  value={form.stockQuantity}
+                  onChange={(e) => setForm((prev) => ({ ...prev, stockQuantity: e.target.value }))}
+                />
+                <input
+                  className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                  placeholder={t('inventory.minStock')}
+                  value={form.minStockLevel}
+                  onChange={(e) => setForm((prev) => ({ ...prev, minStockLevel: e.target.value }))}
+                />
+              </div>
 
-            {/* Storefront details */}
-            <div className="mt-6 border-t border-cyan-500/20 pt-6">
+              {/* Storefront details */}
+              <div className="mt-6 border-t border-cyan-500/20 pt-6">
               <h3 className="text-sm font-bold text-cyan-300 mb-3">{language === 'ar' ? 'تفاصيل المتجر الأونلاين' : 'Online store details'}</h3>
               <div className="space-y-4">
                 <textarea
@@ -688,13 +714,15 @@ export default function InventoryPage() {
                   />
                 </div>
               </div>
+              </div>
             </div>
 
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="px-6 py-4 border-t border-cyan-500/20 flex justify-end gap-3 bg-[#0b1220]">
               <button
                 onClick={() => {
                   setShowForm(false);
                   setEditingId(null);
+                  setFormScannerTarget(null);
                 }}
                 className="px-4 py-2 rounded-lg border border-cyan-500/40 text-cyan-300"
               >
@@ -812,6 +840,19 @@ export default function InventoryPage() {
         open={scannerOpen}
         onClose={() => setScannerOpen(false)}
         onDetected={(value) => setSearch(value)}
+        language={language}
+      />
+      <BarcodeScanner
+        open={formScannerTarget !== null}
+        onClose={() => setFormScannerTarget(null)}
+        onDetected={(value) => {
+          if (formScannerTarget === 'barcode') {
+            setForm((prev) => ({ ...prev, barcode: value }));
+          } else if (formScannerTarget === 'qr') {
+            setForm((prev) => ({ ...prev, qrCode: value }));
+          }
+        }}
+        language={language}
       />
     </div>
   );

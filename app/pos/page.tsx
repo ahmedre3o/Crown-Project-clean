@@ -576,7 +576,7 @@ export default function PosPage() {
               max-width: 800px;
               margin: 0 auto;
               background: #ffffff;
-              border: 1px solid #e5e7eb;
+              border: 1px solid #22d3ee;
               border-radius: 12px;
               padding: 24px;
               position: relative;
@@ -584,11 +584,12 @@ export default function PosPage() {
               display: flex;
               flex-direction: column;
               min-height: 70vh;
+              box-shadow: 0 0 18px rgba(34, 211, 238, 0.15);
             }
             .header {
               text-align: center;
               margin-bottom: 30px;
-              border-bottom: 1px solid #e5e7eb;
+              border-bottom: 1px solid #22d3ee;
               padding-bottom: 20px;
             }
             .header h1 {
@@ -597,6 +598,8 @@ export default function PosPage() {
               text-transform: uppercase;
               letter-spacing: 3px;
               margin-bottom: 10px;
+              color: #0ea5e9;
+              text-shadow: 0 0 10px rgba(14, 165, 233, 0.35);
             }
             .header p {
               font-size: 12px;
@@ -629,7 +632,7 @@ export default function PosPage() {
               display: flex;
               justify-content: space-between;
               padding: 12px 0;
-              border-bottom: 1px solid #e5e7eb;
+              border-bottom: 1px solid #bae6fd;
               font-size: 13px;
             }
             .item-name {
@@ -647,13 +650,15 @@ export default function PosPage() {
             .total {
               margin-top: 20px;
               padding-top: 20px;
-              border-top: 1px solid #e5e7eb;
+              border-top: 2px solid #22d3ee;
               display: flex;
               justify-content: space-between;
               font-size: 20px;
               font-weight: 700;
               text-transform: uppercase;
             }
+            .total span:first-child { color: #0ea5e9; }
+            .total span:last-child { color: #ec4899; }
             .footer {
               margin-top: 30px;
               text-align: center;
@@ -741,7 +746,7 @@ export default function PosPage() {
   return (
     <div className="min-h-screen bg-black text-white flex" dir={direction}>
       <Sidebar />
-      <div className="flex-1 p-8 pt-20 md:pt-8 overflow-y-auto">
+      <div className="flex-1 p-8 pt-20 md:pt-8 overflow-y-auto overflow-x-hidden">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-cyan-200">{t('pos.title')}</h1>
         </div>

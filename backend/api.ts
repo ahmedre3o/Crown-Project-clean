@@ -5,7 +5,6 @@ import path from 'path';
 import { Readable } from 'stream';
 import { pool, testConnection, initializeDatabase } from './db';
 import { resolveNotificationText, isCorruptedText, getFallbackText, buildNotificationText } from './notifications';
-import { buildNotificationContent, parseNotificationPayload } from './notificationTemplates';
 import { looksMojibake } from './encodingGuard';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';

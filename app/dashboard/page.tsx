@@ -99,66 +99,6 @@ export default function DashboardPage() {
 
   const displayName = user?.username?.split('@')[0] || (user as any)?.ownerName || user?.username || '';
 
-  useEffect(() => {
-    loadDashboardData();
-  }, [loadDashboardData]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const handler = () => loadDashboardData();
-    window.addEventListener('crown-dashboard-refresh', handler);
-    return () => window.removeEventListener('crown-dashboard-refresh', handler);
-  }, [loadDashboardData]);
-
-  useEffect(() => {
-    if (!allowed || authLoading) return;
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') loadDashboardData();
-    }, 20000);
-    return () => clearInterval(interval);
-  }, [allowed, authLoading, loadDashboardData]);
-
-  useEffect(() => {
-    try {
-      if (typeof window !== 'undefined' && sessionStorage.getItem('crown-trial-toast') === '1') {
-        sessionStorage.removeItem('crown-trial-toast');
-        setTrialToast(
-          language === 'ar'
-            ? 'أنت على تجربة GOLD لمدة 7 أيام. بعد انتهاء التجربة، فعّل كود الاشتراك للاستمرار.'
-            : 'You are on a 7-day GOLD trial. After the trial, activate a subscription code to continue.'
-        );
-        const t = setTimeout(() => setTrialToast(null), 8000);
-        return () => clearTimeout(t);
-      }
-    } catch {
-      // ignore
-    }
-  }, [language]);
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem('crown:last-excel-import');
-      if (!raw) return;
-      localStorage.removeItem('crown:last-excel-import');
-      const payload = JSON.parse(raw);
-      if (!payload?.ok) return;
-
-      const imported = Number(payload.importedCount || 0);
-      const skipped = Number(payload.skippedCount || 0);
-      const fileName = String(payload.fileName || '').trim();
-
-      const msg =
-        language === 'ar'
-          ? `اكتمل الاستيراد: تمت إضافة ${imported} منتج${skipped ? ` (تم تخطي ${skipped})` : ''}${fileName ? ` — ${fileName}` : ''}`
-          : `Import complete: added ${imported} products${skipped ? ` (skipped ${skipped})` : ''}${fileName ? ` — ${fileName}` : ''}`;
-
-      setImportNotice(msg);
-      window.setTimeout(() => setImportNotice(null), 6000);
-    } catch {
-      // ignore
-    }
-  }, [language]);
-
   const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
@@ -235,6 +175,66 @@ export default function DashboardPage() {
       }
     } finally {
       setLoading(false);
+    }
+  }, [language]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = () => loadDashboardData();
+    window.addEventListener('crown-dashboard-refresh', handler);
+    return () => window.removeEventListener('crown-dashboard-refresh', handler);
+  }, [loadDashboardData]);
+
+  useEffect(() => {
+    if (!allowed || authLoading) return;
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') loadDashboardData();
+    }, 20000);
+    return () => clearInterval(interval);
+  }, [allowed, authLoading, loadDashboardData]);
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && sessionStorage.getItem('crown-trial-toast') === '1') {
+        sessionStorage.removeItem('crown-trial-toast');
+        setTrialToast(
+          language === 'ar'
+            ? 'أنت على تجربة GOLD لمدة 7 أيام. بعد انتهاء التجربة، فعّل كود الاشتراك للاستمرار.'
+            : 'You are on a 7-day GOLD trial. After the trial, activate a subscription code to continue.'
+        );
+        const t = setTimeout(() => setTrialToast(null), 8000);
+        return () => clearTimeout(t);
+      }
+    } catch {
+      // ignore
+    }
+  }, [language]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('crown:last-excel-import');
+      if (!raw) return;
+      localStorage.removeItem('crown:last-excel-import');
+      const payload = JSON.parse(raw);
+      if (!payload?.ok) return;
+
+      const imported = Number(payload.importedCount || 0);
+      const skipped = Number(payload.skippedCount || 0);
+      const fileName = String(payload.fileName || '').trim();
+
+      const msg =
+        language === 'ar'
+          ? `اكتمل الاستيراد: تمت إضافة ${imported} منتج${skipped ? ` (تم تخطي ${skipped})` : ''}${fileName ? ` — ${fileName}` : ''}`
+          : `Import complete: added ${imported} products${skipped ? ` (skipped ${skipped})` : ''}${fileName ? ` — ${fileName}` : ''}`;
+
+      setImportNotice(msg);
+      window.setTimeout(() => setImportNotice(null), 6000);
+    } catch {
+      // ignore
     }
   }, [language]);
 

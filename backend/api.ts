@@ -6139,7 +6139,8 @@ app.get('/api/public/storefront/orders/track', handleStorefrontOrderTrack);
 
 app.get('/api/storefront/orders/:id', async (req: Request, res: Response) => {
   try {
-    const orderId = parseInt(req.params.id, 10);
+    const idParam = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const orderId = parseInt(String(idParam || ''), 10);
     if (!Number.isFinite(orderId) || orderId <= 0) {
       return res.status(400).json({ ok: false, error: 'Invalid order id', ar: 'رقم الطلب غير صحيح' });
     }

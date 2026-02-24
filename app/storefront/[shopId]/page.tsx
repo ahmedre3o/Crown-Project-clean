@@ -21,8 +21,34 @@ interface StorefrontData {
     id: number;
     name: string;
     package: string;
+    business_name?: string | null;
+    activity_type?: string | null;
   };
   products: Product[];
+}
+
+function normalizeActivityKey(value: string): string {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ');
+}
+
+function resolveActivityLabel(value: string | null | undefined, lang: 'ar' | 'en'): string {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const key = normalizeActivityKey(raw);
+  const map: Array<{ keys: string[]; ar: string; en: string }> = [
+    { keys: ['spare parts', 'spare part', 'auto parts', 'auto part', 'auto parts store', 'auto parts shop', 'auto_parts', 'spare_parts', 'قطع غيار', 'قطع الغيار'], ar: 'قطع غيار', en: 'Spare Parts' },
+    { keys: ['makeup and perfume', 'makeup & perfume', 'makeup perfume', 'perfume', 'cosmetics', 'makeup', 'عطور', 'ميكاب وعطور', 'مكياج وعطور', 'makeup and perfumes'], ar: 'مكياج وعطور', en: 'Makeup & Perfume' },
+    { keys: ['pharmacy', 'drugstore', 'صيدلية'], ar: 'صيدلية', en: 'Pharmacy' },
+    { keys: ['supermarket', 'grocery', 'grocery store', 'سوبر ماركت', 'بقالة'], ar: 'سوبر ماركت', en: 'Supermarket' },
+    { keys: ['decor', 'furniture', 'ديكور', 'مفروشات'], ar: 'ديكور ومفروشات', en: 'Decor & Furniture' },
+  ];
+  const hit = map.find((row) => row.keys.some((k) => normalizeActivityKey(k) === key));
+  if (hit) return lang === 'ar' ? hit.ar : hit.en;
+  return raw;
 }
 
 export default function StorefrontPage() {
@@ -80,6 +106,17 @@ export default function StorefrontPage() {
   const safeProducts = Array.isArray(data?.products) ? data.products : [];
   const cartCount = cart.length;
   const cartItems = safeProducts.filter((p) => cart.includes(p.id));
+  const rawBusinessType = String(data?.shop?.activity_type || '').trim();
+  const defaultBusinessLabel = language === 'ar' ? 'المنتجات' : 'Products';
+  const businessTypeLabel = resolveActivityLabel(rawBusinessType, language) || defaultBusinessLabel;
+  const heroTagline =
+    language === 'ar'
+      ? businessTypeLabel === defaultBusinessLabel
+        ? 'أفضل المنتجات والخدمات'
+        : `أفضل ${businessTypeLabel}`
+      : businessTypeLabel === defaultBusinessLabel
+        ? 'Premium products & services'
+        : `Premium ${businessTypeLabel}`;
 
   return (
     <div className="min-h-screen bg-black text-white" dir={language === 'ar' ? 'rtl' : 'ltr'}>
@@ -117,9 +154,7 @@ export default function StorefrontPage() {
           <h2 className="text-5xl font-bold mb-4 neon-text">
             {language === 'ar' ? 'مرحباً بكم في' : 'Welcome to'} {data.shop.name}
           </h2>
-          <p className="text-xl text-gray-400">
-            {language === 'ar' ? 'أفضل قطع الغيار والخدمات للسيارات' : 'Premium Auto Parts & Services'}
-          </p>
+          <p className="text-xl text-gray-400">{heroTagline}</p>
         </div>
       </section>
 

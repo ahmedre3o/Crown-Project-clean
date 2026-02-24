@@ -39,26 +39,48 @@ type Shop = {
   currency_symbol?: string | null;
 };
 
+type StorefrontContext = {
+  storeName?: string | null;
+  ownerName?: string | null;
+  activityType?: string | null;
+  language?: string | null;
+  planFeatures?: Record<string, boolean>;
+};
+
+function normalizeActivityKey(value: string): string {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ');
+}
+
+function resolveActivityLabel(value: string | null | undefined, lang: 'ar' | 'en'): string {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const key = normalizeActivityKey(raw);
+  const map: Array<{ keys: string[]; ar: string; en: string }> = [
+    { keys: ['spare parts', 'spare part', 'auto parts', 'auto part', 'auto parts store', 'auto parts shop', 'auto_parts', 'spare_parts', 'قطع غيار', 'قطع الغيار'], ar: 'قطع غيار', en: 'Spare Parts' },
+    { keys: ['makeup and perfume', 'makeup & perfume', 'makeup perfume', 'perfume', 'cosmetics', 'makeup', 'عطور', 'ميكاب وعطور', 'مكياج وعطور', 'makeup and perfumes'], ar: 'مكياج وعطور', en: 'Makeup & Perfume' },
+    { keys: ['pharmacy', 'drugstore', 'صيدلية'], ar: 'صيدلية', en: 'Pharmacy' },
+    { keys: ['supermarket', 'grocery', 'grocery store', 'سوبر ماركت', 'بقالة'], ar: 'سوبر ماركت', en: 'Supermarket' },
+    { keys: ['decor', 'furniture', 'ديكور', 'مفروشات'], ar: 'ديكور ومفروشات', en: 'Decor & Furniture' },
+  ];
+  const hit = map.find((row) => row.keys.some((k) => normalizeActivityKey(k) === key));
+  if (hit) return lang === 'ar' ? hit.ar : hit.en;
+  return raw;
+}
+
 function getTagline(businessType: string | null | undefined, lang: 'ar' | 'en'): string {
-  const t = String(businessType || '').toLowerCase();
-  const map: Record<string, { ar: string; en: string }> = {
-    auto_parts: {
-      ar: 'ابحث عن قطع الغيار بسهولة — الأسعار والمخزون بيتحدثوا تلقائيًا من نظام الـ ERP.',
-      en: 'Find auto parts easily — prices & stock sync automatically from the ERP.',
-    },
-    pharmacy: {
-      ar: 'ابحث عن الأدوية بسهولة — الأسعار والمخزون بيتحدثوا تلقائيًا من نظام الـ ERP.',
-      en: 'Find medicines easily — prices & stock sync automatically from the ERP.',
-    },
-    grocery: {
-      ar: 'ابحث عن المنتجات بسهولة — الأسعار والمخزون بيتحدثوا تلقائيًا من نظام الـ ERP.',
-      en: 'Find products easily — prices & stock sync automatically from the ERP.',
-    },
-  };
-  if (t.includes('auto') || t.includes('parts') || t.includes('قطع') || t.includes('غيار')) return map.auto_parts[lang];
-  if (t.includes('pharm') || t.includes('دواء') || t.includes('صيدل')) return map.pharmacy[lang];
-  if (t.includes('groc') || t.includes('بقالة') || t.includes('سوبر')) return map.grocery[lang];
-  return map.grocery[lang];
+  const label = String(businessType || '').trim();
+  if (label) {
+    return lang === 'ar'
+      ? `ابحث عن ${label} بسهولة — الأسعار والمخزون بيتحدثوا تلقائيًا من نظام الـ ERP.`
+      : `Find ${label} easily — prices & stock sync automatically from the ERP.`;
+  }
+  return lang === 'ar'
+    ? 'ابحث عن المنتجات بسهولة — الأسعار والمخزون بيتحدثوا تلقائيًا من نظام الـ ERP.'
+    : 'Find products easily — prices & stock sync automatically from the ERP.';
 }
 
 type StorefrontData = {
@@ -127,6 +149,7 @@ function StorefrontPageContent() {
   const [error, setError] = useState<string | null>(null);
 
   const [data, setData] = useState<StorefrontData | null>(null);
+  const [storeContext, setStoreContext] = useState<StorefrontContext | null>(null);
   const [query, setQuery] = useState('');
   const [cart, setCart] = useState<Record<number, number>>({});
   const [toast, setToast] = useState<string | null>(null);
@@ -203,10 +226,29 @@ function StorefrontPageContent() {
     }
   };
 
+  const loadStoreContext = async (shopId: number, domain?: string | null) => {
+    try {
+      const q = new URLSearchParams();
+      q.set('shopId', String(shopId));
+      if (domain) q.set('domain', domain);
+      q.set('lang', language);
+      const ctx = await apiRequest(`/storefront/shop?${q.toString()}`);
+      setStoreContext(ctx || null);
+    } catch {
+      setStoreContext(null);
+    }
+  };
+
   useEffect(() => {
     void loadStorefront(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewSlug, domainParam, shopIdParam]);
+
+  useEffect(() => {
+    if (!data?.shop?.id) return;
+    void loadStoreContext(data.shop.id, data?.domain || domainParam || null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.shop?.id, data?.domain, domainParam, language]);
 
   useEffect(() => {
     // Real-time sync (poll inventory directly, no sync jobs)
@@ -225,10 +267,28 @@ function StorefrontPageContent() {
 
   const shopName =
     language === 'ar'
-      ? data?.shop?.business_name_ar || data?.shop?.business_name || data?.shop?.business_name_en || data?.shop?.name || 'Crown Store'
-      : data?.shop?.business_name_en || data?.shop?.business_name || data?.shop?.business_name_ar || data?.shop?.name || 'Crown Store';
+      ? storeContext?.storeName ||
+        data?.shop?.business_name_ar ||
+        data?.shop?.business_name ||
+        data?.shop?.business_name_en ||
+        data?.shop?.name ||
+        'Crown Store'
+      : storeContext?.storeName ||
+        data?.shop?.business_name_en ||
+        data?.shop?.business_name ||
+        data?.shop?.business_name_ar ||
+        data?.shop?.name ||
+        'Crown Store';
   const currencyCode = data?.shop?.currency_code || 'EGP';
   const currencySymbol = data?.shop?.currency_symbol || null;
+  const rawBusinessType =
+    storeContext?.activityType ||
+    data?.shop?.activity_type ||
+    (data?.shop as any)?.businessType ||
+    (data?.shop as any)?.category ||
+    '';
+  const defaultBusinessLabel = language === 'ar' ? 'المنتجات' : 'Products';
+  const businessTypeLabel = resolveActivityLabel(rawBusinessType, language) || defaultBusinessLabel;
 
   const products = Array.isArray(data?.products) ? data.products : [];
 
@@ -250,6 +310,17 @@ function StorefrontPageContent() {
       return hay.includes(q);
     });
   }, [products, query]);
+  const emptyStateText = query.trim()
+    ? language === 'ar'
+      ? 'مفيش نتائج مطابقة للبحث.'
+      : 'No products match your search.'
+    : language === 'ar'
+      ? businessTypeLabel === defaultBusinessLabel
+        ? 'لا توجد منتجات حالياً.'
+        : `لا توجد منتجات ${businessTypeLabel} حالياً.`
+      : businessTypeLabel === defaultBusinessLabel
+        ? 'No products available.'
+        : `No ${businessTypeLabel} available.`;
 
   const cartItems = useMemo(() => {
     const ids = Object.keys(cart).map((k) => Number(k));
@@ -404,7 +475,7 @@ function StorefrontPageContent() {
                   </span>
                 </h1>
                 <p className="mt-3 text-sm md:text-base text-slate-300 max-w-2xl">
-                  {getTagline(data?.shop?.activity_type, language)}
+                  {getTagline(businessTypeLabel, language)}
                 </p>
               </div>
 
@@ -427,7 +498,7 @@ function StorefrontPageContent() {
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder={language === 'ar' ? 'ابحث باسم القطعة / الماركة / SKU...' : 'Search by part name / brand / SKU...'}
+                  placeholder={language === 'ar' ? 'ابحث باسم المنتج / الماركة / SKU...' : 'Search by product name / brand / SKU...'}
                   className="w-full h-12 pl-10 pr-4 rounded-2xl border border-cyan-500/25 bg-black/30 backdrop-blur-xl text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-cyan-400/60 shadow-[0_0_24px_rgba(34,211,238,0.08)]"
                 />
               </div>
@@ -451,7 +522,7 @@ function StorefrontPageContent() {
           <div>
             <div className="text-xs text-slate-400">{language === 'ar' ? 'الكتالوج' : 'Catalog'}</div>
             <div className="text-xl md:text-2xl font-extrabold text-cyan-100">
-              {language === 'ar' ? 'قطع الغيار' : 'Spare Parts'}
+              {businessTypeLabel}
             </div>
           </div>
           <div className="text-xs text-slate-300 border border-cyan-500/20 bg-white/5 backdrop-blur-xl rounded-full px-3 py-1">
@@ -461,7 +532,7 @@ function StorefrontPageContent() {
 
         {filteredProducts.length === 0 ? (
           <div className="rounded-2xl border border-cyan-500/20 bg-white/5 backdrop-blur-xl p-8 text-slate-300 text-sm">
-            {language === 'ar' ? 'مفيش نتائج مطابقة للبحث.' : 'No products match your search.'}
+            {emptyStateText}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
@@ -505,7 +576,7 @@ function StorefrontPageContent() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="text-[10px] tracking-widest uppercase text-purple-200/80">
-                          {category || (language === 'ar' ? 'قطع غيار' : 'Spare Part')}
+                          {category || businessTypeLabel}
                         </div>
                         <div className="mt-1 font-extrabold text-white truncate">{name}</div>
                         <div className="mt-1 text-xs text-slate-300 truncate">{product.brand || '—'}</div>
@@ -655,6 +726,8 @@ function StorefrontPageContent() {
                 try {
                   const payload = {
                     shopId: data.shop.id,
+                    domain: data?.domain || domainParam || undefined,
+                    lang: language,
                     customerName: checkoutForm.customerName.trim(),
                     phone: checkoutForm.phone.trim(),
                     governorate: checkoutForm.governorate.trim(),

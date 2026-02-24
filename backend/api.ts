@@ -822,6 +822,40 @@ const getTtsLocaleForLang = (lang: 'ar' | 'en') => {
   return lang === 'ar' ? 'ar-EG' : 'en-US';
 };
 
+// Normalize payment method to stable codes (avoid DB truncation / inconsistencies)
+const normalizePaymentMethod = (value: unknown): string => {
+  const s = String(value || '').toLowerCase();
+  if (s.includes('cod') || s.includes('cash') || s.includes('استلام') || s.includes('نقد')) return 'COD';
+  if (s.includes('transfer') || s.includes('bank') || s.includes('تحويل')) return 'TRANSFER';
+  if (s.includes('card') || s.includes('credit') || s.includes('بطاقة')) return 'CARD';
+  if (s.includes('wallet') || s.includes('instapay') || s.includes('vodafone')) return 'WALLET';
+  return 'COD';
+};
+
+const generatePublicCode = (): string => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s = '';
+  for (let i = 0; i < 6; i += 1) {
+    s += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return s;
+};
+
+const resolveUserDisplayName = async (user: any): Promise<string | null> => {
+  if (!user) return null;
+  let name = String(user?.name || '').trim();
+  // Do NOT use username/email prefix as display name (e.g. "ahmed" from "ahmed@example.com")
+  if (!name && user?.role === 'shop_owner' && user?.shop_id) {
+    try {
+      const [rows] = await pool.execute('SELECT owner_name FROM shops WHERE id = ?', [user.shop_id]);
+      name = String((rows as any[])[0]?.owner_name || '').trim();
+    } catch {
+      // ignore lookup failure
+    }
+  }
+  return name || null;
+};
+
 const normalizeNumber = (value?: string | number | null) => {
   if (value === null || value === undefined) return null;
   const raw = String(value).trim();
@@ -1339,10 +1373,12 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
       { expiresIn: '24h' }
     );
 
+    const displayName = await resolveUserDisplayName(user);
     res.json({
       token,
       user: {
         id: user.id,
+        name: displayName || undefined,
         username: user.username,
         role: user.role,
         package: user.package,
@@ -1355,9 +1391,11 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
 });
 
 app.get('/api/auth/me', authenticateToken, async (req: any, res: Response) => {
+  const displayName = await resolveUserDisplayName(req.user);
   res.json({
     user: {
       id: req.user.id,
+      name: displayName || undefined,
       username: req.user.username,
       role: req.user.role,
       package: req.user.package,
@@ -1443,6 +1481,7 @@ app.post('/api/auth/register-shop', async (req: Request, res: Response) => {
         token,
         user: {
           id: userInsert.insertId,
+          name: ownerName || username,
           username,
           role: 'shop_owner',
           package: trialPlan,
@@ -1555,11 +1594,17 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
     if (!GEMINI_API_KEY || !genAI) {
       return res.status(400).json({ error: 'AI API key is missing' });
     }
-    const { message } = req.body;
+    const body = (req as any).body || {};
+    const { message } = body;
+    const aiContext = body?.aiContext || body?.context || {};
+    const requestedLangRaw =
+      body?.lang || body?.language || aiContext?.language || aiContext?.lang || aiContext?.languageCode;
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'message is required' });
     }
-    detectedLang = detectUserLanguage(message);
+    const requestedLang =
+      requestedLangRaw === 'ar' || requestedLangRaw === 'en' ? requestedLangRaw : null;
+    detectedLang = requestedLang ?? detectUserLanguage(message);
     const ttsLang = getTtsLocaleForLang(detectedLang);
     console.log('📩 Chat message:', { detectedLang, preview: String(message).slice(0, 120) });
 
@@ -1640,7 +1685,8 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
     );
 
     const [shopRows] = await pool.execute(
-      'SELECT business_name, activity_type FROM shops WHERE id = ?',
+      `SELECT id, name, business_name, owner_name, activity_type, country_name, currency_code, currency_symbol, package, plan_type
+       FROM shops WHERE id = ?`,
       [shopId]
     );
     const shopProfile = (shopRows as any[])[0] || {};
@@ -1695,33 +1741,102 @@ app.post('/api/chat', authenticateToken, requirePackageFeature('ai'), async (req
       createdAt: row.created_at,
     }));
 
-    const rawUserName = (req as any).user?.username || '';
-    const firstToken = String(rawUserName || '').split(' ')[0];
-    const userName = firstToken && !firstToken.includes('@') ? firstToken : 'Ahmed';
-    const businessName = shopProfile.business_name || (detectedLang === 'en' ? 'the shop' : 'المحل');
-    const activityType = String(shopProfile.activity_type || '').toLowerCase();
-    const businessType =
-      activityType === 'pharmacy'
-        ? 'pharmacy'
-        : activityType === 'supermarket'
-        ? 'supermarket'
-        : activityType === 'decor'
-        ? 'decor'
-        : 'auto_parts';
+    const ctxUser = aiContext?.user || {};
+    const ctxStore = aiContext?.store || {};
+    const authUser = (req as any).user || {};
+    // Use only explicit display name or shop owner_name — never username/email prefix (e.g. "ahmed" from email)
+    const rawUserName = String(ctxUser?.name || '').trim();
+    const userRole = String(ctxUser?.role || authUser?.role || '').trim();
+    let userName = rawUserName;
+    if (!userName && userRole === 'shop_owner' && shopProfile?.owner_name) {
+      userName = String(shopProfile.owner_name || '').trim();
+    }
+    const hasUserName = Boolean(userName);
 
-    const businessTypeAr =
-      businessType === 'pharmacy'
-        ? 'صيدلية'
-        : businessType === 'supermarket'
-        ? 'سوبر ماركت'
-        : businessType === 'decor'
-        ? 'ديكور ومفروشات'
-        : 'قطع غيار سيارات';
+    const shopName =
+      String(
+        shopProfile.business_name ||
+          ctxStore?.name ||
+          shopProfile.name ||
+          (detectedLang === 'en' ? 'the store' : 'المتجر')
+      ).trim() || (detectedLang === 'en' ? 'the store' : 'المتجر');
+    const activityLabel =
+      String(
+        shopProfile.activity_type || ctxStore?.businessType || ctxStore?.category || ''
+      ).trim() || (detectedLang === 'ar' ? 'غير محدد' : 'unspecified');
+    const currencyCode = String(shopProfile.currency_code || ctxStore?.currency || 'EGP').trim();
+    const countryName = String(shopProfile.country_name || ctxStore?.country || '').trim();
+    const plan = normalizePlan(
+      shopProfile.plan_type || shopProfile.package || authUser.package || ctxStore?.subscription || 'bronze'
+    );
+    const planFeatures = getPlanDefinition(plan).features;
+    const roleLabelsAr: Record<string, string> = {
+      super_admin: 'مدير النظام',
+      shop_owner: 'مالك',
+      branch_manager: 'مدير فرع',
+      multi_branch_manager: 'مدير فروع',
+      cashier: 'كاشير',
+      warehouse: 'مخزن',
+    };
+    const roleLabelsEn: Record<string, string> = {
+      super_admin: 'System admin',
+      shop_owner: 'Owner',
+      branch_manager: 'Branch manager',
+      multi_branch_manager: 'Multi-branch manager',
+      cashier: 'Cashier',
+      warehouse: 'Warehouse',
+    };
+    const roleLabel =
+      detectedLang === 'ar'
+        ? roleLabelsAr[userRole] || userRole || 'مستخدم'
+        : roleLabelsEn[userRole] || userRole || 'User';
+    const featureLabelsAr: Record<string, string> = {
+      ai: 'الذكاء الاصطناعي',
+      onlineStore: 'المتجر الأونلاين',
+      excelImport: 'استيراد Excel',
+      manualEntry: 'الإدخال اليدوي',
+      branches: 'الفروع',
+      notifications: 'الإشعارات',
+      reports: 'التقارير',
+    };
+    const featureLabelsEn: Record<string, string> = {
+      ai: 'AI assistant',
+      onlineStore: 'Online store',
+      excelImport: 'Excel import',
+      manualEntry: 'Manual entry',
+      branches: 'Branches',
+      notifications: 'Notifications',
+      reports: 'Reports',
+    };
+    const enabledFeaturesAr = Object.entries(planFeatures)
+      .filter(([, enabled]) => Boolean(enabled))
+      .map(([key]) => featureLabelsAr[key] || key)
+      .filter(Boolean);
+    const enabledFeaturesEn = Object.entries(planFeatures)
+      .filter(([, enabled]) => Boolean(enabled))
+      .map(([key]) => featureLabelsEn[key] || key)
+      .filter(Boolean);
+
+    const whoLineAr = hasUserName
+      ? `إنت بتتكلم مع "${userName}" (${roleLabel}) داخل متجر "${shopName}". نادِه باسمه أحياناً عشان يحس بالتخصيص.`
+      : `إنت بتتكلم مع مستخدم داخل متجر "${shopName}" (${roleLabel}).`;
+    const whoLineEn = hasUserName
+      ? `You are speaking with "${userName}" (${roleLabel}) at "${shopName}".`
+      : `You are speaking with a user at "${shopName}" (${roleLabel}).`;
 
     const systemPromptAr = `إنت مساعد ذكي اسمك "كراون" — بتتكلم باللهجة المصرية بطريقة ودودة وبستايل سايبربانك (نيون/سيستم/شبكات) من غير مبالغة.
 إنت متخصص في مساعدة أصحاب المحلات في إدارة المخزون والمبيعات داخل Crown Services ERP.
 
-إنت بتتكلم مع "${userName}" صاحب "${businessName}". نادِه باسمه أحياناً عشان يحس بالتخصيص.
+${whoLineAr}
+
+بيانات المتجر:
+- النشاط: ${activityLabel}
+- الدولة: ${countryName || 'غير محدد'}
+- العملة: ${currencyCode}
+- الاشتراك: ${plan}
+- المميزات المفعلة: ${enabledFeaturesAr.length ? enabledFeaturesAr.join('، ') : 'بدون'}
+
+وحدات النظام اللي تقدر تساعد فيها: POS، الطلبات الأونلاين، المخزون، الإشعارات، التقارير، الإعدادات.
 
 ملخص المبيعات (Sales/Invoices) لآخر 7 أيام:
 ${last7DaysContextAr}
@@ -1740,10 +1855,9 @@ ${inventoryContextAr || 'لا توجد منتجات في المخزن حاليا
 - إجمالي المنتجات: ${totalProducts}
 - منتجات قليلة المخزون: ${lowStockCount}
 
-نوع النشاط: ${businessTypeAr}
-
 قواعد مهمة:
 - أنت تعرف فقط بيانات هذا المحل (Shop ${shopId}) ولا تكشف أي معلومات عن محلات أو مستخدمين آخرين.
+- استخدم بيانات المستخدم الحالي فقط ولا تنسبه لأي مدير إلا لو دوره super_admin.
 - لو رسالة المستخدم عربية/مصري: رد بالمصري فقط (لهجة مصرية) وبنَفَس سايبربانك. ممنوع الإنجليزية وممنوع الفصحى.
 - رد باختصار + خطوات عملية.
 - لو سؤاله عن "امبارح" أو "آخر 7 أيام": استخدم أرقام الملخص اللي فوق زي ما هي، ومتخمنش.
@@ -1753,7 +1867,16 @@ ${inventoryContextAr || 'لا توجد منتجات في المخزن حاليا
     const systemPromptEn = `You are "Crown", an AI assistant for Crown Services ERP.
 Respond in professional English. Be concise, actionable, and accurate.
 
-You are speaking with "${userName}", the owner of "${businessName}".
+${whoLineEn}
+
+Store context:
+- Business type: ${activityLabel}
+- Country: ${countryName || 'unspecified'}
+- Currency: ${currencyCode}
+- Subscription: ${plan}
+- Enabled features: ${enabledFeaturesEn.length ? enabledFeaturesEn.join(', ') : 'none'}
+
+System modules you can help with: POS, Online orders, Inventory, Notifications, Reports, Settings.
 
 Sales/Invoices summary (past 7 days):
 ${last7DaysContextEn}
@@ -1772,10 +1895,9 @@ Today stats:
 - Total products: ${totalProducts}
 - Low stock products: ${lowStockCount}
 
-Business type: ${businessType}
-
 Rules:
 - Only use this shop's data (Shop ${shopId}). Do not mention or infer other shops/users.
+- Use the current user's identity only; do not assume admin unless role is super_admin.
 - If the user asks about a specific product, look for it in the inventory list above and answer precisely.
 - If the user asks about yesterday / last 7 days sales, use the provided summary numbers exactly. Do not guess.
 - If the user message is Arabic, do not reply in English.`;
@@ -5720,6 +5842,440 @@ app.get('/api/dashboard/profit-chart', authenticateToken, requirePackageFeature(
   }
 });
 
+// ========== STOREFRONT ORDERS (Public) ==========
+const handleStorefrontOrderCreate = async (req: Request, res: Response) => {
+  const body = (req as any).body || {};
+  const requestLang = body?.lang === 'en' ? 'en' : 'ar';
+  const t = (ar: string, en: string) => (requestLang === 'ar' ? ar : en);
+  try {
+    const {
+      shopId: rawShopId,
+      domain,
+      customerName,
+      phone,
+      governorate,
+      city,
+      address,
+      detailedAddress,
+      notes,
+      paymentMethod,
+      items,
+    } = body;
+    const addr = address || detailedAddress;
+    let shopId = Number(rawShopId || 0);
+    if (!Number.isFinite(shopId) || shopId <= 0) {
+      const dom = String(
+        domain || req.headers?.['x-shop-domain'] || req.headers?.['x-forwarded-host'] || req.headers?.host || ''
+      )
+        .trim()
+        .toLowerCase();
+      if (dom) {
+        const [rows] = await pool.execute(
+          'SELECT shop_id FROM domains WHERE domain = ? AND is_active = 1 AND status = ? LIMIT 1',
+          [dom, 'active']
+        );
+        shopId = Number((rows as any[])[0]?.shop_id || 0);
+      }
+    }
+    if (!Number.isFinite(shopId) || shopId <= 0) {
+      return res.status(400).json({ error: t('معرف المتجر مطلوب', 'shopId is required') });
+    }
+    if (!customerName || String(customerName).trim().length === 0) {
+      return res.status(400).json({ error: t('الاسم مطلوب', 'Customer name is required') });
+    }
+    const phoneStr = String(phone || '').trim();
+    if (!phoneStr || !/^[\d\s\-\+\(\)]{8,20}$/.test(phoneStr)) {
+      return res.status(400).json({ error: t('رقم هاتف صحيح مطلوب', 'Valid phone is required') });
+    }
+    if (!governorate || String(governorate).trim().length === 0) {
+      return res.status(400).json({ error: t('المحافظة مطلوبة', 'Governorate is required') });
+    }
+    if (!city || String(city).trim().length === 0) {
+      return res.status(400).json({ error: t('المدينة مطلوبة', 'City is required') });
+    }
+    if (!addr || String(addr).trim().length === 0) {
+      return res.status(400).json({ error: t('العنوان مطلوب', 'Address is required') });
+    }
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: t('السلة فارغة', 'Cart items required') });
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const [shopRows] = await conn.execute(
+        'SELECT id, package, plan_type, currency_code FROM shops WHERE id = ?',
+        [shopId]
+      );
+      const shop = (shopRows as any[])[0];
+      if (!shop) {
+        await conn.rollback();
+        return res.status(404).json({ error: t('المتجر غير موجود', 'Shop not found') });
+      }
+      const plan = normalizePlan(shop.plan_type || shop.package || 'bronze');
+      const allowOnline = Boolean(getPlanDefinition(plan).features.onlineStore);
+      if (!allowOnline) {
+        await conn.rollback();
+        return res.status(403).json({ error: t('المتجر الأونلاين غير مفعل', 'Storefront is not enabled') });
+      }
+
+      let total = 0;
+      const orderItems: Array<{
+        productId: number;
+        nameSnapshot: string;
+        skuSnapshot: string | null;
+        barcodeSnapshot: string | null;
+        sellPriceSnapshot: number;
+        quantity: number;
+      }> = [];
+
+      for (const it of items) {
+        const productId = Number(it?.productId || it?.id || 0);
+        const quantity = Math.max(1, Math.floor(Number(it?.quantity || 1)));
+        if (!Number.isFinite(productId) || productId <= 0 || quantity <= 0) continue;
+
+        const [prods] = await conn.execute(
+          'SELECT id, name_en, name_ar, sku, barcode, sell_price, stock_quantity FROM products WHERE id = ? AND shop_id = ?',
+          [productId, shopId]
+        );
+        const prod = (prods as any[])[0];
+        if (!prod) continue;
+        const price = Number(prod.sell_price || 0);
+        if (!Number.isFinite(price) || price < 0) continue;
+        const stock = Number(prod.stock_quantity ?? 0);
+        if (Number.isFinite(stock) && stock < quantity) {
+          await conn.rollback();
+          await insertNotification(
+            {
+              shopId,
+              source: 'system',
+              type: 'system_stock_insufficient',
+              data: { productId, requested: quantity, available: stock },
+            },
+            conn
+          );
+          return res.status(400).json({
+            error: t('المخزون غير كافٍ. المنتج غير متوفر بالكمية المطلوبة.', 'Insufficient stock for requested quantity.'),
+          });
+        }
+
+        orderItems.push({
+          productId,
+          nameSnapshot: String(it?.nameSnapshot || prod.name_ar || prod.name_en || 'Product').substring(0, 255),
+          skuSnapshot: prod.sku ? String(prod.sku).substring(0, 128) : null,
+          barcodeSnapshot: prod.barcode ? String(prod.barcode).substring(0, 128) : null,
+          sellPriceSnapshot: price,
+          quantity,
+        });
+        total += price * quantity;
+      }
+
+      if (orderItems.length === 0) {
+        await conn.rollback();
+        return res.status(400).json({ error: t('لا توجد منتجات صالحة', 'No valid items') });
+      }
+
+      const paymentMethodRaw = String(paymentMethod || '').trim();
+      const paymentMethodCode = normalizePaymentMethod(paymentMethodRaw || 'COD');
+      let publicCode = generatePublicCode();
+      let tries = 0;
+      while (tries < 5) {
+        const [dup] = await conn.execute('SELECT id FROM online_orders WHERE public_code = ?', [publicCode]);
+        if ((dup as any[]).length === 0) break;
+        publicCode = generatePublicCode();
+        tries += 1;
+      }
+      const currency = shop.currency_code || 'EGP';
+      const [ordResult] = await conn.execute(
+        `INSERT INTO online_orders (shop_id, status, order_status, customer_name, phone, governorate, city, address, notes, payment_method, subtotal, total, currency, source, public_code)
+         VALUES (?, 'pending', 'NEW', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'online', ?)`,
+        [
+          shopId,
+          String(customerName).trim(),
+          phoneStr,
+          String(governorate).trim(),
+          String(city).trim(),
+          String(addr).trim(),
+          notes ? String(notes).trim() : null,
+          paymentMethodRaw || paymentMethodCode,
+          total,
+          total,
+          currency,
+          publicCode,
+        ]
+      );
+      const orderId = (ordResult as any).insertId;
+
+      for (const it of orderItems) {
+        await conn.execute(
+          `INSERT INTO online_order_items (order_id, product_id, name_snapshot, sku_snapshot, barcode_snapshot, sell_price_snapshot, quantity)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            orderId,
+            it.productId,
+            it.nameSnapshot,
+            it.skuSnapshot,
+            it.barcodeSnapshot,
+            it.sellPriceSnapshot,
+            it.quantity,
+          ]
+        );
+      }
+
+      await conn.execute(
+        `INSERT INTO payments (shop_id, order_id, method, amount, status)
+         VALUES (?, ?, ?, ?, 'pending')`,
+        [shopId, orderId, paymentMethodCode, total]
+      );
+
+      await insertNotification(
+        {
+          shopId,
+          source: 'online',
+          type: 'online_order_created',
+          data: {
+            orderId,
+            customerName: String(customerName).trim(),
+            total,
+            itemsCount: orderItems.length,
+            publicCode,
+          },
+        },
+        conn
+      );
+
+      await conn.commit();
+      return res.status(201).json({
+        ok: true,
+        orderId,
+        orderNumber: publicCode,
+        publicCode,
+        status: 'pending',
+        total,
+        currency,
+        message: t('تم تسجيل الطلب', 'Order created'),
+      });
+    } catch (error: any) {
+      await conn.rollback();
+      return res.status(500).json({ error: error?.message || t('حدث خطأ أثناء إنشاء الطلب', 'Failed to create order') });
+    } finally {
+      conn.release();
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || t('حدث خطأ', 'Server error') });
+  }
+};
+
+app.post('/api/storefront/orders', handleStorefrontOrderCreate);
+app.post('/api/public/storefront/orders', handleStorefrontOrderCreate);
+
+const handleStorefrontOrderTrack = async (req: Request, res: Response) => {
+  try {
+    const code = String(req.query.code || '').trim().toUpperCase();
+    const phone = String(req.query.phone || '').trim().replace(/\D/g, '');
+    if (!code || code.length < 4) {
+      return res.status(400).json({ ok: false, error: 'Tracking code required', ar: 'كود التتبع مطلوب' });
+    }
+    if (!phone || phone.length < 8) {
+      return res.status(400).json({ ok: false, error: 'Phone required', ar: 'رقم الهاتف مطلوب' });
+    }
+    const phoneNorm = phone.replace(/\D/g, '');
+    const [orders] = await pool.execute(
+      `SELECT o.*, s.id as shop_id, s.name as shop_name, s.business_name as shop_business_name
+       FROM online_orders o
+       JOIN shops s ON s.id = o.shop_id
+       WHERE o.public_code = ? AND (
+         REPLACE(REPLACE(REPLACE(REPLACE(o.phone,' ',''),'-',''),'+',''),'(','') LIKE CONCAT('%',?,'%')
+       )
+       LIMIT 1`,
+      [code, phoneNorm]
+    );
+    const order = (orders as any[])[0];
+    if (!order) {
+      return res.status(404).json({ ok: false, error: 'Order not found', ar: 'لم يتم العثور على الطلب' });
+    }
+    const [items] = await pool.execute('SELECT * FROM online_order_items WHERE order_id = ?', [order.id]);
+    // Get primary domain for this shop (if any)
+    let shopDomain: string | null = null;
+    const [domRows] = await pool.execute(
+      'SELECT domain FROM domains WHERE shop_id = ? AND is_active = 1 AND status = ? LIMIT 1',
+      [order.shop_id, 'active']
+    );
+    if ((domRows as any[]).length > 0) {
+      shopDomain = (domRows as any[])[0].domain;
+    }
+    const orderPayload = {
+      orderId: order.id,
+      publicCode: order.public_code,
+      status: order.status,
+      customerName: order.customer_name,
+      phone: order.phone,
+      address: `${order.governorate}, ${order.city}, ${order.address}`,
+      total: Number(order.total),
+      currency: order.currency || 'EGP',
+      createdAt: order.created_at,
+      items: (items as any[]).map((i) => ({
+        name: i.name_snapshot,
+        sku: i.sku_snapshot,
+        price: Number(i.sell_price_snapshot),
+        quantity: i.quantity,
+        subtotal: Number(i.sell_price_snapshot) * Number(i.quantity),
+      })),
+    };
+    const shopPayload = {
+      id: order.shop_id,
+      slug: `${order.shop_id}-shop`,
+      domain: shopDomain,
+      name: order.shop_business_name || order.shop_name || `Shop ${order.shop_id}`,
+    };
+    res.json({ ok: true, order: orderPayload, shop: shopPayload });
+  } catch (error: any) {
+    res.status(500).json({ ok: false, error: error.message });
+  }
+};
+
+app.get('/api/storefront/orders/track', handleStorefrontOrderTrack);
+app.get('/api/public/storefront/orders/track', handleStorefrontOrderTrack);
+
+app.get('/api/storefront/orders/:id', async (req: Request, res: Response) => {
+  try {
+    const orderId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(orderId) || orderId <= 0) {
+      return res.status(400).json({ ok: false, error: 'Invalid order id', ar: 'رقم الطلب غير صحيح' });
+    }
+    const code = String(req.query.code || '').trim().toUpperCase();
+    const phone = String(req.query.phone || '').trim().replace(/\D/g, '');
+    if (!code || code.length < 4 || !phone || phone.length < 8) {
+      return res.status(400).json({ ok: false, error: 'Tracking code and phone required', ar: 'كود التتبع ورقم الهاتف مطلوبان' });
+    }
+    const phoneNorm = phone.replace(/\D/g, '');
+    const [orders] = await pool.execute(
+      `SELECT o.*, s.id as shop_id, s.name as shop_name, s.business_name as shop_business_name
+       FROM online_orders o
+       JOIN shops s ON s.id = o.shop_id
+       WHERE o.id = ? AND o.public_code = ? AND (
+         REPLACE(REPLACE(REPLACE(REPLACE(o.phone,' ',''),'-',''),'+',''),'(','') LIKE CONCAT('%',?,'%')
+       )
+       LIMIT 1`,
+      [orderId, code, phoneNorm]
+    );
+    const order = (orders as any[])[0];
+    if (!order) {
+      return res.status(404).json({ ok: false, error: 'Order not found', ar: 'لم يتم العثور على الطلب' });
+    }
+    const [items] = await pool.execute('SELECT * FROM online_order_items WHERE order_id = ?', [order.id]);
+    let shopDomain: string | null = null;
+    const [domRows] = await pool.execute(
+      'SELECT domain FROM domains WHERE shop_id = ? AND is_active = 1 AND status = ? LIMIT 1',
+      [order.shop_id, 'active']
+    );
+    if ((domRows as any[]).length > 0) {
+      shopDomain = (domRows as any[])[0].domain;
+    }
+    const orderPayload = {
+      orderId: order.id,
+      publicCode: order.public_code,
+      status: order.status,
+      customerName: order.customer_name,
+      phone: order.phone,
+      address: `${order.governorate}, ${order.city}, ${order.address}`,
+      total: Number(order.total),
+      currency: order.currency || 'EGP',
+      createdAt: order.created_at,
+      items: (items as any[]).map((i) => ({
+        name: i.name_snapshot,
+        sku: i.sku_snapshot,
+        price: Number(i.sell_price_snapshot),
+        quantity: i.quantity,
+        subtotal: Number(i.sell_price_snapshot) * Number(i.quantity),
+      })),
+    };
+    const shopPayload = {
+      id: order.shop_id,
+      slug: `${order.shop_id}-shop`,
+      domain: shopDomain,
+      name: order.shop_business_name || order.shop_name || `Shop ${order.shop_id}`,
+    };
+    res.json({ ok: true, order: orderPayload, shop: shopPayload });
+  } catch (error: any) {
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get('/api/storefront/branches', async (req: Request, res: Response) => {
+  try {
+    const rawShopId = String(req.query.shopId || '').trim();
+    let shopId = parseInt(rawShopId, 10);
+    if (!Number.isFinite(shopId) || shopId <= 0) {
+      const dom = String(req.query.domain || req.headers?.['x-shop-domain'] || req.headers?.host || '')
+        .trim()
+        .toLowerCase();
+      if (dom) {
+        const [rows] = await pool.execute(
+          'SELECT shop_id FROM domains WHERE domain = ? AND is_active = 1 AND status = ? LIMIT 1',
+          [dom, 'active']
+        );
+        shopId = Number((rows as any[])[0]?.shop_id || 0);
+      }
+    }
+    if (!Number.isFinite(shopId) || shopId <= 0) {
+      return res.status(400).json({ error: 'shopId is required' });
+    }
+    const [rows] = await pool.execute(
+      'SELECT id, shop_id, name, name_ar, name_en, code FROM branches WHERE shop_id = ? ORDER BY id ASC',
+      [shopId]
+    );
+    res.json(rows || []);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/storefront/shop', async (req: Request, res: Response) => {
+  try {
+    const lang = String(req.query.lang || '').toLowerCase() === 'en' ? 'en' : 'ar';
+    let shopId = parseInt(String(req.query.shopId || ''), 10);
+    if (!Number.isFinite(shopId) || shopId <= 0) {
+      const dom = String(req.query.domain || req.headers?.['x-shop-domain'] || req.headers?.host || '')
+        .trim()
+        .toLowerCase();
+      if (dom) {
+        const [rows] = await pool.execute(
+          'SELECT shop_id FROM domains WHERE domain = ? AND is_active = 1 AND status = ? LIMIT 1',
+          [dom, 'active']
+        );
+        shopId = Number((rows as any[])[0]?.shop_id || 0);
+      }
+    }
+    if (!Number.isFinite(shopId) || shopId <= 0) {
+      return res.status(400).json({ error: 'shopId is required' });
+    }
+    const [shops] = await pool.execute(
+      `SELECT id, name, business_name, owner_name, activity_type, package, plan_type, country_name, currency_code
+       FROM shops WHERE id = ?`,
+      [shopId]
+    );
+    const shop = (shops as any[])[0];
+    if (!shop) return res.status(404).json({ error: 'Shop not found' });
+    const plan = normalizePlan(shop.plan_type || shop.package || 'bronze');
+    const planFeatures = getPlanDefinition(plan).features;
+    res.json({
+      ok: true,
+      storeName: shop.business_name || shop.name,
+      ownerName: shop.owner_name || null,
+      activityType: shop.activity_type || null,
+      language: lang,
+      planFeatures,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/storefront/health', (_req: Request, res: Response) => {
+  res.json({ ok: true });
+});
+
 // ========== PUBLIC STOREFRONT (Gold package only) ==========
 // Resolve shop by the HTTP Host header (custom domains)
 app.get('/api/public/storefront/preview/:shopSlug', async (req: Request, res: Response) => {
@@ -5837,6 +6393,7 @@ app.get('/api/public/storefront/:shopId', async (req: Request, res: Response) =>
 
 const server = app.listen(port, '0.0.0.0', () => {
   console.log(`listening ${port}`);
+  console.log('[Routes] POST /api/storefront/orders, GET /api/storefront/health registered');
 });
 
 server.on('error', (error) => {

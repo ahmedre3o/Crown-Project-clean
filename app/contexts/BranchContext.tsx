@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { useAuth } from './AuthContext';
 import { apiRequest } from './AuthContext';
 import { getStoredShopId } from '@/lib/shop';
@@ -34,6 +35,7 @@ const BranchContext = createContext<BranchContextType | undefined>(undefined);
 
 export function BranchProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const pathname = usePathname();
   const [activeShopId, setActiveShopId] = useState<number | null>(() => getStoredShopId());
   const shopId = activeShopId ?? (user as any)?.shopId ?? (user as any)?.shop_id ?? null;
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -41,6 +43,12 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(false);
 
   const loadBranches = useCallback(async () => {
+    const path = pathname ?? (typeof window !== 'undefined' ? window.location.pathname : '');
+    if (path.startsWith('/storefront') || path.startsWith('/track')) {
+      setBranches([]);
+      setActiveBranchIdState(null);
+      return;
+    }
     if (!shopId || (user?.role !== 'shop_owner' && user?.role !== 'super_admin' && user?.role !== 'branch_manager' && user?.role !== 'multi_branch_manager' && user?.role !== 'cashier')) {
       setBranches([]);
       return;
@@ -67,7 +75,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [shopId, user?.role]);
+  }, [shopId, user?.role, pathname]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

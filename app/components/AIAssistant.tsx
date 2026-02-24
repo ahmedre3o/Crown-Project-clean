@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Mic, Send, MessageCircle, X, Copy, Volume2, VolumeX, Square } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { usePathname } from 'next/navigation';
-import { apiFetch, useAuth } from '../contexts/AuthContext';
+import { apiFetch, apiRequest, useAuth } from '../contexts/AuthContext';
 import { useBranch } from '../contexts/BranchContext';
 import { getPlanFeatures } from '../permissions';
 import { getStoredShopId } from '@/lib/shop';
@@ -46,6 +46,7 @@ export function AIAssistant() {
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [aiMode, setAiMode] = useState<'unknown' | 'cloud' | 'offline'>('unknown');
+  const [storeProfile, setStoreProfile] = useState<any>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendMessageRef = useRef<(text: string, fromVoice?: boolean) => Promise<void>>(() => Promise.resolve());
@@ -66,6 +67,24 @@ export function AIAssistant() {
     }
     return () => window.removeEventListener('crown:open-ai', handler);
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const shopId = (user as any)?.shopId ?? (user as any)?.shop_id ?? null;
+    if (!shopId) return;
+    let alive = true;
+    (async () => {
+      try {
+        const profile = await apiRequest('/shops/profile');
+        if (alive) setStoreProfile(profile || null);
+      } catch {
+        if (alive) setStoreProfile(null);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [open, user]);
 
   const toggleVoice = useCallback(() => {
     const next = !voiceEnabled;
@@ -152,10 +171,51 @@ export function AIAssistant() {
           planFeatures,
           lang,
         };
+        const userRole = effectiveRole ?? user?.role;
+        const rawName = String(
+          (user as any)?.name ||
+          (user as any)?.full_name ||
+          (user as any)?.display_name ||
+          ''
+        ).trim();
+        const ownerFallback =
+          userRole === 'shop_owner' && storeProfile?.owner_name
+            ? String(storeProfile.owner_name || '').trim()
+            : '';
+        // Use only explicit name or owner_name — never username/email prefix (no "Ahmed" from email)
+        const userName =
+          (rawName && !rawName.includes('@') && !/^\d+$/.test(rawName) ? rawName : '') || ownerFallback;
+        const storeName =
+          storeProfile?.business_name ||
+          storeProfile?.name ||
+          storeProfile?.business_name_ar ||
+          storeProfile?.business_name_en ||
+          '';
+        const aiContext = {
+          user: {
+            id: u?.id ?? u?.userId,
+            name: userName,
+            role: effectiveRole ?? user?.role,
+          },
+          store: {
+            id: storeProfile?.id ?? shopId ?? undefined,
+            name: storeName,
+            businessType:
+              storeProfile?.activity_type ||
+              storeProfile?.businessType ||
+              storeProfile?.category ||
+              undefined,
+            currency: storeProfile?.currency_code || storeProfile?.currency_symbol || undefined,
+            country: storeProfile?.country_name || undefined,
+            subscription: storeProfile?.plan_type || storeProfile?.package || user?.package || undefined,
+          },
+          language: lang,
+          enabledFeatures: planFeatures,
+        };
 
         const response = await apiFetch('/chat', {
           method: 'POST',
-          body: JSON.stringify({ message: trimmed, lang, context, history }),
+          body: JSON.stringify({ message: trimmed, lang, context, aiContext, history }),
         });
         const data = await response.json().catch(() => ({}));
 
@@ -247,7 +307,7 @@ export function AIAssistant() {
         setUploadingVoice(false);
       }
     },
-    [lang, messages, pathname, user, effectiveRole, planFeatures]
+    [lang, messages, pathname, user, effectiveRole, planFeatures, storeProfile]
   );
 
   useEffect(() => {

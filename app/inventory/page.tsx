@@ -3,14 +3,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { useLanguage } from '../contexts/LanguageContext';
-import { apiRequest, getNoShopMessage, isShopMissingError, useAuth } from '../contexts/AuthContext';
+import { apiRequest, apiFetch, getNoShopMessage, isShopMissingError, useAuth } from '../contexts/AuthContext';
 import { useRouteGuard } from '../guards/useRouteGuard';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { canAccess, getPlanFeatures } from '../permissions';
 import { formatCurrency } from '@/lib/formatters';
 import { AIAssistant } from '../components/AIAssistant';
 import { BarcodeScanner } from '../components/BarcodeScanner';
-import { Image as ImageIcon, Pencil, MapPin } from 'lucide-react';
+import { Image as ImageIcon, Pencil, MapPin, Upload } from 'lucide-react';
 
 interface Product {
   id: number;
@@ -33,6 +33,16 @@ interface Product {
   warranty_text?: string;
   return_policy_text?: string;
   gallery_urls_json?: string;
+}
+
+function getProductImageUrl(p: Product): string | null {
+  if (p.image_url && String(p.image_url).trim().startsWith('http')) return p.image_url;
+  try {
+    const g = (p as any).gallery_urls_json;
+    const arr = typeof g === 'string' ? JSON.parse(g) : g;
+    const first = Array.isArray(arr) && arr[0] ? String(arr[0]).trim() : null;
+    return first && first.startsWith('http') ? first : null;
+  } catch { return null; }
 }
 
 const emptyForm = {
@@ -82,6 +92,8 @@ export default function InventoryPage() {
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [availabilityModal, setAvailabilityModal] = useState<{ productId: number; productName: string } | null>(null);
   const [availabilityData, setAvailabilityData] = useState<{ branches: Array<{ branchNameAr: string; branchNameEn: string; qty: number }> } | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const showToast = useCallback((msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
@@ -140,15 +152,27 @@ export default function InventoryPage() {
     });
   }, [products, search]);
 
+  const isValidImageUrl = (s: string) => /^https?:\/\/.+/i.test(String(s || '').trim());
+  const formImageUrls = useMemo(() => form.imageUrl.split(/[\n,]+/).map((s) => s.trim()).filter(isValidImageUrl), [form.imageUrl]);
+
   const handleSave = async () => {
     setError(null);
     if (!form.nameEn) {
       setError(language === 'ar' ? 'يرجى إدخال اسم المنتج' : 'Name is required.');
       return;
     }
+    const urlsFromImage = form.imageUrl.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
+    const allUrls = [...urlsFromImage, ...form.galleryUrls];
+    const invalid = allUrls.filter((u) => !isValidImageUrl(u));
+    if (invalid.length > 0) {
+      showToast(language === 'ar' ? 'رابط الصورة غير صالح. يجب أن يبدأ بـ http:// أو https://' : 'Invalid image URL. Must start with http:// or https://', 'error');
+      return;
+    }
 
     try {
       setSaving(true);
+      const urlsFromImage = form.imageUrl.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
+      const galleryUrls = [...urlsFromImage, ...form.galleryUrls].filter((u) => isValidImageUrl(u));
       const payload = {
         nameEn: form.nameEn,
         nameAr: form.nameAr || form.nameEn,
@@ -160,13 +184,13 @@ export default function InventoryPage() {
         sellPrice: form.sellPrice ? parseFloat(form.sellPrice) : undefined,
         stockQuantity: parseInt(form.stockQuantity || '0', 10),
         minStockLevel: parseInt(form.minStockLevel || '5', 10),
-        imageUrl: form.imageUrl,
+        imageUrl: form.imageUrl.trim() || undefined,
+        galleryUrls: galleryUrls.length > 0 ? galleryUrls : undefined,
         descriptionShort: form.descriptionShort || undefined,
         descriptionLong: form.descriptionLong || undefined,
         warrantyText: form.warrantyText || undefined,
         returnPolicyText: form.returnPolicyText || undefined,
         specs: form.specs?.length ? form.specs : undefined,
-        galleryUrls: form.galleryUrls?.length ? form.galleryUrls : undefined,
       };
       if (editingId) {
         await apiRequest(`/products/${editingId}`, {
@@ -207,6 +231,8 @@ export default function InventoryPage() {
       if (p.gallery_urls_json) galleryUrls = Array.isArray(JSON.parse(p.gallery_urls_json)) ? JSON.parse(p.gallery_urls_json) : [];
       else if (Array.isArray(p.gallery_urls_json)) galleryUrls = p.gallery_urls_json;
     } catch {}
+    const primaryUrl = product.image_url || '';
+    const combined = primaryUrl ? [primaryUrl, ...galleryUrls.filter((u) => u !== primaryUrl)] : galleryUrls;
     setForm({
       ...emptyForm,
       nameEn: product.name_en,
@@ -215,7 +241,7 @@ export default function InventoryPage() {
       sku: product.sku || '',
       barcode: product.barcode || '',
       qrCode: product.qr_code || '',
-      imageUrl: product.image_url || '',
+      imageUrl: combined.join('\n'),
       buyPrice: String(product.buy_price ?? ''),
       sellPrice: String(product.sell_price ?? ''),
       stockQuantity: String(product.stock_quantity ?? ''),
@@ -481,10 +507,10 @@ export default function InventoryPage() {
                           {formatCurrency(product.buy_price || 0, language === 'ar' ? 'ar' : 'en', currency, symbol)}
                         </td>
                         <td className="py-2">
-                          {product.image_url ? (
+                          {getProductImageUrl(product) ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
-                              src={product.image_url}
+                              src={getProductImageUrl(product)!}
                               alt={product.name_en}
                               className="h-10 w-10 rounded-md object-cover border border-cyan-500/20"
                             />
@@ -601,12 +627,70 @@ export default function InventoryPage() {
                     {language === 'ar' ? 'مسح بالكاميرا' : 'Scan'}
                   </button>
                 </div>
-                <input
-                  className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-                  placeholder={t('inventory.productImage') || 'Image URL'}
-                  value={form.imageUrl}
-                  onChange={(e) => setForm((prev) => ({ ...prev, imageUrl: e.target.value }))}
-                />
+                <div>
+                  <div className="text-xs text-slate-400 mb-1">{language === 'ar' ? 'روابط الصور (سطر لكل رابط أو مفصولة بفاصلة)' : 'Image URLs (one per line or comma-separated)'}</div>
+                  <div className="flex gap-2">
+                    <textarea
+                      className="flex-1 bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                      placeholder="https://..."
+                      rows={2}
+                      value={form.imageUrl}
+                      onChange={(e) => setForm((prev) => ({ ...prev, imageUrl: e.target.value }))}
+                    />
+                    <div className="flex flex-col gap-1">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/jpg"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          if (file.size > 5 * 1024 * 1024) {
+                            showToast(language === 'ar' ? 'الملف كبير جداً (الحد 5 ميجا)' : 'File too large (max 5 MB)', 'error');
+                            return;
+                          }
+                          setUploadingImage(true);
+                          try {
+                            const fd = new FormData();
+                            fd.append('file', file);
+                            const res = await apiFetch('/uploads/product-image', { method: 'POST', body: fd });
+                            const data = await res.json().catch(() => ({}));
+                            if (data?.ok && data?.url) {
+                              setForm((prev) => ({ ...prev, imageUrl: prev.imageUrl.trim() ? `${prev.imageUrl}\n${data.url}` : data.url }));
+                              showToast(language === 'ar' ? 'تم رفع الصورة' : 'Image uploaded');
+                            } else {
+                              showToast(data?.error || (language === 'ar' ? 'فشل الرفع' : 'Upload failed'), 'error');
+                            }
+                          } catch (err: any) {
+                            showToast((err as Error)?.message || (language === 'ar' ? 'فشل الرفع' : 'Upload failed'), 'error');
+                          } finally {
+                            setUploadingImage(false);
+                            e.target.value = '';
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadingImage}
+                        className="px-3 py-2 rounded-lg border border-cyan-500/30 text-cyan-300 text-xs whitespace-nowrap flex items-center gap-1 disabled:opacity-50"
+                      >
+                        <Upload className="h-4 w-4" />
+                        {uploadingImage ? (language === 'ar' ? 'جاري...' : 'Uploading...') : (language === 'ar' ? 'رفع صورة' : 'Upload')}
+                      </button>
+                    </div>
+                  </div>
+                  {formImageUrls.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {formImageUrls.map((url, i) => (
+                        <div key={i} className="relative w-14 h-14 rounded overflow-hidden border border-cyan-500/20 bg-slate-800">
+                          <img src={url} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <input
                   className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
                   placeholder={t('inventory.buyPrice')}

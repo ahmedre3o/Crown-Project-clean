@@ -242,6 +242,13 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
+-- 15b) products: add gallery_urls_json for product image gallery
+SET @col = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'products' AND COLUMN_NAME = 'gallery_urls_json');
+SET @sql = IF(@col = 0, 'ALTER TABLE products ADD COLUMN gallery_urls_json JSON NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
 -- 16) sale_items table if missing – fixes "Table crown_services.sale_items doesn't exist"
 CREATE TABLE IF NOT EXISTS sale_items (
   id INT AUTO_INCREMENT PRIMARY KEY,

@@ -16,6 +16,7 @@ import ExcelJS from 'exceljs';
 import csvParser from 'csv-parser';
 import { GoogleGenAI } from '@google/genai';
 import { domainToASCII } from 'url';
+import { Storage } from '@google-cloud/storage';
 
 declare global {
   namespace Express {
@@ -4282,6 +4283,7 @@ app.post('/api/products', authenticateToken, requireRole('super_admin', 'shop_ow
       stockQuantity,
       minStockLevel,
       imageUrl,
+      galleryUrls,
       sku,
       barcode,
       qrCode,
@@ -4300,6 +4302,21 @@ app.post('/api/products', authenticateToken, requireRole('super_admin', 'shop_ow
     if (!nameEn) {
       return res.status(400).json({ error: 'Product name is required' });
     }
+
+    const isValidUrl = (s: string) => /^https?:\/\/.+/i.test(String(s || '').trim());
+    const urlsFromImage = String(imageUrl || '').split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
+    const urlsFromGallery = Array.isArray(galleryUrls)
+      ? galleryUrls.map((u) => String(u || '').trim()).filter(Boolean)
+      : typeof galleryUrls === 'string'
+        ? galleryUrls.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean)
+        : [];
+    const allUrls = [...new Set([...urlsFromImage, ...urlsFromGallery].filter((u) => isValidUrl(u)))];
+    const invalidUrls = [...urlsFromImage, ...urlsFromGallery].filter((u) => u && !isValidUrl(u));
+    if (invalidUrls.length > 0) {
+      return res.status(400).json({ error: 'Invalid image URL(s). Must start with http:// or https://' });
+    }
+    const primaryImage = allUrls[0] || (imageUrl && String(imageUrl).trim()) || null;
+    const galleryJson = allUrls.length > 0 ? JSON.stringify(allUrls) : null;
 
     const [existing] = await pool.execute(
       `SELECT id FROM products 
@@ -4322,8 +4339,8 @@ app.post('/api/products', authenticateToken, requireRole('super_admin', 'shop_ow
 
     const [result] = await pool.execute(
       `INSERT INTO products 
-       (name_en, name_ar, sku, barcode, qr_code, brand, category_id, buy_price, sell_price, stock_quantity, min_stock_level, image_url, shop_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (name_en, name_ar, sku, barcode, qr_code, brand, category_id, buy_price, sell_price, stock_quantity, min_stock_level, image_url, gallery_urls_json, shop_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         nameEn,
         nameAr || nameEn,
@@ -4336,7 +4353,8 @@ app.post('/api/products', authenticateToken, requireRole('super_admin', 'shop_ow
         computedSellPrice,
         stockQuantity || 0,
         minStockLevel || 5,
-        imageUrl || null,
+        primaryImage,
+        galleryJson,
         shopId,
       ]
     );
@@ -4369,12 +4387,36 @@ app.put('/api/products/:id', authenticateToken, requireRole('super_admin', 'shop
       stockQuantity,
       minStockLevel,
       imageUrl,
+      galleryUrls,
+      descriptionShort,
+      descriptionLong,
+      specs,
+      warrantyText,
+      returnPolicyText,
       extra_fields: extraFieldsBody,
     } = req.body;
 
     if (!nameEn) {
       return res.status(400).json({ error: 'Product name is required' });
     }
+
+    const isValidUrl = (s: string) => /^https?:\/\/.+/i.test(String(s || '').trim());
+    const urlsFromImage = String(imageUrl || '')
+      .split(/[\n,]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const urlsFromGallery = Array.isArray(galleryUrls)
+      ? galleryUrls.map((u) => String(u || '').trim()).filter(Boolean)
+      : typeof galleryUrls === 'string'
+        ? galleryUrls.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean)
+        : [];
+    const allUrls = [...new Set([...urlsFromImage, ...urlsFromGallery].filter((u) => isValidUrl(u)))];
+    const invalidUrls = [...urlsFromImage, ...urlsFromGallery].filter((u) => u && !isValidUrl(u));
+    if (invalidUrls.length > 0) {
+      return res.status(400).json({ error: 'Invalid image URL(s). Must start with http:// or https://' });
+    }
+    const primaryImage = allUrls[0] || (imageUrl && String(imageUrl).trim()) || null;
+    const galleryJson = allUrls.length > 0 ? JSON.stringify(allUrls) : null;
 
     const computedSellPrice =
       sellPrice ?? (buyPrice ? Number((Number(buyPrice) * 1.2).toFixed(2)) : 0);
@@ -4388,11 +4430,14 @@ app.put('/api/products/:id', authenticateToken, requireRole('super_admin', 'shop
       extraFieldsBody != null && typeof extraFieldsBody === 'object'
         ? JSON.stringify(extraFieldsBody)
         : null;
+    const specsJson = Array.isArray(specs) && specs.length > 0 ? JSON.stringify(specs) : null;
 
     await pool.execute(
       `UPDATE products 
        SET name_en = ?, name_ar = ?, sku = ?, barcode = ?, qr_code = ?, brand = ?, buy_price = ?, sell_price = ?,
-           stock_quantity = ?, min_stock_level = ?, image_url = ?, is_incomplete = ?, missing_fields = ?, extra_fields = ?
+           stock_quantity = ?, min_stock_level = ?, image_url = ?, gallery_urls_json = ?,
+           description_short = ?, description_long = ?, specs_json = ?, warranty_text = ?, return_policy_text = ?,
+           is_incomplete = ?, missing_fields = ?, extra_fields = ?
        WHERE id = ? AND shop_id = ?`,
       [
         nameEn,
@@ -4405,7 +4450,13 @@ app.put('/api/products/:id', authenticateToken, requireRole('super_admin', 'shop
         computedSellPrice,
         stockQuantity || 0,
         minStockLevel || 5,
-        imageUrl || null,
+        primaryImage,
+        galleryJson,
+        descriptionShort || null,
+        descriptionLong || null,
+        specsJson,
+        warrantyText || null,
+        returnPolicyText || null,
         isComplete ? 0 : 1,
         isComplete ? null : missingFieldsJson,
         extraFieldsJson,
@@ -4440,6 +4491,82 @@ app.delete('/api/products/:id', authenticateToken, requireRole('super_admin', 's
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
+});
+
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+
+app.post('/api/uploads/product-image', authenticateToken, requireRole('super_admin', 'shop_owner', 'warehouse'), (req: any, res: Response) => {
+  const shopId = getShopIdOrFail(req, res);
+  if (shopId === null) return;
+
+  const bucketName = process.env.GCS_PRODUCT_IMAGES_BUCKET || process.env.CLOUD_STORAGE_BUCKET;
+  if (!bucketName) {
+    return res.status(503).json({ ok: false, error: 'Image upload not configured. Set GCS_PRODUCT_IMAGES_BUCKET.' });
+  }
+
+  const contentType = req.headers['content-type'] || '';
+  if (!contentType.includes('multipart/form-data')) {
+    return res.status(400).json({ ok: false, error: 'Content-Type must be multipart/form-data' });
+  }
+
+  const busboy = Busboy({ headers: req.headers, limits: { fileSize: MAX_IMAGE_SIZE } });
+  let fileBuffer: Buffer | null = null;
+  let fileMime = '';
+  let fileName = '';
+
+  busboy.on('file', (fieldName: string, file: NodeJS.ReadableStream, info: { filename?: string; mimeType?: string }) => {
+    if (fieldName !== 'file' && fieldName !== 'image') {
+      file.resume();
+      return;
+    }
+    const chunks: Buffer[] = [];
+    file.on('data', (chunk: Buffer) => chunks.push(chunk));
+    file.on('end', () => {
+      fileBuffer = Buffer.concat(chunks);
+      fileMime = info.mimeType || 'image/jpeg';
+      fileName = info.filename || 'image.jpg';
+    });
+  });
+
+  busboy.on('finish', async () => {
+    try {
+      if (!fileBuffer || fileBuffer.length === 0) {
+        return res.status(400).json({ ok: false, error: 'No file received. Send field "file" or "image".' });
+      }
+      if (fileBuffer.length > MAX_IMAGE_SIZE) {
+        return res.status(400).json({ ok: false, error: 'File too large. Max 5 MB.' });
+      }
+      if (!ALLOWED_IMAGE_TYPES.includes(fileMime)) {
+        return res.status(400).json({ ok: false, error: 'Invalid file type. Use JPG, PNG, or WebP.' });
+      }
+
+      const ext = fileName.toLowerCase().endsWith('.png') ? 'png' : fileName.toLowerCase().endsWith('.webp') ? 'webp' : 'jpg';
+      const objectName = `products/${shopId}/${crypto.randomUUID()}.${ext}`;
+
+      const storage = new Storage();
+      const bucket = storage.bucket(bucketName);
+      const blob = bucket.file(objectName);
+
+      await blob.save(fileBuffer, {
+        contentType: fileMime,
+        metadata: { cacheControl: 'public, max-age=31536000' },
+      });
+      await blob.makePublic();
+
+      const publicUrl = `https://storage.googleapis.com/${bucketName}/${objectName}`;
+      res.json({ ok: true, url: publicUrl });
+    } catch (err: any) {
+      console.error('[UPLOAD] product-image error:', err);
+      res.status(500).json({ ok: false, error: err?.message || 'Upload failed' });
+    }
+  });
+
+  busboy.on('error', (err: Error) => {
+    res.status(400).json({ ok: false, error: err.message });
+  });
+
+  req.pipe(busboy);
 });
 
 const handleProductsImportUpload = async (

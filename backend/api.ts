@@ -1332,12 +1332,18 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
     const password = req.body?.password;
     const identifier = usernameInput || emailInput;
 
+    const hasUsername = !!usernameInput;
+    const hasEmail = !!emailInput;
+    const hasPassword = !!password;
+    console.log('[AUTH] login start', { hasUsername, hasEmail, hasPassword });
+
     if (!identifier || !password) {
       return res.status(400).json({ error: 'Username and password required' });
     }
 
     let users: any[] = [];
     try {
+      console.log('[AUTH] lookup user');
       const [rows] = await pool.execute('SELECT * FROM users WHERE username = ? OR email = ?', [identifier, identifier]);
       users = rows as any[];
     } catch (err: any) {
@@ -1349,18 +1355,26 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
       }
     }
     const userArray = users as any[];
-    
+
     if (userArray.length === 0) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     const user = userArray[0];
-    const validPassword = await bcrypt.compare(password, user.password);
-    
+    const storedHash = user.password ?? user.password_hash ?? null;
+    if (!storedHash || typeof storedHash !== 'string') {
+      console.warn('[AUTH] user has no password hash');
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    console.log('[AUTH] before password compare');
+    const validPassword = await bcrypt.compare(password, storedHash);
+
     if (!validPassword) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    console.log('[AUTH] before token sign');
     if (user.shop_id) {
       const synced = await syncShopSubscription(user.shop_id);
       if (synced?.plan) {
@@ -1387,7 +1401,8 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
       }
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('[AUTH] login error:', error?.message || error);
+    res.status(500).json({ ok: false, error: 'Login failed (server error)', message: 'Login failed (server error)' });
   }
 });
 

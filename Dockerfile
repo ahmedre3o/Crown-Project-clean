@@ -4,7 +4,8 @@ FROM node:20-slim AS builder
 WORKDIR /app
 
 # Next.js inlines NEXT_PUBLIC_* at build time; must be set here, not at runtime.
-ARG NEXT_PUBLIC_API_URL
+# Default ensures login/API calls go to backend even when deploy omits --build-arg.
+ARG NEXT_PUBLIC_API_URL=https://api.crowncs.org
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
 COPY package*.json ./

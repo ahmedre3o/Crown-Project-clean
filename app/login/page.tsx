@@ -43,6 +43,8 @@ export default function LoginPage() {
         friendly = language === 'ar' ? 'بيانات الدخول غير صحيحة.' : 'Invalid login credentials.';
       } else if (msg === 'SUPER_ADMIN_EMAIL_ONLY') {
         friendly = language === 'ar' ? 'حساب مدير النظام يجب تسجيل الدخول بالبريد الإلكتروني.' : 'Super admin must sign in using email.';
+      } else if (msg === 'Server error. Please try again.') {
+        friendly = language === 'ar' ? 'خطأ في الخادم. يرجى المحاولة مرة أخرى.' : msg;
       }
       setError(friendly);
     } finally {

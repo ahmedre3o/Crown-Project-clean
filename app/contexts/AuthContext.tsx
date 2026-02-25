@@ -159,21 +159,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     const raw = await response.text();
-    if (!response.ok) {
-      try {
-        const error = JSON.parse(raw);
-        if (error?.error === 'SHOP_ID_REQUIRED') {
-          const e: any = new Error(error?.message_en || error?.error || 'SHOP_ID_REQUIRED');
-          e.code = 'SHOP_ID_REQUIRED';
-          e.message_ar = error?.message_ar;
-          e.message_en = error?.message_en;
-          throw e;
-        }
+    const contentType = (response.headers.get('content-type') || '').toLowerCase();
+    const isJson = contentType.includes('application/json');
 
-        throw new Error(error.error || 'Login failed');
-      } catch {
-        throw new Error(raw || 'Login failed');
+    if (!response.ok) {
+      if (isJson && raw) {
+        try {
+          const err = JSON.parse(raw);
+          if (err?.error === 'SHOP_ID_REQUIRED') {
+            const e: any = new Error(err?.message_en || err?.error || 'SHOP_ID_REQUIRED');
+            e.code = 'SHOP_ID_REQUIRED';
+            e.message_ar = err?.message_ar;
+            e.message_en = err?.message_en;
+            throw e;
+          }
+          throw new Error(err?.error || err?.message || 'Login failed');
+        } catch (e: any) {
+          if (e?.code === 'SHOP_ID_REQUIRED') throw e;
+          throw new Error('Login failed');
+        }
       }
+      // Never show HTML or raw non-JSON body to user
+      throw new Error('Server error. Please try again.');
     }
 
     const data = raw ? JSON.parse(raw) : {};
@@ -332,24 +339,29 @@ export const apiRequest = async (url: string, options: RequestInit = {}) => {
   }
 
   if (!response.ok) {
+    const contentType = (response.headers.get('content-type') || '').toLowerCase();
+    const isJson = contentType.includes('application/json');
     let errorMessage = 'Request failed';
-    try {
-      const error = raw ? JSON.parse(raw) : {};
-      if (error.error === 'SHOP_ID_REQUIRED' || error.error === 'shopId is required') {
-        errorMessage = 'SHOP_ID_REQUIRED';
-      } else {
-        errorMessage = error.error || error.message || errorMessage;
+
+    if (isJson && raw) {
+      try {
+        const error = JSON.parse(raw);
+        if (error.error === 'SHOP_ID_REQUIRED' || error.error === 'shopId is required') {
+          errorMessage = 'SHOP_ID_REQUIRED';
+        } else {
+          errorMessage = error.error || error.message || errorMessage;
+        }
+      } catch {
+        errorMessage = 'Request failed';
       }
-    } catch {
-      if (raw && raw.trim().startsWith('{')) errorMessage = raw;
-      else if (raw && raw.includes('<html')) {
-        errorMessage =
-          response.status === 404
-            ? 'Service not found. Please check that the backend is running.'
-            : response.status === 500
-            ? 'Server error. Please try again later.'
-            : 'Request failed. Please try again.';
-      } else if (raw) errorMessage = raw.slice(0, 200);
+    } else {
+      // Non-JSON (e.g. HTML 404) - never show body to user
+      errorMessage =
+        response.status === 404
+          ? 'Service not found. Please check that the backend is running.'
+          : response.status === 500
+          ? 'Server error. Please try again later.'
+          : 'Request failed. Please try again.';
     }
     const err: any = new Error(errorMessage);
     err.status = response.status;

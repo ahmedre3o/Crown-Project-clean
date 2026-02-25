@@ -1375,31 +1375,37 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
     }
 
     console.log('[AUTH] before token sign');
-    if (user.shop_id) {
-      const synced = await syncShopSubscription(user.shop_id);
-      if (synced?.plan) {
-        user.package = synced.plan;
+    try {
+      if (user.shop_id) {
+        const synced = await syncShopSubscription(user.shop_id);
+        if (synced?.plan) {
+          user.package = synced.plan;
+        }
       }
+
+      const token = jwt.sign(
+        { userId: user.id, role: user.role, package: user.package, shopId: user.shop_id },
+        JWT_SECRET,
+        { expiresIn: '24h' }
+      );
+      console.log('[AUTH] after token sign');
+
+      const displayName = await resolveUserDisplayName(user);
+      res.json({
+        token,
+        user: {
+          id: user.id,
+          name: displayName || undefined,
+          username: user.username,
+          role: user.role,
+          package: user.package,
+          shopId: user.shop_id
+        }
+      });
+    } catch (signErr: any) {
+      console.error('[AUTH] token/response error:', signErr?.message || signErr);
+      return res.status(500).json({ ok: false, error: 'Login failed (server error)', message: 'Login failed (server error)' });
     }
-
-    const token = jwt.sign(
-      { userId: user.id, role: user.role, package: user.package, shopId: user.shop_id },
-      JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
-    const displayName = await resolveUserDisplayName(user);
-    res.json({
-      token,
-      user: {
-        id: user.id,
-        name: displayName || undefined,
-        username: user.username,
-        role: user.role,
-        package: user.package,
-        shopId: user.shop_id
-      }
-    });
   } catch (error: any) {
     console.error('[AUTH] login error:', error?.message || error);
     res.status(500).json({ ok: false, error: 'Login failed (server error)', message: 'Login failed (server error)' });

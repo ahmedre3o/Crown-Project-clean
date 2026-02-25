@@ -33,10 +33,16 @@ echo "==> Deploy backend to Cloud Run from ./backend with labels git_sha, git_br
 gcloud config set project "$PROJECT" >/dev/null
 gcloud config set run/region "$REGION" >/dev/null
 
+# Cloud SQL instance for DB (required for login/API)
+CLOUDSQL_INSTANCE="${CLOUDSQL_INSTANCE:-gen-lang-client-0711622878:us-central1:crown-services-last-project-db}"
+DB_SOCKET="/cloudsql/$CLOUDSQL_INSTANCE"
+
 pushd backend >/dev/null
 gcloud run deploy "$SERVICE" \
   --source . \
   --allow-unauthenticated \
+  --add-cloudsql-instances="$CLOUDSQL_INSTANCE" \
+  --update-env-vars "DB_HOST=$DB_SOCKET,DB_NAME=crown_services_dev,DB_MODE=socket,INSTANCE_CONNECTION_NAME=$CLOUDSQL_INSTANCE" \
   --labels "git_sha=$SHA,git_branch=master" \
   --quiet
 popd >/dev/null

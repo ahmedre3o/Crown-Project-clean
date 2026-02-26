@@ -1,25 +1,11 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { useLanguage } from '../contexts/LanguageContext';
 import { apiRequest, getNoShopMessage, isShopMissingError, useAuth } from '../contexts/AuthContext';
 import { useRouteGuard } from '../guards/useRouteGuard';
-import { BarcodeScanner } from '../components/BarcodeScanner';
-
-interface Product {
-  id: number;
-  name_en: string;
-  name_ar: string;
-  brand?: string;
-  sku?: string;
-  barcode?: string;
-  qr_code?: string;
-  buy_price: number;
-  sell_price: number;
-  stock_quantity: number;
-  min_stock_level: number;
-}
+import { ProductForm } from '../components/ProductForm';
 
 export default function ManualEntryPage() {
   const { t, direction, language } = useLanguage();
@@ -31,117 +17,18 @@ export default function ManualEntryPage() {
   const maxProducts = Number.isFinite(Number(packageObj?.maxProducts)) ? Number(packageObj?.maxProducts) : Infinity;
   const showPackageUnavailable = !hasPackageString && !packageObj;
   const showMaxProducts = Number.isFinite(maxProducts) && maxProducts !== Infinity;
-  const [form, setForm] = useState({
-    nameEn: '',
-    nameAr: '',
-    brand: '',
-    sku: '',
-    barcode: '',
-    qrCode: '',
-    buyPrice: '',
-    sellPrice: '',
-    stockQuantity: '',
-    minStockLevel: '',
-    cartonPacksCount: '',
-    packUnitsCount: '',
-  });
-  const [products, setProducts] = useState<Product[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [scannerTarget, setScannerTarget] = useState<'barcode' | 'qr' | null>(null);
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
-  useEffect(() => {
-    loadProducts();
+  const showToast = useCallback((msg: string, type: 'success' | 'error' = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 4000);
   }, []);
 
-  const loadProducts = async () => {
-    try {
-      const data = await apiRequest('/products');
-      setProducts(data);
-    } catch (err: any) {
-      if (isShopMissingError(err)) {
-        setError(getNoShopMessage(language));
-      }
-    }
-  };
-
-  const handleBarcodeDetected = (value: string, target: 'barcode' | 'qr') => {
-    setForm((prev) => ({ ...prev, [target === 'barcode' ? 'barcode' : 'qrCode']: value }));
-    const existing = products.find(
-      (p) => p.barcode === value || p.sku === value || p.qr_code === value
-    );
-    if (existing) {
-      setForm({
-        nameEn: existing.name_en,
-        nameAr: existing.name_ar,
-        brand: existing.brand || '',
-        sku: existing.sku || '',
-        barcode: existing.barcode || value,
-        qrCode: existing.qr_code || (target === 'qr' ? value : ''),
-        buyPrice: String(existing.buy_price),
-        sellPrice: String(existing.sell_price),
-        stockQuantity: String(existing.stock_quantity),
-        minStockLevel: String(existing.min_stock_level),
-        cartonPacksCount: String((existing as any).carton_packs_count ?? ''),
-        packUnitsCount: String((existing as any).pack_units_count ?? ''),
-      });
-    }
-  };
-
-  const handleSave = async () => {
-    setError(null);
-    setMessage(null);
-    if (!form.nameEn || !form.sellPrice) {
-      setError(language === 'ar' ? 'يرجى إدخال اسم المنتج وسعر البيع' : 'Name and sell price are required.');
-      return;
-    }
-
-    try {
-      setSaving(true);
-      await apiRequest('/products', {
-        method: 'POST',
-        body: JSON.stringify({
-          nameEn: form.nameEn,
-          nameAr: form.nameAr || form.nameEn,
-          brand: form.brand,
-          sku: form.sku,
-          barcode: form.barcode,
-          qrCode: form.qrCode,
-          buyPrice: parseFloat(form.buyPrice || '0'),
-          sellPrice: parseFloat(form.sellPrice),
-          stockQuantity: parseInt(form.stockQuantity || '0', 10),
-          minStockLevel: parseInt(form.minStockLevel || '5', 10),
-          cartonPacksCount: form.cartonPacksCount ? parseInt(form.cartonPacksCount, 10) : undefined,
-          packUnitsCount: form.packUnitsCount ? parseInt(form.packUnitsCount, 10) : undefined,
-        }),
-      });
-      setMessage(language === 'ar' ? 'تم حفظ المنتج' : 'Product saved successfully.');
-      setForm({
-        nameEn: '',
-        nameAr: '',
-        brand: '',
-        sku: '',
-        barcode: '',
-        qrCode: '',
-        buyPrice: '',
-        sellPrice: '',
-        stockQuantity: '',
-        minStockLevel: '',
-        cartonPacksCount: '',
-        packUnitsCount: '',
-      });
-      await loadProducts();
-    } catch (err: any) {
-      if (isShopMissingError(err)) {
-        setError(getNoShopMessage(language));
-      } else {
-        setError(err.message || 'Failed to save');
-      }
-    } finally {
-      setSaving(false);
-    }
-  };
+  useEffect(() => {
+    setShowForm(true);
+  }, []);
 
   if (authLoading || !allowed) return null;
 
@@ -166,124 +53,42 @@ export default function ManualEntryPage() {
               {error}
             </div>
           )}
-          {message && (
-            <div className="mb-4 rounded-lg border border-green-500/40 bg-green-500/10 p-3 text-sm text-green-200">
-              {message}
+          {toast && (
+            <div
+              className={`mb-4 rounded-lg p-3 text-sm ${toast.type === 'success' ? 'bg-green-500/20 text-green-200 border border-green-500/40' : 'bg-red-500/20 text-red-200 border border-red-500/40'}`}
+            >
+              {toast.msg}
             </div>
           )}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input
-              className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-              placeholder={t('inventory.productName')}
-              value={form.nameEn}
-              onChange={(e) => setForm((prev) => ({ ...prev, nameEn: e.target.value }))}
-            />
-            <input
-              className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-              placeholder={`${t('inventory.productName')} (AR)`}
-              value={form.nameAr}
-              onChange={(e) => setForm((prev) => ({ ...prev, nameAr: e.target.value }))}
-            />
-            <input
-              className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-              placeholder={t('inventory.brand')}
-              value={form.brand}
-              onChange={(e) => setForm((prev) => ({ ...prev, brand: e.target.value }))}
-            />
-            <input
-              className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-              placeholder="SKU"
-              value={form.sku}
-              onChange={(e) => setForm((prev) => ({ ...prev, sku: e.target.value }))}
-            />
-            <div className="flex gap-2">
-              <input
-                className="flex-1 bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-                placeholder="Barcode"
-                value={form.barcode}
-                onChange={(e) => setForm((prev) => ({ ...prev, barcode: e.target.value }))}
-              />
-              <button
-                type="button"
-                onClick={() => setScannerTarget('barcode')}
-                className="px-3 py-2 rounded-lg border border-cyan-500/30 text-cyan-300 text-xs whitespace-nowrap"
-              >
-                {language === 'ar' ? 'مسح بالكاميرا' : 'Scan'}
-              </button>
-            </div>
-            <div className="flex gap-2">
-              <input
-                className="flex-1 bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-                placeholder="QR Code"
-                value={form.qrCode}
-                onChange={(e) => setForm((prev) => ({ ...prev, qrCode: e.target.value }))}
-              />
-              <button
-                type="button"
-                onClick={() => setScannerTarget('qr')}
-                className="px-3 py-2 rounded-lg border border-cyan-500/30 text-cyan-300 text-xs whitespace-nowrap"
-              >
-                {language === 'ar' ? 'مسح بالكاميرا' : 'Scan'}
-              </button>
-            </div>
-            <input
-              className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-              placeholder={t('inventory.buyPrice')}
-              value={form.buyPrice}
-              onChange={(e) => setForm((prev) => ({ ...prev, buyPrice: e.target.value }))}
-            />
-            <input
-              className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-              placeholder={t('inventory.sellPrice')}
-              value={form.sellPrice}
-              onChange={(e) => setForm((prev) => ({ ...prev, sellPrice: e.target.value }))}
-            />
-            <input
-              className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-              placeholder={t('inventory.stock')}
-              value={form.stockQuantity}
-              onChange={(e) => setForm((prev) => ({ ...prev, stockQuantity: e.target.value }))}
-            />
-            <input
-              className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-              placeholder={t('inventory.minStock')}
-              value={form.minStockLevel}
-              onChange={(e) => setForm((prev) => ({ ...prev, minStockLevel: e.target.value }))}
-            />
-            <div className="flex gap-2">
-              <input
-                className="flex-1 bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-                placeholder={language === 'ar' ? 'X (علب في الكرتونة)' : 'X (packs per carton)'}
-                value={form.cartonPacksCount}
-                onChange={(e) => setForm((prev) => ({ ...prev, cartonPacksCount: e.target.value }))}
-              />
-              <input
-                className="flex-1 bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
-                placeholder={language === 'ar' ? 'Y (قطع في العلبة)' : 'Y (pieces per pack)'}
-                value={form.packUnitsCount}
-                onChange={(e) => setForm((prev) => ({ ...prev, packUnitsCount: e.target.value }))}
-              />
-            </div>
-          </div>
+          <p className="mb-4 text-slate-300 text-sm">
+            {language === 'ar'
+              ? 'استخدم النموذج الكامل لإضافة منتج جديد. نفس الحقول والوظائف كما في المخزون.'
+              : 'Use the full form to add a new product. Same fields and features as inventory.'}
+          </p>
           <button
-            onClick={handleSave}
-            disabled={saving}
-            className="mt-6 px-6 py-2 rounded-lg bg-cyan-600 text-white font-semibold"
+            onClick={() => setShowForm(true)}
+            className="px-6 py-2 rounded-lg bg-cyan-600 text-white font-semibold"
           >
-            {t('common.save')}
+            {language === 'ar' ? 'إضافة منتج' : 'Add Product'}
           </button>
         </div>
       </div>
 
-      <BarcodeScanner
-        open={scannerTarget !== null}
-        onClose={() => setScannerTarget(null)}
-        onDetected={(value) => {
-          if (scannerTarget) handleBarcodeDetected(value, scannerTarget);
-        }}
-        language={language}
-      />
+      {showForm && (
+        <ProductForm
+          mode="add"
+          title={language === 'ar' ? 'إضافة منتج' : 'Add Product'}
+          t={t}
+          language={language}
+          showToast={showToast}
+          onSuccess={() => {
+            setError(null);
+            setShowForm(true);
+          }}
+          onCancel={() => setShowForm(false)}
+          onError={(msg) => setError(msg)}
+        />
+      )}
     </div>
   );
 }
-

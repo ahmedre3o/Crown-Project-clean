@@ -12,6 +12,16 @@ import { AIAssistant } from '../components/AIAssistant';
 import { BarcodeScanner } from '../components/BarcodeScanner';
 import { Image as ImageIcon, Pencil, MapPin, Upload } from 'lucide-react';
 
+interface ProductUnit {
+  id: number;
+  name_ar: string;
+  name_en?: string;
+  factor_to_base: number;
+  level: number;
+  sell_price?: number | null;
+  buy_price?: number | null;
+}
+
 interface Product {
   id: number;
   name_en: string;
@@ -35,6 +45,7 @@ interface Product {
   warranty_text?: string;
   return_policy_text?: string;
   gallery_urls_json?: string;
+  units?: ProductUnit[];
 }
 
 function getProductImageUrl(p: Product): string | null {
@@ -61,6 +72,12 @@ const emptyForm = {
   minStockLevel: '',
   cartonPacksCount: '',
   packUnitsCount: '',
+  pieceBuyPrice: '',
+  pieceSellPrice: '',
+  packBuyPrice: '',
+  packSellPrice: '',
+  cartonBuyPrice: '',
+  cartonSellPrice: '',
   descriptionShort: '',
   descriptionLong: '',
   warrantyText: '',
@@ -98,6 +115,9 @@ export default function InventoryPage() {
   const [availabilityData, setAvailabilityData] = useState<{ branches: Array<{ branchNameAr: string; branchNameEn: string; qty: number }> } | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [productBarcodes, setProductBarcodes] = useState<Array<{ id: number; barcode_value: string; unit_id?: number | null }>>([]);
+  const [newBarcodeValue, setNewBarcodeValue] = useState('');
+  const [newBarcodeUnitId, setNewBarcodeUnitId] = useState<number | null>(null);
 
   const showToast = useCallback((msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
@@ -114,11 +134,26 @@ export default function InventoryPage() {
     return () => window.removeEventListener('products-imported', onProductsImported);
   }, []);
 
+  useEffect(() => {
+    if (!editingId) {
+      setProductBarcodes([]);
+      return;
+    }
+    (async () => {
+      try {
+        const data = await apiRequest(`/products/${editingId}/barcodes`);
+        setProductBarcodes(Array.isArray(data) ? data : []);
+      } catch {
+        setProductBarcodes([]);
+      }
+    })();
+  }, [editingId]);
+
   const loadProducts = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await apiRequest('/products');
+      const data = await apiRequest('/products?includeUnits=1');
       setProducts(data);
     } catch (err: any) {
       if (isShopMissingError(err)) {
@@ -190,6 +225,12 @@ export default function InventoryPage() {
         minStockLevel: parseInt(form.minStockLevel || '5', 10),
         cartonPacksCount: form.cartonPacksCount ? parseInt(form.cartonPacksCount, 10) : undefined,
         packUnitsCount: form.packUnitsCount ? parseInt(form.packUnitsCount, 10) : undefined,
+        pieceBuyPrice: form.pieceBuyPrice ? parseFloat(form.pieceBuyPrice) : undefined,
+        pieceSellPrice: form.pieceSellPrice ? parseFloat(form.pieceSellPrice) : undefined,
+        packBuyPrice: form.packBuyPrice ? parseFloat(form.packBuyPrice) : undefined,
+        packSellPrice: form.packSellPrice ? parseFloat(form.packSellPrice) : undefined,
+        cartonBuyPrice: form.cartonBuyPrice ? parseFloat(form.cartonBuyPrice) : undefined,
+        cartonSellPrice: form.cartonSellPrice ? parseFloat(form.cartonSellPrice) : undefined,
         imageUrl: form.imageUrl.trim() || undefined,
         galleryUrls: galleryUrls.length > 0 ? galleryUrls : undefined,
         descriptionShort: form.descriptionShort || undefined,
@@ -239,6 +280,10 @@ export default function InventoryPage() {
     } catch {}
     const primaryUrl = product.image_url || '';
     const combined = primaryUrl ? [primaryUrl, ...galleryUrls.filter((u) => u !== primaryUrl)] : galleryUrls;
+    const units = (p.units || []) as ProductUnit[];
+    const piece = units.find((u) => u.level === 0);
+    const pack = units.find((u) => u.level === 1);
+    const carton = units.find((u) => u.level === 2);
     setForm({
       ...emptyForm,
       nameEn: product.name_en,
@@ -254,6 +299,12 @@ export default function InventoryPage() {
       minStockLevel: String(product.min_stock_level ?? ''),
       cartonPacksCount: String(product.carton_packs_count ?? ''),
       packUnitsCount: String(product.pack_units_count ?? ''),
+      pieceBuyPrice: String(piece?.buy_price ?? ''),
+      pieceSellPrice: String(piece?.sell_price ?? ''),
+      packBuyPrice: String(pack?.buy_price ?? ''),
+      packSellPrice: String(pack?.sell_price ?? ''),
+      cartonBuyPrice: String(carton?.buy_price ?? ''),
+      cartonSellPrice: String(carton?.sell_price ?? ''),
       descriptionShort: p.description_short || '',
       descriptionLong: p.description_long || '',
       warrantyText: p.warranty_text || '',
@@ -737,6 +788,131 @@ export default function InventoryPage() {
                     onChange={(e) => setForm((prev) => ({ ...prev, packUnitsCount: e.target.value }))}
                   />
                 </div>
+                <div className="md:col-span-2 text-xs text-cyan-300/80 mb-1">{language === 'ar' ? 'أسعار الوحدات (اختياري)' : 'Unit prices (optional)'}</div>
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                    placeholder={language === 'ar' ? 'قطعة شراء' : 'Piece buy'}
+                    value={form.pieceBuyPrice}
+                    onChange={(e) => setForm((prev) => ({ ...prev, pieceBuyPrice: e.target.value }))}
+                  />
+                  <input
+                    className="flex-1 bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                    placeholder={language === 'ar' ? 'قطعة بيع' : 'Piece sell'}
+                    value={form.pieceSellPrice}
+                    onChange={(e) => setForm((prev) => ({ ...prev, pieceSellPrice: e.target.value }))}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                    placeholder={language === 'ar' ? 'علبة شراء' : 'Pack buy'}
+                    value={form.packBuyPrice}
+                    onChange={(e) => setForm((prev) => ({ ...prev, packBuyPrice: e.target.value }))}
+                  />
+                  <input
+                    className="flex-1 bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                    placeholder={language === 'ar' ? 'علبة بيع' : 'Pack sell'}
+                    value={form.packSellPrice}
+                    onChange={(e) => setForm((prev) => ({ ...prev, packSellPrice: e.target.value }))}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                    placeholder={language === 'ar' ? 'كرتونة شراء' : 'Carton buy'}
+                    value={form.cartonBuyPrice}
+                    onChange={(e) => setForm((prev) => ({ ...prev, cartonBuyPrice: e.target.value }))}
+                  />
+                  <input
+                    className="flex-1 bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                    placeholder={language === 'ar' ? 'كرتونة بيع' : 'Carton sell'}
+                    value={form.cartonSellPrice}
+                    onChange={(e) => setForm((prev) => ({ ...prev, cartonSellPrice: e.target.value }))}
+                  />
+                </div>
+                {editingId && (
+                  <div className="md:col-span-2 mt-4 pt-4 border-t border-cyan-500/20">
+                    <div className="text-xs text-cyan-300/80 mb-2">{language === 'ar' ? 'باركودات إضافية (مع الوحدة)' : 'Additional barcodes (with unit)'}</div>
+                    <div className="space-y-2">
+                      {productBarcodes.map((b) => (
+                        <div key={b.id} className="flex items-center gap-2">
+                          <span className="text-sm text-slate-200 flex-1">{b.barcode_value}</span>
+                          <span className="text-xs text-slate-500">
+                            {language === 'ar' ? 'وحدة: ' : 'Unit: '}
+                            {(products.find((p) => p.id === editingId) as any)?.units?.find((u: any) => u.id === b.unit_id)?.name_ar ||
+                              (products.find((p) => p.id === editingId) as any)?.units?.find((u: any) => u.id === b.unit_id)?.name_en ||
+                              (language === 'ar' ? 'قطعة' : 'Piece')}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await apiRequest(`/products/${editingId}/barcodes/${encodeURIComponent(b.barcode_value)}`, { method: 'DELETE' });
+                                const data = await apiRequest(`/products/${editingId}/barcodes`);
+                                setProductBarcodes(Array.isArray(data) ? data : []);
+                              } catch (err: any) {
+                                showToast(err?.message || (language === 'ar' ? 'فشل الحذف' : 'Delete failed'), 'error');
+                              }
+                            }}
+                            className="text-red-400 hover:text-red-300 text-xs"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                      <div className="flex gap-2">
+                        <input
+                          className="flex-1 bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                          placeholder={language === 'ar' ? 'باركود جديد' : 'New barcode'}
+                          value={newBarcodeValue}
+                          onChange={(e) => setNewBarcodeValue(e.target.value)}
+                        />
+                        <select
+                          className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                          value={newBarcodeUnitId ?? ''}
+                          onChange={(e) => setNewBarcodeUnitId(e.target.value ? parseInt(e.target.value, 10) : null)}
+                        >
+                          <option value="">{language === 'ar' ? 'قطعة' : 'Piece'}</option>
+                          {(products.find((p) => p.id === editingId) as any)?.units
+                            ?.filter((u: any) => u.level > 0)
+                            ?.map((u: any) => (
+                              <option key={u.id} value={u.id}>
+                                {language === 'ar' ? u.name_ar : u.name_en || u.name_ar}
+                              </option>
+                            ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const val = newBarcodeValue.trim();
+                            if (!val) return;
+                            try {
+                              await apiRequest(`/products/${editingId}/barcodes`, {
+                                method: 'POST',
+                                body: JSON.stringify({ barcodeValue: val, unitId: newBarcodeUnitId }),
+                              });
+                              const data = await apiRequest(`/products/${editingId}/barcodes`);
+                              setProductBarcodes(Array.isArray(data) ? data : []);
+                              setNewBarcodeValue('');
+                              setNewBarcodeUnitId(null);
+                              showToast(language === 'ar' ? 'تمت إضافة الباركود' : 'Barcode added');
+                            } catch (err: any) {
+                              let msg = err?.message;
+                              try {
+                                if (err?.body) msg = JSON.parse(err.body)?.error || msg;
+                              } catch {}
+                              showToast(msg || (language === 'ar' ? 'فشل الإضافة' : 'Add failed'), 'error');
+                            }
+                          }}
+                          className="px-3 py-2 rounded-lg bg-cyan-600 text-white text-sm"
+                        >
+                          {language === 'ar' ? 'إضافة' : 'Add'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Storefront details */}

@@ -4247,37 +4247,99 @@ app.post('/api/activate', authenticateToken, async (req: any, res: Response) => 
 
 // ========== PRODUCTS/INVENTORY ==========
 /** Create/update product_units from carton_packs_count (X) and pack_units_count (Y). 1 كرتونة = X*Y قطعة, 1 علبة = Y قطعة. */
-async function upsertProductUnits(productId: number, cartonPacksCount: number | null, packUnitsCount: number | null) {
+async function upsertProductUnits(
+  productId: number,
+  cartonPacksCount: number | null,
+  packUnitsCount: number | null,
+  unitPrices?: { piece?: { sell?: number; buy?: number }; pack?: { sell?: number; buy?: number }; carton?: { sell?: number; buy?: number } }
+) {
   await pool.execute('DELETE FROM product_units WHERE product_id = ?', [productId]);
-  const units: Array<{ name_ar: string; name_en: string; factor_to_base: number; level: number }> = [
-    { name_ar: 'قطعة', name_en: 'Piece', factor_to_base: 1, level: 0 },
+  const units: Array<{ name_ar: string; name_en: string; factor_to_base: number; level: number; sell_price?: number; buy_price?: number }> = [
+    {
+      name_ar: 'قطعة',
+      name_en: 'Piece',
+      factor_to_base: 1,
+      level: 0,
+      sell_price: unitPrices?.piece?.sell ?? undefined,
+      buy_price: unitPrices?.piece?.buy ?? undefined,
+    },
   ];
   const X = Number(cartonPacksCount) || 0;
   const Y = Number(packUnitsCount) || 0;
   if (Y > 0) {
-    units.push({ name_ar: 'علبة', name_en: 'Pack', factor_to_base: Y, level: 1 });
+    units.push({
+      name_ar: 'علبة',
+      name_en: 'Pack',
+      factor_to_base: Y,
+      level: 1,
+      sell_price: unitPrices?.pack?.sell ?? undefined,
+      buy_price: unitPrices?.pack?.buy ?? undefined,
+    });
   }
   if (X > 0 && Y > 0) {
-    units.push({ name_ar: 'كرتونة', name_en: 'Carton', factor_to_base: X * Y, level: 2 });
+    units.push({
+      name_ar: 'كرتونة',
+      name_en: 'Carton',
+      factor_to_base: X * Y,
+      level: 2,
+      sell_price: unitPrices?.carton?.sell ?? undefined,
+      buy_price: unitPrices?.carton?.buy ?? undefined,
+    });
   }
+  const hasUnitPrices = await hasColumn('product_units', 'sell_price');
   for (const u of units) {
-    await pool.execute(
-      'INSERT INTO product_units (product_id, name_ar, name_en, factor_to_base, level) VALUES (?, ?, ?, ?, ?)',
-      [productId, u.name_ar, u.name_en, u.factor_to_base, u.level]
-    );
+    if (hasUnitPrices) {
+      await pool.execute(
+        'INSERT INTO product_units (product_id, name_ar, name_en, factor_to_base, level, sell_price, buy_price) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [productId, u.name_ar, u.name_en, u.factor_to_base, u.level, u.sell_price ?? null, u.buy_price ?? null]
+      );
+    } else {
+      await pool.execute(
+        'INSERT INTO product_units (product_id, name_ar, name_en, factor_to_base, level) VALUES (?, ?, ?, ?, ?)',
+        [productId, u.name_ar, u.name_en, u.factor_to_base, u.level]
+      );
+    }
   }
 }
 
-/** Sync product barcode to product_barcodes table for lookup. */
-async function syncProductBarcode(productId: number, barcode: string | null) {
+/** Sync product barcode to product_barcodes table for lookup. Shop-scoped when shop_id column exists. */
+async function syncProductBarcode(productId: number, barcode: string | null, shopId?: number, unitId?: number | null) {
   if (!barcode || !String(barcode).trim()) return;
   const val = String(barcode).trim();
+  const hasShopId = await hasColumn('product_barcodes', 'shop_id');
+  const resolvedShopId = shopId ?? (hasShopId ? await getProductShopId(productId) : null);
   try {
-    await pool.execute('INSERT INTO product_barcodes (product_id, barcode_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE product_id = VALUES(product_id)', [productId, val]);
+    if (hasShopId && resolvedShopId != null) {
+      const hasUnitId = await hasColumn('product_barcodes', 'unit_id');
+      if (hasUnitId) {
+        await pool.execute(
+          `INSERT INTO product_barcodes (product_id, barcode_value, shop_id, unit_id, is_active) 
+           VALUES (?, ?, ?, ?, 1) 
+           ON DUPLICATE KEY UPDATE product_id = VALUES(product_id), unit_id = VALUES(unit_id)`,
+          [productId, val, resolvedShopId, unitId ?? null]
+        );
+      } else {
+        await pool.execute(
+          `INSERT INTO product_barcodes (product_id, barcode_value, shop_id) VALUES (?, ?, ?) 
+           ON DUPLICATE KEY UPDATE product_id = VALUES(product_id)`,
+          [productId, val, resolvedShopId]
+        );
+      }
+    } else {
+      await pool.execute(
+        'INSERT INTO product_barcodes (product_id, barcode_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE product_id = VALUES(product_id)',
+        [productId, val]
+      );
+    }
   } catch (e: any) {
     if (e?.code?.includes?.('ER_DUP')) return;
     throw e;
   }
+}
+
+async function getProductShopId(productId: number): Promise<number | null> {
+  const [rows] = await pool.execute('SELECT shop_id FROM products WHERE id = ? LIMIT 1', [productId]);
+  return (rows as any[])[0]?.shop_id ?? null;
 }
 
 app.get('/api/products/lookup', authenticateToken, async (req: any, res: Response) => {
@@ -4286,23 +4348,57 @@ app.get('/api/products/lookup', authenticateToken, async (req: any, res: Respons
     if (shopId === null) return;
 
     const rawCode = Array.isArray(req.query.code) ? req.query.code[0] : req.query.code;
-    const code = String(rawCode || '').trim();
+    const rawBarcode = Array.isArray(req.query.barcode) ? req.query.barcode[0] : req.query.barcode;
+    const code = String(rawCode || rawBarcode || '').trim();
     if (!code) {
-      return res.status(400).json({ error: 'code is required' });
+      return res.status(400).json({ error: 'code or barcode is required' });
     }
 
-    let list: any[] = [];
-    const [rows] = await pool.execute(
-      `SELECT p.*, c.name_en as category_name_en, c.name_ar as category_name_ar
-       FROM products p
-       LEFT JOIN categories c ON p.category_id = c.id
-       WHERE p.shop_id = ?
-         AND (p.barcode = ? OR p.sku = ? OR p.qr_code = ?)
-       LIMIT 1`,
-      [shopId, code, code, code]
-    );
-    list = rows as any[];
-    if (list.length === 0) {
+    let product: any = null;
+    let matchedUnitId: number | null = null;
+
+    // 1) Try product_barcodes first (shop-scoped, supports unit mapping)
+    const hasBarcodesShop = await hasColumn('product_barcodes', 'shop_id');
+    if (hasBarcodesShop) {
+      const [barcodeRows] = await pool.execute(
+        `SELECT pb.product_id, pb.unit_id
+         FROM product_barcodes pb
+         WHERE pb.shop_id = ? AND pb.barcode_value = ? AND (pb.is_active = 1 OR pb.is_active IS NULL)
+         LIMIT 1`,
+        [shopId, code]
+      );
+      const barcodeList = barcodeRows as any[];
+      if (barcodeList.length > 0) {
+        matchedUnitId = barcodeList[0].unit_id ?? null;
+        const [prodRows] = await pool.execute(
+          `SELECT p.*, c.name_en as category_name_en, c.name_ar as category_name_ar
+           FROM products p
+           LEFT JOIN categories c ON p.category_id = c.id
+           WHERE p.id = ? AND p.shop_id = ? AND (p.is_deleted = 0 OR p.is_deleted IS NULL)
+           LIMIT 1`,
+          [barcodeList[0].product_id, shopId]
+        );
+        if ((prodRows as any[]).length > 0) product = (prodRows as any[])[0];
+      }
+    }
+
+    // 2) Fallback: products.barcode/sku/qr_code
+    if (!product) {
+      const [rows] = await pool.execute(
+        `SELECT p.*, c.name_en as category_name_en, c.name_ar as category_name_ar
+         FROM products p
+         LEFT JOIN categories c ON p.category_id = c.id
+         WHERE p.shop_id = ? AND (p.is_deleted = 0 OR p.is_deleted IS NULL)
+           AND (p.barcode = ? OR p.sku = ? OR p.qr_code = ?)
+         LIMIT 1`,
+        [shopId, code, code, code]
+      );
+      const list = rows as any[];
+      if (list.length > 0) product = list[0];
+    }
+
+    // 3) Legacy product_barcodes (no shop_id) fallback
+    if (!product && !hasBarcodesShop) {
       const [barcodeRows] = await pool.execute(
         `SELECT p.*, c.name_en as category_name_en, c.name_ar as category_name_ar
          FROM products p
@@ -4312,15 +4408,46 @@ app.get('/api/products/lookup', authenticateToken, async (req: any, res: Respons
          LIMIT 1`,
         [code, shopId]
       );
-      list = barcodeRows as any[];
+      const list = barcodeRows as any[];
+      if (list.length > 0) product = list[0];
     }
-    if (list.length === 0) {
+
+    if (!product) {
       return res.status(404).json({ error: 'Product not found' });
     }
-    const product = list[0];
-    const [units] = await pool.execute('SELECT id, name_ar, name_en, factor_to_base, level FROM product_units WHERE product_id = ? ORDER BY level', [product.id]);
-    (product as any).units = units || [];
-    res.json(product);
+
+    // Load units with pricing (backward compatible when sell_price/buy_price columns missing)
+    const hasUnitPrices = await hasColumn('product_units', 'sell_price');
+    const unitCols = hasUnitPrices ? 'id, name_ar, name_en, factor_to_base, level, sell_price, buy_price' : 'id, name_ar, name_en, factor_to_base, level';
+    const [units] = await pool.execute(
+      `SELECT ${unitCols} FROM product_units WHERE product_id = ? ORDER BY level`,
+      [product.id]
+    );
+    let unitsList = (units || []) as any[];
+    if (unitsList.length === 0) {
+      unitsList = [{ id: 0, name_ar: 'قطعة', name_en: 'Piece', factor_to_base: 1, level: 0, sell_price: null, buy_price: null }];
+    }
+    (product as any).units = unitsList;
+
+    // Resolve unit for response (barcode may map to specific unit)
+    let unit = unitsList.find((u: any) => u.id === matchedUnitId) || unitsList.find((u: any) => u.level === 0) || unitsList[0];
+    const sellPrice = unit?.sell_price != null ? Number(unit.sell_price) : Number(product.sell_price ?? 0);
+    const buyPrice = unit?.buy_price != null ? Number(unit.buy_price) : Number(product.buy_price ?? product.purchase_price ?? 0);
+
+    res.json({
+      ...product,
+      unit: {
+        id: unit?.id ?? 0,
+        name_ar: unit?.name_ar ?? 'قطعة',
+        name_en: unit?.name_en ?? 'Piece',
+        level: unit?.level ?? 0,
+        factor_to_base: unit?.factor_to_base ?? 1,
+        sell_price: sellPrice,
+        buy_price: buyPrice,
+      },
+      sell_price: sellPrice,
+      buy_price: buyPrice,
+    });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -4352,15 +4479,24 @@ app.get('/api/products', authenticateToken, async (req: any, res: Response) => {
     if (includeUnits && list.length > 0) {
       const ids = list.map((p) => p.id);
       const placeholders = ids.map(() => '?').join(',');
+      const hasUnitPrices = await hasColumn('product_units', 'sell_price');
+      const unitCols = hasUnitPrices ? 'product_id, id, name_ar, name_en, factor_to_base, level, sell_price, buy_price' : 'product_id, id, name_ar, name_en, factor_to_base, level';
       const [units] = await pool.execute(
-        `SELECT product_id, id, name_ar, name_en, factor_to_base, level FROM product_units WHERE product_id IN (${placeholders}) ORDER BY product_id, level`,
+        `SELECT ${unitCols} FROM product_units WHERE product_id IN (${placeholders}) ORDER BY product_id, level`,
         ids
       );
       const unitsByProduct: Record<number, any[]> = {};
       for (const u of units as any[]) {
         const pid = u.product_id;
         if (!unitsByProduct[pid]) unitsByProduct[pid] = [];
-        unitsByProduct[pid].push({ id: u.id, name_ar: u.name_ar, name_en: u.name_en, factor_to_base: u.factor_to_base, level: u.level });
+        unitsByProduct[pid].push({
+          id: u.id,
+          name_ar: u.name_ar,
+          name_en: u.name_en,
+          factor_to_base: u.factor_to_base,
+          level: u.level,
+          ...(hasUnitPrices && { sell_price: u.sell_price, buy_price: u.buy_price }),
+        });
       }
       for (const p of list) {
         p.units = unitsByProduct[p.id] || [{ id: 0, name_ar: 'قطعة', name_en: 'Piece', factor_to_base: 1, level: 0 }];
@@ -4443,6 +4579,11 @@ app.post('/api/products', authenticateToken, requireRole('super_admin', 'shop_ow
 
     const xVal = cartonPacksCount != null ? Number(cartonPacksCount) : null;
     const yVal = packUnitsCount != null ? Number(packUnitsCount) : null;
+    const unitPrices = {
+      piece: { sell: req.body.pieceSellPrice, buy: req.body.pieceBuyPrice },
+      pack: { sell: req.body.packSellPrice, buy: req.body.packBuyPrice },
+      carton: { sell: req.body.cartonSellPrice, buy: req.body.cartonBuyPrice },
+    };
 
     const [result] = await pool.execute(
       `INSERT INTO products 
@@ -4470,8 +4611,8 @@ app.post('/api/products', authenticateToken, requireRole('super_admin', 'shop_ow
 
     const insertResult = result as any;
     const productId = insertResult.insertId;
-    await upsertProductUnits(productId, xVal, yVal);
-    if (barcode) await syncProductBarcode(productId, barcode);
+    await upsertProductUnits(productId, xVal, yVal, unitPrices);
+    if (barcode) await syncProductBarcode(productId, barcode, shopId);
     res.status(201).json({ id: productId });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -4509,6 +4650,11 @@ app.put('/api/products/:id', authenticateToken, requireRole('super_admin', 'shop
       cartonPacksCount,
       packUnitsCount,
     } = req.body;
+    const unitPrices = {
+      piece: { sell: req.body.pieceSellPrice, buy: req.body.pieceBuyPrice },
+      pack: { sell: req.body.packSellPrice, buy: req.body.packBuyPrice },
+      carton: { sell: req.body.cartonSellPrice, buy: req.body.cartonBuyPrice },
+    };
 
     if (!nameEn) {
       return res.status(400).json({ error: 'Product name is required' });
@@ -4585,8 +4731,8 @@ app.put('/api/products/:id', authenticateToken, requireRole('super_admin', 'shop
       ]
     );
 
-    await upsertProductUnits(productId, xVal, yVal);
-    if (barcode) await syncProductBarcode(productId, barcode);
+    await upsertProductUnits(productId, xVal, yVal, unitPrices);
+    if (barcode) await syncProductBarcode(productId, barcode, shopId);
 
     res.json({ success: true });
   } catch (error: any) {
@@ -4609,6 +4755,78 @@ app.delete('/api/products/:id', authenticateToken, requireRole('super_admin', 's
     const affected = (result as any).affectedRows;
     if (affected === 0) {
       return res.status(404).json({ error: 'Product not found' });
+    }
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/products/:id/barcodes', authenticateToken, requireRole('super_admin', 'shop_owner', 'warehouse'), async (req: any, res: Response) => {
+  try {
+    const productId = parseInt(req.params.id, 10);
+    if (!productId) return res.status(400).json({ error: 'Invalid product id' });
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const hasShopId = await hasColumn('product_barcodes', 'shop_id');
+    const hasUnitId = await hasColumn('product_barcodes', 'unit_id');
+    const cols = hasUnitId ? 'id, barcode_value, unit_id, is_active' : 'id, barcode_value';
+    const [rows] = hasShopId
+      ? await pool.execute(`SELECT ${cols} FROM product_barcodes pb WHERE pb.product_id = ? AND pb.shop_id = ?`, [productId, shopId])
+      : await pool.execute(`SELECT ${cols} FROM product_barcodes pb JOIN products p ON p.id = pb.product_id WHERE pb.product_id = ? AND p.shop_id = ?`, [productId, shopId]);
+    res.json(rows);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/products/:id/barcodes', authenticateToken, requireRole('super_admin', 'shop_owner', 'warehouse'), async (req: any, res: Response) => {
+  try {
+    const productId = parseInt(req.params.id, 10);
+    if (!productId) return res.status(400).json({ error: 'Invalid product id' });
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const { barcodeValue, unitId } = req.body;
+    const val = String(barcodeValue || '').trim();
+    if (!val) return res.status(400).json({ error: 'barcodeValue is required' });
+    const [prod] = await pool.execute('SELECT id FROM products WHERE id = ? AND shop_id = ?', [productId, shopId]);
+    if ((prod as any[]).length === 0) return res.status(404).json({ error: 'Product not found' });
+    const hasShopId = await hasColumn('product_barcodes', 'shop_id');
+    const hasUnitId = await hasColumn('product_barcodes', 'unit_id');
+    if (hasShopId && hasUnitId) {
+      await pool.execute(
+        'INSERT INTO product_barcodes (product_id, barcode_value, shop_id, unit_id, is_active) VALUES (?, ?, ?, ?, 1)',
+        [productId, val, shopId, unitId ?? null]
+      );
+    } else if (hasShopId) {
+      await pool.execute(
+        'INSERT INTO product_barcodes (product_id, barcode_value, shop_id) VALUES (?, ?, ?)',
+        [productId, val, shopId]
+      );
+    } else {
+      await pool.execute('INSERT INTO product_barcodes (product_id, barcode_value) VALUES (?, ?)', [productId, val]);
+    }
+    res.status(201).json({ success: true });
+  } catch (e: any) {
+    if (e?.code?.includes?.('ER_DUP')) return res.status(400).json({ error: 'Barcode already exists for this shop' });
+    res.status(500).json({ error: e?.message || 'Failed to add barcode' });
+  }
+});
+
+app.delete('/api/products/:id/barcodes/:barcodeValue', authenticateToken, requireRole('super_admin', 'shop_owner', 'warehouse'), async (req: any, res: Response) => {
+  try {
+    const productId = parseInt(req.params.id, 10);
+    const barcodeValue = String(req.params.barcodeValue || '').trim();
+    if (!productId || !barcodeValue) return res.status(400).json({ error: 'Invalid id or barcode' });
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const hasShopId = await hasColumn('product_barcodes', 'shop_id');
+    if (hasShopId) {
+      const [r] = await pool.execute('DELETE FROM product_barcodes WHERE product_id = ? AND barcode_value = ? AND shop_id = ?', [productId, barcodeValue, shopId]);
+      if ((r as any).affectedRows === 0) return res.status(404).json({ error: 'Barcode not found' });
+    } else {
+      const [r] = await pool.execute('DELETE FROM product_barcodes WHERE product_id = ? AND barcode_value = ?', [productId, barcodeValue]);
+      if ((r as any).affectedRows === 0) return res.status(404).json({ error: 'Barcode not found' });
     }
     res.json({ success: true });
   } catch (error: any) {

@@ -187,20 +187,23 @@ export default function PosPage() {
     return u;
   };
 
-  const addToCart = (product: Product, unit?: ProductUnit) => {
+  const addToCart = (product: Product, unit?: ProductUnit, priceOverride?: number) => {
     const u = unit ?? getUnitForProduct(product, selectedUnitLevel);
     const factor = Number(u?.factor_to_base ?? 1);
     const avail = Number(product.available_stock ?? product.stock_quantity ?? 0);
     if (avail < factor) return;
 
+    const unitId = u?.id ?? 0;
+    const price = priceOverride ?? Number((u as any)?.sell_price ?? product.sell_price ?? 0);
+
     setCart((prev) => {
-      const existing = prev.find((item) => item.productId === product.id && item.factorToBase === factor);
+      const existing = prev.find((item) => item.productId === product.id && (item.unitId ?? 0) === unitId);
       if (existing) {
         const maxInUnit = Math.floor(avail / factor);
         if (existing.quantity >= maxInUnit) return prev;
         const nextQty = Math.min(existing.quantity + 1, maxInUnit);
         return prev.map((item) =>
-          item.productId === product.id && item.factorToBase === factor
+          item.productId === product.id && (item.unitId ?? 0) === unitId
             ? { ...item, quantity: nextQty, total: nextQty * Number(item.price || 0) }
             : item
         );
@@ -210,11 +213,11 @@ export default function PosPage() {
         {
           productId: product.id,
           name: language === 'ar' ? product.name_ar : product.name_en,
-          price: Number(product.sell_price || 0),
+          price,
           quantity: 1,
-          total: Number(product.sell_price || 0),
+          total: price,
           factorToBase: factor,
-          unitId: u?.id,
+          unitId: unitId || undefined,
         },
       ];
     });
@@ -231,15 +234,28 @@ export default function PosPage() {
         (product) => product.barcode === code || product.sku === code || product.qr_code === code
       );
 
-      // DB lookup fallback (ensures scanner always works even with large inventories)
+      let matchedUnit: ProductUnit | undefined;
+      let matchedPrice: number | undefined;
+
       if (!match) {
         try {
           const lookedUp = await apiRequest(`/products/lookup?code=${encodeURIComponent(code)}`);
           if (lookedUp?.id) {
             match = lookedUp as Product;
+            if (lookedUp.unit) {
+              matchedUnit = {
+                id: lookedUp.unit.id ?? 0,
+                name_ar: lookedUp.unit.name_ar ?? 'قطعة',
+                name_en: lookedUp.unit.name_en ?? 'Piece',
+                factor_to_base: lookedUp.unit.factor_to_base ?? 1,
+                level: lookedUp.unit.level ?? 0,
+              };
+              matchedPrice = Number(lookedUp.unit.sell_price ?? lookedUp.sell_price ?? 0);
+            }
             setProducts((prev) => {
               const exists = prev.some((p) => p.id === match!.id);
-              return exists ? prev.map((p) => (p.id === match!.id ? match! : p)) : [match!, ...prev];
+              const merged = { ...match!, units: match!.units ?? lookedUp.units ?? [] };
+              return exists ? prev.map((p) => (p.id === match!.id ? merged : p)) : [merged, ...prev];
             });
           }
         } catch {
@@ -248,7 +264,7 @@ export default function PosPage() {
       }
 
       if (match) {
-        addToCart(match as Product);
+        addToCart(match as Product, matchedUnit, matchedPrice);
         setScanMessage(language === 'ar' ? 'تمت إضافة المنتج' : 'Product added to cart.');
       } else {
         setScanMessage(language === 'ar' ? 'لم يتم العثور على المنتج' : 'Product not found.');
@@ -364,9 +380,14 @@ export default function PosPage() {
     return () => window.removeEventListener('keydown', onKeyDown, true);
   }, []);
 
-  const updateQuantity = (productId: number, delta: number, itemFactor?: number) => {
+  const updateQuantity = (productId: number, delta: number, itemKey?: { unitId?: number; factorToBase?: number }) => {
     setCart((prev) => {
-      const item = prev.find((i) => i.productId === productId && (itemFactor == null || i.factorToBase === itemFactor));
+      const item = prev.find((i) => {
+        if (i.productId !== productId) return false;
+        if (itemKey?.unitId != null) return (i.unitId ?? 0) === itemKey.unitId;
+        if (itemKey?.factorToBase != null) return i.factorToBase === itemKey.factorToBase;
+        return true;
+      });
       if (!item) return prev;
 
       const product = products.find((p) => p.id === productId);
@@ -375,23 +396,25 @@ export default function PosPage() {
       const avail = Number(product.available_stock ?? product.stock_quantity ?? 0);
       const maxInUnit = Math.floor(avail / item.factorToBase);
       const newQuantity = item.quantity + delta;
+      const sameItem = (x: typeof item) => x.productId === productId && ((item.unitId != null && x.unitId === item.unitId) || (item.unitId == null && x.factorToBase === item.factorToBase));
       if (newQuantity <= 0) {
-        return prev.filter((i) => !(i.productId === productId && i.factorToBase === item.factorToBase));
+        return prev.filter((i) => !sameItem(i));
       }
       if (newQuantity > maxInUnit) return prev;
 
-      return prev.map((i) =>
-        i.productId === productId && i.factorToBase === item.factorToBase
-          ? { ...i, quantity: newQuantity, total: newQuantity * i.price }
-          : i
-      );
+      return prev.map((i) => (sameItem(i) ? { ...i, quantity: newQuantity, total: newQuantity * i.price } : i));
     });
   };
 
-  const removeFromCart = (productId: number, factorToBase?: number) => {
+  const removeFromCart = (productId: number, itemKey?: { unitId?: number; factorToBase?: number }) => {
     setCart((prev) =>
-      factorToBase != null
-        ? prev.filter((item) => !(item.productId === productId && item.factorToBase === factorToBase))
+      itemKey
+        ? prev.filter((item) => {
+            if (item.productId !== productId) return true;
+            if (itemKey.unitId != null) return (item.unitId ?? 0) !== itemKey.unitId;
+            if (itemKey.factorToBase != null) return item.factorToBase !== itemKey.factorToBase;
+            return false;
+          })
         : prev.filter((item) => item.productId !== productId)
     );
   };
@@ -963,7 +986,15 @@ export default function PosPage() {
                     <p className="text-sm text-gray-400 mb-2">{product.brand}</p>
                     <div className="flex justify-between items-center">
                       <span className="text-cyan-400 font-bold">
-                        {formatCurrency(product.sell_price || 0, language === 'ar' ? 'ar' : 'en', currency, symbol)}
+                        {formatCurrency(
+                          (() => {
+                            const u = getUnitForProduct(product, selectedUnitLevel);
+                            return Number((u as any)?.sell_price ?? product.sell_price ?? 0);
+                          })(),
+                          language === 'ar' ? 'ar' : 'en',
+                          currency,
+                          symbol
+                        )}
                       </span>
                       <span className={`text-xs ${(product.available_stock ?? product.stock_quantity) > 0 ? 'text-green-400' : 'text-red-400'}`}>
                         {(product.available_stock ?? product.stock_quantity)} {t('pos.inStock')}
@@ -1012,21 +1043,21 @@ export default function PosPage() {
                     <div key={item.productId} className="bg-gray-800 p-3 rounded-lg">
                       <div className="flex justify-between items-start mb-2">
                         <h4 className="font-medium text-white flex-1">{item.name}</h4>
-                        <button onClick={() => removeFromCart(item.productId, item.factorToBase)} className="text-red-400 hover:text-red-300 ml-2">
+                        <button onClick={() => removeFromCart(item.productId, { unitId: item.unitId, factorToBase: item.factorToBase })} className="text-red-400 hover:text-red-300 ml-2">
                           <X className="w-4 h-4" />
                         </button>
                       </div>
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => updateQuantity(item.productId, -1, item.factorToBase)}
+                            onClick={() => updateQuantity(item.productId, -1, { unitId: item.unitId, factorToBase: item.factorToBase })}
                             className="w-8 h-8 rounded bg-gray-700 hover:bg-gray-600 flex items-center justify-center text-sm"
                           >
                             -
                           </button>
                           <span className="text-white font-medium">{item.quantity}</span>
                           <button
-                            onClick={() => updateQuantity(item.productId, 1, item.factorToBase)}
+                            onClick={() => updateQuantity(item.productId, 1, { unitId: item.unitId, factorToBase: item.factorToBase })}
                             className="w-8 h-8 rounded bg-gray-700 hover:bg-gray-600 flex items-center justify-center text-sm"
                           >
                             +

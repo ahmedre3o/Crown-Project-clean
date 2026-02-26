@@ -266,6 +266,7 @@ export function getNoShopMessage(language: string): string {
 const SHOP_OPTIONAL_PREFIXES = [
   '/auth',
   '/public',
+  '/storefront',
   '/health',
   '/setup-admin',
   '/admin/shops',

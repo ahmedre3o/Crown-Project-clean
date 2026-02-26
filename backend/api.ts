@@ -17,6 +17,11 @@ import csvParser from 'csv-parser';
 import { GoogleGenAI } from '@google/genai';
 import { domainToASCII } from 'url';
 import { Storage } from '@google-cloud/storage';
+import {
+  applyProductDiscount,
+  generateCouponCode,
+  calculateCouponDiscount,
+} from './discounts';
 
 declare global {
   namespace Express {
@@ -3067,6 +3072,206 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requirePackageFeatu
   }
 });
 
+// ========== ADMIN COUPONS (shop-scoped) ==========
+app.post('/api/coupons', authenticateToken, requirePackageFeature('storefront'), async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const { type, value, starts_at, expires_at, usage_limit, min_order_total } = req.body || {};
+    const couponType = String(type || 'percent').toLowerCase();
+    if (couponType !== 'percent' && couponType !== 'fixed') {
+      return res.status(400).json({ error: 'type must be percent or fixed' });
+    }
+    const couponValue = Number(value);
+    if (!Number.isFinite(couponValue) || couponValue < 0) {
+      return res.status(400).json({ error: 'value must be a non-negative number' });
+    }
+    const code = await generateCouponCode(shopId, couponType as 'percent' | 'fixed', couponValue);
+    const startsAt = starts_at ? new Date(starts_at) : null;
+    const expiresAt = expires_at ? new Date(expires_at) : null;
+    const usageLimit = usage_limit != null && Number.isFinite(Number(usage_limit)) ? Math.max(0, Math.floor(Number(usage_limit))) : null;
+    const minOrderTotal = min_order_total != null && Number.isFinite(Number(min_order_total)) ? Number(min_order_total) : null;
+    const userId = req.user?.id ?? null;
+    const [result] = await pool.execute(
+      `INSERT INTO coupons (shop_id, code, type, value, is_active, starts_at, expires_at, usage_limit, min_order_total, created_by_user_id)
+       VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
+      [shopId, code, couponType, couponValue, startsAt, expiresAt, usageLimit, minOrderTotal, userId]
+    );
+    const insertId = (result as any).insertId;
+    const [rows] = await pool.execute('SELECT * FROM coupons WHERE id = ?', [insertId]);
+    const coupon = (rows as any[])[0];
+    res.status(201).json({ coupon });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/coupons', authenticateToken, requirePackageFeature('storefront'), async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const [rows] = await pool.execute(
+      'SELECT * FROM coupons WHERE shop_id = ? ORDER BY created_at DESC',
+      [shopId]
+    );
+    res.json(rows || []);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/coupons/:id', authenticateToken, requirePackageFeature('storefront'), async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Invalid coupon id' });
+    const [existing] = await pool.execute('SELECT * FROM coupons WHERE id = ? AND shop_id = ?', [id, shopId]);
+    if ((existing as any[]).length === 0) return res.status(404).json({ error: 'Coupon not found' });
+    const { is_active, starts_at, expires_at, usage_limit, min_order_total } = req.body || {};
+    const updates: string[] = [];
+    const params: any[] = [];
+    if (is_active !== undefined) {
+      updates.push('is_active = ?');
+      params.push(is_active ? 1 : 0);
+    }
+    if (starts_at !== undefined) {
+      updates.push('starts_at = ?');
+      params.push(starts_at ? new Date(starts_at) : null);
+    }
+    if (expires_at !== undefined) {
+      updates.push('expires_at = ?');
+      params.push(expires_at ? new Date(expires_at) : null);
+    }
+    if (usage_limit !== undefined) {
+      updates.push('usage_limit = ?');
+      params.push(usage_limit != null && Number.isFinite(Number(usage_limit)) ? Math.max(0, Math.floor(Number(usage_limit))) : null);
+    }
+    if (min_order_total !== undefined) {
+      updates.push('min_order_total = ?');
+      params.push(min_order_total != null && Number.isFinite(Number(min_order_total)) ? Number(min_order_total) : null);
+    }
+    if (updates.length === 0) return res.json({ coupon: (existing as any[])[0] });
+    params.push(id, shopId);
+    await pool.execute(
+      `UPDATE coupons SET ${updates.join(', ')} WHERE id = ? AND shop_id = ?`,
+      params
+    );
+    const [rows] = await pool.execute('SELECT * FROM coupons WHERE id = ?', [id]);
+    res.json({ coupon: (rows as any[])[0] });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/coupons/:id', authenticateToken, requirePackageFeature('storefront'), async (req: any, res: Response) => {
+  try {
+    const shopId = getShopIdOrFail(req, res);
+    if (shopId === null) return;
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Invalid coupon id' });
+    await pool.execute('UPDATE coupons SET is_active = 0 WHERE id = ? AND shop_id = ?', [id, shopId]);
+    const [rows] = await pool.execute('SELECT * FROM coupons WHERE id = ? AND shop_id = ?', [id, shopId]);
+    if ((rows as any[]).length === 0) return res.status(404).json({ error: 'Coupon not found' });
+    res.json({ ok: true, message: 'Coupon disabled' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== CHECKOUT APPLY COUPON (public, for online store) ==========
+const handleApplyCoupon = async (req: Request, res: Response) => {
+  const body = (req as any).body || {};
+  const requestLang = body?.lang === 'en' ? 'en' : 'ar';
+  const t = (ar: string, en: string) => (requestLang === 'ar' ? ar : en);
+  try {
+    const { shopId: rawShopId, code, orderTotal } = body;
+    let shopId = Number(rawShopId || 0);
+    if (!Number.isFinite(shopId) || shopId <= 0) {
+      const dom = String(req.headers?.['x-shop-domain'] || req.headers?.['x-forwarded-host'] || req.headers?.host || '').trim().toLowerCase();
+      if (dom) {
+        const [rows] = await pool.execute(
+          'SELECT shop_id FROM domains WHERE domain = ? AND is_active = 1 AND status = ? LIMIT 1',
+          [dom, 'active']
+        );
+        shopId = Number((rows as any[])[0]?.shop_id || 0);
+      }
+    }
+    if (!Number.isFinite(shopId) || shopId <= 0) {
+      return res.status(400).json({ valid: false, error: t('معرف المتجر مطلوب', 'shopId is required') });
+    }
+    const codeStr = String(code || '').trim();
+    if (!codeStr) {
+      return res.status(400).json({ valid: false, error: t('كود القسيمة مطلوب', 'Coupon code is required') });
+    }
+    const orderTotalNum = Number(orderTotal);
+    if (!Number.isFinite(orderTotalNum) || orderTotalNum < 0) {
+      return res.status(400).json({ valid: false, error: t('إجمالي الطلب مطلوب', 'Order total is required') });
+    }
+    const [rows] = await pool.execute(
+      'SELECT * FROM coupons WHERE shop_id = ? AND LOWER(code) = LOWER(?)',
+      [shopId, codeStr]
+    );
+    const coupon = (rows as any[])[0];
+    if (!coupon) {
+      return res.json({
+        valid: false,
+        error: t('كود القسيمة غير صالح', 'Invalid coupon code'),
+      });
+    }
+    if (!coupon.is_active) {
+      return res.json({
+        valid: false,
+        error: t('هذه القسيمة غير نشطة', 'This coupon is not active'),
+      });
+    }
+    const now = new Date();
+    if (coupon.starts_at && new Date(coupon.starts_at) > now) {
+      return res.json({
+        valid: false,
+        error: t('هذه القسيمة لم تبدأ بعد', 'This coupon has not started yet'),
+      });
+    }
+    if (coupon.expires_at && new Date(coupon.expires_at) < now) {
+      return res.json({
+        valid: false,
+        error: t('هذه القسيمة منتهية الصلاحية', 'This coupon has expired'),
+      });
+    }
+    if (coupon.usage_limit != null && Number(coupon.usage_count) >= Number(coupon.usage_limit)) {
+      return res.json({
+        valid: false,
+        error: t('تم استنفاد استخدام هذه القسيمة', 'This coupon has reached its usage limit'),
+      });
+    }
+    if (coupon.min_order_total != null && orderTotalNum < Number(coupon.min_order_total)) {
+      return res.json({
+        valid: false,
+        error: t('الحد الأدنى للطلب غير محقق', 'Minimum order total not met'),
+      });
+    }
+    const discountTotal = calculateCouponDiscount(orderTotalNum, coupon.type, Number(coupon.value));
+    const totalAfterDiscount = Math.max(0, orderTotalNum - discountTotal);
+    res.json({
+      valid: true,
+      discountTotal,
+      totalBeforeDiscount: orderTotalNum,
+      totalAfterDiscount,
+      coupon: {
+        id: coupon.id,
+        code: coupon.code,
+        type: coupon.type,
+        value: coupon.value,
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ valid: false, error: error?.message || 'Server error' });
+  }
+};
+
+app.post('/api/checkout/apply-coupon', handleApplyCoupon);
+app.post('/api/public/storefront/checkout/apply-coupon', handleApplyCoupon);
+
 // ========== ADMIN PAYMENTS / ORDERS (payments page) ==========
 app.get('/api/admin/payments-orders/orders', authenticateToken, async (req: any, res: Response) => {
   try {
@@ -4527,6 +4732,9 @@ app.post('/api/products', authenticateToken, requireRole('super_admin', 'shop_ow
       qrCode,
       cartonPacksCount,
       packUnitsCount,
+      discountType,
+      discountValue,
+      discountActive,
     } = req.body;
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -4585,28 +4793,39 @@ app.post('/api/products', authenticateToken, requireRole('super_admin', 'shop_ow
       carton: { sell: req.body.cartonSellPrice, buy: req.body.cartonBuyPrice },
     };
 
+    const hasDiscountCols = await hasColumn('products', 'discount_type');
+    const discountTypeVal = ['none', 'percent', 'fixed'].includes(String(discountType || 'none')) ? String(discountType) : 'none';
+    const discountValueVal = discountValue != null && Number.isFinite(Number(discountValue)) ? Number(discountValue) : null;
+    const discountActiveVal = discountActive ? 1 : 0;
+
+    const insertCols = hasDiscountCols
+      ? 'name_en, name_ar, sku, barcode, qr_code, brand, category_id, buy_price, sell_price, stock_quantity, min_stock_level, image_url, gallery_urls_json, shop_id, carton_packs_count, pack_units_count, discount_type, discount_value, discount_active'
+      : 'name_en, name_ar, sku, barcode, qr_code, brand, category_id, buy_price, sell_price, stock_quantity, min_stock_level, image_url, gallery_urls_json, shop_id, carton_packs_count, pack_units_count';
+    const insertPlaceholders = hasDiscountCols ? '?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?' : '?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?';
+    const insertParams: any[] = [
+      nameEn,
+      nameAr || nameEn,
+      sku || null,
+      barcode || null,
+      qrCode || null,
+      brand || null,
+      categoryId || null,
+      buyPrice || 0,
+      computedSellPrice,
+      stockQuantity || 0,
+      minStockLevel || 5,
+      primaryImage,
+      galleryJson,
+      shopId,
+      Number.isFinite(xVal) ? xVal : null,
+      Number.isFinite(yVal) ? yVal : null,
+    ];
+    if (hasDiscountCols) {
+      insertParams.push(discountTypeVal, discountValueVal, discountActiveVal);
+    }
     const [result] = await pool.execute(
-      `INSERT INTO products 
-       (name_en, name_ar, sku, barcode, qr_code, brand, category_id, buy_price, sell_price, stock_quantity, min_stock_level, image_url, gallery_urls_json, shop_id, carton_packs_count, pack_units_count)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        nameEn,
-        nameAr || nameEn,
-        sku || null,
-        barcode || null,
-        qrCode || null,
-        brand || null,
-        categoryId || null,
-        buyPrice || 0,
-        computedSellPrice,
-        stockQuantity || 0,
-        minStockLevel || 5,
-        primaryImage,
-        galleryJson,
-        shopId,
-        Number.isFinite(xVal) ? xVal : null,
-        Number.isFinite(yVal) ? yVal : null,
-      ]
+      `INSERT INTO products (${insertCols}) VALUES (${insertPlaceholders})`,
+      insertParams
     );
 
     const insertResult = result as any;
@@ -4649,6 +4868,9 @@ app.put('/api/products/:id', authenticateToken, requireRole('super_admin', 'shop
       extra_fields: extraFieldsBody,
       cartonPacksCount,
       packUnitsCount,
+      discountType,
+      discountValue,
+      discountActive,
     } = req.body;
     const unitPrices = {
       piece: { sell: req.body.pieceSellPrice, buy: req.body.pieceBuyPrice },
@@ -4695,40 +4917,54 @@ app.put('/api/products/:id', authenticateToken, requireRole('super_admin', 'shop
     const xVal = cartonPacksCount != null ? Number(cartonPacksCount) : null;
     const yVal = packUnitsCount != null ? Number(packUnitsCount) : null;
 
+    const hasDiscountCols = await hasColumn('products', 'discount_type');
+    const discountTypeVal = ['none', 'percent', 'fixed'].includes(String(discountType || 'none')) ? String(discountType) : 'none';
+    const discountValueVal = discountValue != null && Number.isFinite(Number(discountValue)) ? Number(discountValue) : null;
+    const discountActiveVal = discountActive ? 1 : 0;
+
+    const updateSet = hasDiscountCols
+      ? `name_en = ?, name_ar = ?, sku = ?, barcode = ?, qr_code = ?, brand = ?, buy_price = ?, sell_price = ?,
+         stock_quantity = ?, min_stock_level = ?, image_url = ?, gallery_urls_json = ?,
+         description_short = ?, description_long = ?, specs_json = ?, warranty_text = ?, return_policy_text = ?,
+         is_incomplete = ?, missing_fields = ?, extra_fields = ?,
+         carton_packs_count = ?, pack_units_count = ?, discount_type = ?, discount_value = ?, discount_active = ?`
+      : `name_en = ?, name_ar = ?, sku = ?, barcode = ?, qr_code = ?, brand = ?, buy_price = ?, sell_price = ?,
+         stock_quantity = ?, min_stock_level = ?, image_url = ?, gallery_urls_json = ?,
+         description_short = ?, description_long = ?, specs_json = ?, warranty_text = ?, return_policy_text = ?,
+         is_incomplete = ?, missing_fields = ?, extra_fields = ?,
+         carton_packs_count = ?, pack_units_count = ?`;
+    const updateParams: any[] = [
+      nameEn,
+      nameAr || nameEn,
+      sku || null,
+      barcode || null,
+      qrCode || null,
+      brand || null,
+      buyPrice || 0,
+      computedSellPrice,
+      stockQuantity || 0,
+      minStockLevel || 5,
+      primaryImage,
+      galleryJson,
+      descriptionShort || null,
+      descriptionLong || null,
+      specsJson,
+      warrantyText || null,
+      returnPolicyText || null,
+      isComplete ? 0 : 1,
+      isComplete ? null : missingFieldsJson,
+      extraFieldsJson,
+      Number.isFinite(xVal) ? xVal : null,
+      Number.isFinite(yVal) ? yVal : null,
+    ];
+    if (hasDiscountCols) {
+      updateParams.push(discountTypeVal, discountValueVal, discountActiveVal);
+    }
+    updateParams.push(productId, shopId);
+
     await pool.execute(
-      `UPDATE products 
-       SET name_en = ?, name_ar = ?, sku = ?, barcode = ?, qr_code = ?, brand = ?, buy_price = ?, sell_price = ?,
-           stock_quantity = ?, min_stock_level = ?, image_url = ?, gallery_urls_json = ?,
-           description_short = ?, description_long = ?, specs_json = ?, warranty_text = ?, return_policy_text = ?,
-           is_incomplete = ?, missing_fields = ?, extra_fields = ?,
-           carton_packs_count = ?, pack_units_count = ?
-       WHERE id = ? AND shop_id = ?`,
-      [
-        nameEn,
-        nameAr || nameEn,
-        sku || null,
-        barcode || null,
-        qrCode || null,
-        brand || null,
-        buyPrice || 0,
-        computedSellPrice,
-        stockQuantity || 0,
-        minStockLevel || 5,
-        primaryImage,
-        galleryJson,
-        descriptionShort || null,
-        descriptionLong || null,
-        specsJson,
-        warrantyText || null,
-        returnPolicyText || null,
-        isComplete ? 0 : 1,
-        isComplete ? null : missingFieldsJson,
-        extraFieldsJson,
-        Number.isFinite(xVal) ? xVal : null,
-        Number.isFinite(yVal) ? yVal : null,
-        productId,
-        shopId,
-      ]
+      `UPDATE products SET ${updateSet} WHERE id = ? AND shop_id = ?`,
+      updateParams
     );
 
     await upsertProductUnits(productId, xVal, yVal, unitPrices);
@@ -6343,6 +6579,7 @@ const handleStorefrontOrderCreate = async (req: Request, res: Response) => {
       notes,
       paymentMethod,
       items,
+      couponCode,
     } = body;
     const addr = address || detailedAddress;
     let shopId = Number(rawShopId || 0);
@@ -6412,18 +6649,28 @@ const handleStorefrontOrderCreate = async (req: Request, res: Response) => {
         quantity: number;
       }> = [];
 
+      const hasDiscountCols = await hasColumn('products', 'discount_type');
+      const prodSelect = hasDiscountCols
+        ? 'SELECT id, name_en, name_ar, sku, barcode, sell_price, stock_quantity, discount_type, discount_value, discount_active FROM products WHERE id = ? AND shop_id = ?'
+        : 'SELECT id, name_en, name_ar, sku, barcode, sell_price, stock_quantity FROM products WHERE id = ? AND shop_id = ?';
+
       for (const it of items) {
         const productId = Number(it?.productId || it?.id || 0);
         const quantity = Math.max(1, Math.floor(Number(it?.quantity || 1)));
         if (!Number.isFinite(productId) || productId <= 0 || quantity <= 0) continue;
 
-        const [prods] = await conn.execute(
-          'SELECT id, name_en, name_ar, sku, barcode, sell_price, stock_quantity FROM products WHERE id = ? AND shop_id = ?',
-          [productId, shopId]
-        );
+        const [prods] = await conn.execute(prodSelect, [productId, shopId]);
         const prod = (prods as any[])[0];
         if (!prod) continue;
-        const price = Number(prod.sell_price || 0);
+        let price = Number(prod.sell_price || 0);
+        if (hasDiscountCols && prod.discount_active) {
+          price = applyProductDiscount(
+            price,
+            (prod.discount_type || 'none') as 'none' | 'percent' | 'fixed',
+            prod.discount_value,
+            prod.discount_active
+          );
+        }
         if (!Number.isFinite(price) || price < 0) continue;
         const stock = Number(prod.stock_quantity ?? 0);
         if (Number.isFinite(stock) && stock < quantity) {
@@ -6458,6 +6705,33 @@ const handleStorefrontOrderCreate = async (req: Request, res: Response) => {
         return res.status(400).json({ error: t('لا توجد منتجات صالحة', 'No valid items') });
       }
 
+      let totalBeforeDiscount = total;
+      let discountTotal: number | null = null;
+      let couponId: number | null = null;
+      let couponCodeSaved: string | null = null;
+
+      if (couponCode && String(couponCode).trim().length > 0) {
+        const codeStr = String(couponCode).trim();
+        const [couponRows] = await conn.execute(
+          'SELECT * FROM coupons WHERE shop_id = ? AND LOWER(code) = LOWER(?)',
+          [shopId, codeStr]
+        );
+        const coupon = (couponRows as any[])[0];
+        if (coupon && coupon.is_active) {
+          const now = new Date();
+          const validStart = !coupon.starts_at || new Date(coupon.starts_at) <= now;
+          const validExpiry = !coupon.expires_at || new Date(coupon.expires_at) >= now;
+          const validUsage = coupon.usage_limit == null || Number(coupon.usage_count) < Number(coupon.usage_limit);
+          const validMin = coupon.min_order_total == null || total >= Number(coupon.min_order_total);
+          if (validStart && validExpiry && validUsage && validMin) {
+            discountTotal = calculateCouponDiscount(total, coupon.type, Number(coupon.value));
+            total = Math.max(0, total - discountTotal);
+            couponId = coupon.id;
+            couponCodeSaved = coupon.code;
+          }
+        }
+      }
+
       const paymentMethodRaw = String(paymentMethod || '').trim();
       const paymentMethodCode = normalizePaymentMethod(paymentMethodRaw || 'COD');
       let publicCode = generatePublicCode();
@@ -6469,25 +6743,42 @@ const handleStorefrontOrderCreate = async (req: Request, res: Response) => {
         tries += 1;
       }
       const currency = shop.currency_code || 'EGP';
+      const hasCouponCols = await hasColumn('online_orders', 'coupon_id');
+      const insertCols = hasCouponCols
+        ? 'shop_id, status, order_status, customer_name, phone, governorate, city, address, notes, payment_method, subtotal, total, currency, source, public_code, coupon_id, coupon_code, discount_total, total_before_discount'
+        : 'shop_id, status, order_status, customer_name, phone, governorate, city, address, notes, payment_method, subtotal, total, currency, source, public_code';
+      const insertVals = hasCouponCols
+        ? '?, \'pending\', \'NEW\', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \'online\', ?, ?, ?, ?, ?'
+        : '?, \'pending\', \'NEW\', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \'online\', ?';
+      const insertParams: any[] = [
+        shopId,
+        String(customerName).trim(),
+        phoneStr,
+        String(governorate).trim(),
+        String(city).trim(),
+        String(addr).trim(),
+        notes ? String(notes).trim() : null,
+        paymentMethodRaw || paymentMethodCode,
+        totalBeforeDiscount,
+        total,
+        currency,
+        publicCode,
+      ];
+      if (hasCouponCols) {
+        insertParams.push(couponId, couponCodeSaved, discountTotal, totalBeforeDiscount);
+      }
       const [ordResult] = await conn.execute(
-        `INSERT INTO online_orders (shop_id, status, order_status, customer_name, phone, governorate, city, address, notes, payment_method, subtotal, total, currency, source, public_code)
-         VALUES (?, 'pending', 'NEW', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'online', ?)`,
-        [
-          shopId,
-          String(customerName).trim(),
-          phoneStr,
-          String(governorate).trim(),
-          String(city).trim(),
-          String(addr).trim(),
-          notes ? String(notes).trim() : null,
-          paymentMethodRaw || paymentMethodCode,
-          total,
-          total,
-          currency,
-          publicCode,
-        ]
+        `INSERT INTO online_orders (${insertCols}) VALUES (${insertVals})`,
+        insertParams
       );
       const orderId = (ordResult as any).insertId;
+
+      if (couponId != null) {
+        await conn.execute(
+          'UPDATE coupons SET usage_count = usage_count + 1 WHERE id = ? AND shop_id = ?',
+          [couponId, shopId]
+        );
+      }
 
       for (const it of orderItems) {
         await conn.execute(
@@ -6858,17 +7149,33 @@ app.get('/api/public/storefront/:shopId', async (req: Request, res: Response) =>
       return res.status(404).json({ error: 'Storefront not available' });
     }
     
-    const [products] = await pool.execute(`
-      SELECT p.*, c.name_en as category_name_en, c.name_ar as category_name_ar 
-      FROM products p 
-      LEFT JOIN categories c ON p.category_id = c.id 
+    const [productsRaw] = await pool.execute(`
+      SELECT p.*, c.name_en as category_name_en, c.name_ar as category_name_ar
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
       WHERE p.shop_id = ? AND p.stock_quantity > 0
       ORDER BY p.created_at DESC
     `, [shopId]);
-    
+    const products = productsRaw as any[];
+    const hasDiscountCols = await hasColumn('products', 'discount_type');
+    const productsWithPrice = hasDiscountCols
+      ? products.map((p) => {
+          const basePrice = Number(p.sell_price || 0);
+          const effective = p.discount_active
+            ? applyProductDiscount(
+                basePrice,
+                (p.discount_type || 'none') as 'none' | 'percent' | 'fixed',
+                p.discount_value,
+                p.discount_active
+              )
+            : basePrice;
+          return { ...p, sell_price: effective, original_sell_price: basePrice };
+        })
+      : products;
+
     res.json({
       shop: shopArray[0],
-      products
+      products: productsWithPrice
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

@@ -59,6 +59,9 @@ export const EMPTY_PRODUCT_FORM = {
   returnPolicyText: '',
   specs: [] as { key: string; value: string }[],
   galleryUrls: [] as string[],
+  discountType: 'none' as 'none' | 'percent' | 'fixed',
+  discountValue: '',
+  discountActive: false,
 };
 
 const isValidImageUrl = (s: string) => /^https?:\/\/.+/i.test(String(s || '').trim());
@@ -89,6 +92,9 @@ export type ProductFormPayload = {
   warrantyText?: string;
   returnPolicyText?: string;
   specs?: { key: string; value: string }[];
+  discountType?: 'none' | 'percent' | 'fixed';
+  discountValue?: number | null;
+  discountActive?: boolean;
 };
 
 export interface ProductFormProps {
@@ -173,6 +179,9 @@ export function ProductForm({
         returnPolicyText: p.return_policy_text || '',
         specs,
         galleryUrls,
+        discountType: ['none', 'percent', 'fixed'].includes(p.discount_type) ? p.discount_type : 'none',
+        discountValue: p.discount_value != null ? String(p.discount_value) : '',
+        discountActive: Boolean(p.discount_active),
       });
     } else {
       setForm(EMPTY_PRODUCT_FORM);
@@ -239,6 +248,9 @@ export function ProductForm({
         warrantyText: form.warrantyText || undefined,
         returnPolicyText: form.returnPolicyText || undefined,
         specs: form.specs?.length ? form.specs : undefined,
+        discountType: form.discountType,
+        discountValue: form.discountValue ? parseFloat(form.discountValue) : null,
+        discountActive: form.discountActive,
       };
 
       if (mode === 'edit' && productId) {
@@ -416,6 +428,38 @@ export function ProductForm({
                 value={form.minStockLevel}
                 onChange={(e) => setForm((prev) => ({ ...prev, minStockLevel: e.target.value }))}
               />
+              <div className="md:col-span-2 flex flex-wrap items-center gap-3 pt-2 border-t border-cyan-500/15">
+                <span className="text-xs text-cyan-300/80">{language === 'ar' ? 'خصم المنتج' : 'Product discount'}</span>
+                <select
+                  value={form.discountType}
+                  onChange={(e) => setForm((prev) => ({ ...prev, discountType: e.target.value as 'none' | 'percent' | 'fixed' }))}
+                  className="bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="none">{language === 'ar' ? 'بدون خصم' : 'None'}</option>
+                  <option value="percent">{language === 'ar' ? 'نسبة مئوية (%)' : 'Percent (%)'}</option>
+                  <option value="fixed">{language === 'ar' ? 'مبلغ ثابت (EGP)' : 'Fixed (EGP)'}</option>
+                </select>
+                {form.discountType !== 'none' && (
+                  <input
+                    type="number"
+                    min="0"
+                    step={form.discountType === 'percent' ? '1' : '0.01'}
+                    className="w-24 bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                    placeholder={form.discountType === 'percent' ? '10' : '5'}
+                    value={form.discountValue}
+                    onChange={(e) => setForm((prev) => ({ ...prev, discountValue: e.target.value }))}
+                  />
+                )}
+                <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.discountActive}
+                    onChange={(e) => setForm((prev) => ({ ...prev, discountActive: e.target.checked }))}
+                    className="rounded border-cyan-500/30"
+                  />
+                  {language === 'ar' ? 'مفعّل' : 'Active'}
+                </label>
+              </div>
               <div className="flex gap-2">
                 <input
                   className="flex-1 bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"

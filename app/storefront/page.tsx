@@ -166,6 +166,16 @@ function StorefrontPageContent() {
     notes: '',
     paymentMethod: 'cash_on_delivery',
   });
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    valid: boolean;
+    discountTotal: number;
+    totalBeforeDiscount: number;
+    totalAfterDiscount: number;
+    coupon?: { id: number; code: string; type: string; value: number };
+  } | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [couponApplying, setCouponApplying] = useState(false);
 
   const toastTimerRef = useRef<number | null>(null);
 
@@ -332,6 +342,7 @@ function StorefrontPageContent() {
     () => cartItems.reduce((sum, p) => sum + Number(p.sell_price || 0) * (cart[p.id] || 0), 0),
     [cartItems, cart]
   );
+  const checkoutTotal = appliedCoupon?.valid ? appliedCoupon.totalAfterDiscount : cartTotal;
 
   const addToCart = (product: Product) => {
     const stock = Number(product.available_stock ?? product.stock_quantity ?? 0);
@@ -712,7 +723,12 @@ function StorefrontPageContent() {
                 {language === 'ar' ? 'بيانات الطلب' : 'Order Details'}
               </h3>
               <button
-                onClick={() => setCheckoutOpen(false)}
+                onClick={() => {
+                  setCheckoutOpen(false);
+                  setCouponCode('');
+                  setAppliedCoupon(null);
+                  setCouponError(null);
+                }}
                 className="p-2 rounded-lg border border-cyan-500/30 text-cyan-200 hover:bg-cyan-500/10"
               >
                 <X className="h-5 w-5" />
@@ -741,6 +757,7 @@ function StorefrontPageContent() {
                       nameSnapshot: language === 'ar' ? p.name_ar : p.name_en,
                       quantity: cart[p.id] || 1,
                     })),
+                    couponCode: appliedCoupon?.valid ? appliedCoupon.coupon?.code || couponCode.trim() : undefined,
                   };
                   const json = await apiRequest('/storefront/orders', {
                     method: 'POST',
@@ -749,6 +766,9 @@ function StorefrontPageContent() {
                   setCheckoutOpen(false);
                   setCart({});
                   setCheckoutForm({ customerName: '', phone: '', governorate: '', city: '', address: '', notes: '', paymentMethod: 'cash_on_delivery' });
+                  setCouponCode('');
+                  setAppliedCoupon(null);
+                  setCouponError(null);
                   setOrderSuccess({
                     orderId: json.orderId,
                     publicCode: json.publicCode || json.public_code || '',
@@ -831,6 +851,99 @@ function StorefrontPageContent() {
                   onChange={(e) => setCheckoutForm((f) => ({ ...f, notes: e.target.value }))}
                   className="w-full rounded-xl border border-cyan-500/25 bg-black/30 px-3 py-2 text-slate-100"
                 />
+              </div>
+              <div>
+                <label className="block text-xs text-cyan-200/80 mb-1">
+                  {language === 'ar' ? 'كود القسيمة' : 'Coupon code'}
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={couponCode}
+                    onChange={(e) => {
+                      setCouponCode(e.target.value);
+                      setCouponError(null);
+                      setAppliedCoupon(null);
+                    }}
+                    placeholder={language === 'ar' ? 'أدخل الكود' : 'Enter code'}
+                    className="flex-1 h-11 rounded-xl border border-cyan-500/25 bg-black/30 px-3 text-slate-100 placeholder:text-slate-400"
+                  />
+                  <button
+                    type="button"
+                    disabled={couponApplying || !couponCode.trim()}
+                    onClick={async () => {
+                      if (!data?.shop?.id || !couponCode.trim()) return;
+                      setCouponApplying(true);
+                      setCouponError(null);
+                      try {
+                        const res = await apiRequest('/public/storefront/checkout/apply-coupon', {
+                          method: 'POST',
+                          body: JSON.stringify({
+                            shopId: data.shop.id,
+                            code: couponCode.trim(),
+                            orderTotal: cartTotal,
+                            lang: language,
+                          }),
+                        });
+                        const r = res as { valid?: boolean; error?: string; discountTotal?: number; totalBeforeDiscount?: number; totalAfterDiscount?: number; coupon?: { id: number; code: string; type: string; value: number } };
+                        if (r.valid) {
+                          setAppliedCoupon({
+                            valid: true,
+                            discountTotal: r.discountTotal ?? 0,
+                            totalBeforeDiscount: r.totalBeforeDiscount ?? cartTotal,
+                            totalAfterDiscount: r.totalAfterDiscount ?? cartTotal,
+                            coupon: r.coupon,
+                          });
+                          setCouponError(null);
+                          showToast(language === 'ar' ? 'تم تطبيق القسيمة' : 'Coupon applied');
+                        } else {
+                          setAppliedCoupon(null);
+                          setCouponError(r.error || (language === 'ar' ? 'كود غير صالح' : 'Invalid coupon'));
+                        }
+                      } catch (err: any) {
+                        setAppliedCoupon(null);
+                        setCouponError(err?.message || (language === 'ar' ? 'فشل التحقق' : 'Verification failed'));
+                      } finally {
+                        setCouponApplying(false);
+                      }
+                    }}
+                    className="h-11 px-4 rounded-xl border border-cyan-500/30 bg-cyan-500/20 text-cyan-200 font-semibold hover:bg-cyan-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {couponApplying ? (language === 'ar' ? 'جاري...' : 'Applying...') : language === 'ar' ? 'تطبيق' : 'Apply'}
+                  </button>
+                </div>
+                {couponError && (
+                  <p className="mt-1 text-xs text-red-300">{couponError}</p>
+                )}
+                {appliedCoupon?.valid && (
+                  <p className="mt-1 text-xs text-green-300">
+                    {language === 'ar' ? `خصم: ${formatCurrency(appliedCoupon.discountTotal, 'ar', currencyCode, currencySymbol)}` : `Discount: ${formatCurrency(appliedCoupon.discountTotal, 'en', currencyCode, currencySymbol)}`}
+                  </p>
+                )}
+              </div>
+              <div className="rounded-xl border border-cyan-500/20 bg-black/20 p-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-300">{language === 'ar' ? 'الإجمالي قبل الخصم' : 'Subtotal'}</span>
+                  <span className="text-cyan-200 font-semibold">{formatCurrency(cartTotal, language === 'ar' ? 'ar' : 'en', currencyCode, currencySymbol)}</span>
+                </div>
+                {appliedCoupon?.valid && (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-300">{language === 'ar' ? 'خصم القسيمة' : 'Coupon discount'}</span>
+                      <span className="text-green-300 font-semibold">-{formatCurrency(appliedCoupon.discountTotal, language === 'ar' ? 'ar' : 'en', currencyCode, currencySymbol)}</span>
+                    </div>
+                    <div className="flex justify-between text-base pt-2 border-t border-cyan-500/15">
+                      <span className="text-cyan-100 font-bold">{language === 'ar' ? 'الإجمالي النهائي' : 'Total'}</span>
+                      <span className="text-cyan-200 font-bold">{formatCurrency(checkoutTotal, language === 'ar' ? 'ar' : 'en', currencyCode, currencySymbol)}</span>
+                    </div>
+                  </>
+                )}
+                {!appliedCoupon?.valid && (
+                  <div className="flex justify-between text-base pt-2 border-t border-cyan-500/15">
+                    <span className="text-cyan-100 font-bold">{language === 'ar' ? 'الإجمالي' : 'Total'}</span>
+                    <span className="text-cyan-200 font-bold">{formatCurrency(cartTotal, language === 'ar' ? 'ar' : 'en', currencyCode, currencySymbol)}</span>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-xs text-cyan-200/80 mb-1">

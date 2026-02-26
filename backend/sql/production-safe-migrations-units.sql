@@ -7,7 +7,7 @@ SET @db = DATABASE();
 -- 1) product_units: packaging levels (قطعة/علبة/كرتونة)
 CREATE TABLE IF NOT EXISTS product_units (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  product_id INT NOT NULL,
+  product_id BIGINT UNSIGNED NOT NULL,
   name_ar VARCHAR(64) NOT NULL,
   name_en VARCHAR(64) NULL,
   factor_to_base INT NOT NULL DEFAULT 1,
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS product_units (
 -- 2) product_barcodes: barcode -> product mapping
 CREATE TABLE IF NOT EXISTS product_barcodes (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  product_id INT NOT NULL,
+  product_id BIGINT UNSIGNED NOT NULL,
   barcode_value VARCHAR(128) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_product_barcodes_value (barcode_value),

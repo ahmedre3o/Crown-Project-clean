@@ -1184,12 +1184,21 @@ const createSaleAndItems = async (req: any, paymentMethodOverride?: string, shop
     const saleId = saleInsert.insertId;
 
     for (const item of items) {
+      const factorToBase = Number(item.factorToBase) || 1;
+      const quantityBase = Math.round(Number(item.quantity) || 0) * factorToBase;
+      const [stockRows] = await connection.execute('SELECT stock_quantity FROM products WHERE id = ? AND shop_id = ?', [item.productId, shopId]);
+      const stock = Number((stockRows as any[])[0]?.stock_quantity ?? 0);
+      if (stock < quantityBase) {
+        await connection.rollback();
+        throw new Error(`Insufficient stock for product ${item.productId}: requested ${quantityBase} base units, available ${stock}`);
+      }
+      const unitId = item.unitId ?? null;
       await connection.execute(
-        'INSERT INTO sale_items (sale_id, product_id, quantity, unit_price, total_price) VALUES (?, ?, ?, ?, ?)',
-        [saleId, item.productId, item.quantity, item.unitPrice, item.quantity * item.unitPrice]
+        'INSERT INTO sale_items (sale_id, product_id, quantity, unit_price, total_price, unit_id, quantity_base_units) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [saleId, item.productId, item.quantity, item.unitPrice, item.quantity * item.unitPrice, unitId, quantityBase]
       );
       await connection.execute('UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?', [
-        item.quantity,
+        quantityBase,
         item.productId,
       ]);
     }
@@ -4237,6 +4246,40 @@ app.post('/api/activate', authenticateToken, async (req: any, res: Response) => 
 });
 
 // ========== PRODUCTS/INVENTORY ==========
+/** Create/update product_units from carton_packs_count (X) and pack_units_count (Y). 1 كرتونة = X*Y قطعة, 1 علبة = Y قطعة. */
+async function upsertProductUnits(productId: number, cartonPacksCount: number | null, packUnitsCount: number | null) {
+  await pool.execute('DELETE FROM product_units WHERE product_id = ?', [productId]);
+  const units: Array<{ name_ar: string; name_en: string; factor_to_base: number; level: number }> = [
+    { name_ar: 'قطعة', name_en: 'Piece', factor_to_base: 1, level: 0 },
+  ];
+  const X = Number(cartonPacksCount) || 0;
+  const Y = Number(packUnitsCount) || 0;
+  if (Y > 0) {
+    units.push({ name_ar: 'علبة', name_en: 'Pack', factor_to_base: Y, level: 1 });
+  }
+  if (X > 0 && Y > 0) {
+    units.push({ name_ar: 'كرتونة', name_en: 'Carton', factor_to_base: X * Y, level: 2 });
+  }
+  for (const u of units) {
+    await pool.execute(
+      'INSERT INTO product_units (product_id, name_ar, name_en, factor_to_base, level) VALUES (?, ?, ?, ?, ?)',
+      [productId, u.name_ar, u.name_en, u.factor_to_base, u.level]
+    );
+  }
+}
+
+/** Sync product barcode to product_barcodes table for lookup. */
+async function syncProductBarcode(productId: number, barcode: string | null) {
+  if (!barcode || !String(barcode).trim()) return;
+  const val = String(barcode).trim();
+  try {
+    await pool.execute('INSERT INTO product_barcodes (product_id, barcode_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE product_id = VALUES(product_id)', [productId, val]);
+  } catch (e: any) {
+    if (e?.code?.includes?.('ER_DUP')) return;
+    throw e;
+  }
+}
+
 app.get('/api/products/lookup', authenticateToken, async (req: any, res: Response) => {
   try {
     const shopId = getShopIdOrFail(req, res);
@@ -4248,6 +4291,7 @@ app.get('/api/products/lookup', authenticateToken, async (req: any, res: Respons
       return res.status(400).json({ error: 'code is required' });
     }
 
+    let list: any[] = [];
     const [rows] = await pool.execute(
       `SELECT p.*, c.name_en as category_name_en, c.name_ar as category_name_ar
        FROM products p
@@ -4257,11 +4301,26 @@ app.get('/api/products/lookup', authenticateToken, async (req: any, res: Respons
        LIMIT 1`,
       [shopId, code, code, code]
     );
-    const list = rows as any[];
+    list = rows as any[];
+    if (list.length === 0) {
+      const [barcodeRows] = await pool.execute(
+        `SELECT p.*, c.name_en as category_name_en, c.name_ar as category_name_ar
+         FROM products p
+         JOIN product_barcodes pb ON pb.product_id = p.id AND pb.barcode_value = ?
+         LEFT JOIN categories c ON p.category_id = c.id
+         WHERE p.shop_id = ?
+         LIMIT 1`,
+        [code, shopId]
+      );
+      list = barcodeRows as any[];
+    }
     if (list.length === 0) {
       return res.status(404).json({ error: 'Product not found' });
     }
-    res.json(list[0]);
+    const product = list[0];
+    const [units] = await pool.execute('SELECT id, name_ar, name_en, factor_to_base, level FROM product_units WHERE product_id = ? ORDER BY level', [product.id]);
+    (product as any).units = units || [];
+    res.json(product);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -4271,7 +4330,9 @@ app.get('/api/products', authenticateToken, async (req: any, res: Response) => {
   try {
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
-    
+
+    const includeUnits = req.query.includeUnits === '1' || req.query.includeUnits === 'true';
+
     let query = `
       SELECT p.*, c.name_en as category_name_en, c.name_ar as category_name_ar 
       FROM products p 
@@ -4279,14 +4340,34 @@ app.get('/api/products', authenticateToken, async (req: any, res: Response) => {
       WHERE 1=1
     `;
     const params: any[] = [];
-    
+
     query += ' AND p.shop_id = ?';
     params.push(shopId);
     query += ' AND (p.is_deleted = 0 OR p.is_deleted IS NULL)';
     query += ' ORDER BY p.created_at DESC';
-    
+
     const [products] = await pool.execute(query, params);
-    res.json(products || []);
+    const list = (products || []) as any[];
+
+    if (includeUnits && list.length > 0) {
+      const ids = list.map((p) => p.id);
+      const placeholders = ids.map(() => '?').join(',');
+      const [units] = await pool.execute(
+        `SELECT product_id, id, name_ar, name_en, factor_to_base, level FROM product_units WHERE product_id IN (${placeholders}) ORDER BY product_id, level`,
+        ids
+      );
+      const unitsByProduct: Record<number, any[]> = {};
+      for (const u of units as any[]) {
+        const pid = u.product_id;
+        if (!unitsByProduct[pid]) unitsByProduct[pid] = [];
+        unitsByProduct[pid].push({ id: u.id, name_ar: u.name_ar, name_en: u.name_en, factor_to_base: u.factor_to_base, level: u.level });
+      }
+      for (const p of list) {
+        p.units = unitsByProduct[p.id] || [{ id: 0, name_ar: 'قطعة', name_en: 'Piece', factor_to_base: 1, level: 0 }];
+      }
+    }
+
+    res.json(list);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -4308,6 +4389,8 @@ app.post('/api/products', authenticateToken, requireRole('super_admin', 'shop_ow
       sku,
       barcode,
       qrCode,
+      cartonPacksCount,
+      packUnitsCount,
     } = req.body;
     const shopId = getShopIdOrFail(req, res);
     if (shopId === null) return;
@@ -4358,10 +4441,13 @@ app.post('/api/products', authenticateToken, requireRole('super_admin', 'shop_ow
     const computedSellPrice =
       sellPrice ?? (buyPrice ? Number((Number(buyPrice) * 1.2).toFixed(2)) : 0);
 
+    const xVal = cartonPacksCount != null ? Number(cartonPacksCount) : null;
+    const yVal = packUnitsCount != null ? Number(packUnitsCount) : null;
+
     const [result] = await pool.execute(
       `INSERT INTO products 
-       (name_en, name_ar, sku, barcode, qr_code, brand, category_id, buy_price, sell_price, stock_quantity, min_stock_level, image_url, gallery_urls_json, shop_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (name_en, name_ar, sku, barcode, qr_code, brand, category_id, buy_price, sell_price, stock_quantity, min_stock_level, image_url, gallery_urls_json, shop_id, carton_packs_count, pack_units_count)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         nameEn,
         nameAr || nameEn,
@@ -4377,11 +4463,16 @@ app.post('/api/products', authenticateToken, requireRole('super_admin', 'shop_ow
         primaryImage,
         galleryJson,
         shopId,
+        Number.isFinite(xVal) ? xVal : null,
+        Number.isFinite(yVal) ? yVal : null,
       ]
     );
-    
+
     const insertResult = result as any;
-    res.status(201).json({ id: insertResult.insertId });
+    const productId = insertResult.insertId;
+    await upsertProductUnits(productId, xVal, yVal);
+    if (barcode) await syncProductBarcode(productId, barcode);
+    res.status(201).json({ id: productId });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -4415,6 +4506,8 @@ app.put('/api/products/:id', authenticateToken, requireRole('super_admin', 'shop
       warrantyText,
       returnPolicyText,
       extra_fields: extraFieldsBody,
+      cartonPacksCount,
+      packUnitsCount,
     } = req.body;
 
     if (!nameEn) {
@@ -4453,12 +4546,16 @@ app.put('/api/products/:id', authenticateToken, requireRole('super_admin', 'shop
         : null;
     const specsJson = Array.isArray(specs) && specs.length > 0 ? JSON.stringify(specs) : null;
 
+    const xVal = cartonPacksCount != null ? Number(cartonPacksCount) : null;
+    const yVal = packUnitsCount != null ? Number(packUnitsCount) : null;
+
     await pool.execute(
       `UPDATE products 
        SET name_en = ?, name_ar = ?, sku = ?, barcode = ?, qr_code = ?, brand = ?, buy_price = ?, sell_price = ?,
            stock_quantity = ?, min_stock_level = ?, image_url = ?, gallery_urls_json = ?,
            description_short = ?, description_long = ?, specs_json = ?, warranty_text = ?, return_policy_text = ?,
-           is_incomplete = ?, missing_fields = ?, extra_fields = ?
+           is_incomplete = ?, missing_fields = ?, extra_fields = ?,
+           carton_packs_count = ?, pack_units_count = ?
        WHERE id = ? AND shop_id = ?`,
       [
         nameEn,
@@ -4481,10 +4578,15 @@ app.put('/api/products/:id', authenticateToken, requireRole('super_admin', 'shop
         isComplete ? 0 : 1,
         isComplete ? null : missingFieldsJson,
         extraFieldsJson,
+        Number.isFinite(xVal) ? xVal : null,
+        Number.isFinite(yVal) ? yVal : null,
         productId,
         shopId,
       ]
     );
+
+    await upsertProductUnits(productId, xVal, yVal);
+    if (barcode) await syncProductBarcode(productId, barcode);
 
     res.json({ success: true });
   } catch (error: any) {

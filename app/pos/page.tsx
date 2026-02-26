@@ -22,6 +22,14 @@ interface Category {
   name_ar: string;
 }
 
+interface ProductUnit {
+  id: number;
+  name_ar: string;
+  name_en?: string;
+  factor_to_base: number;
+  level: number;
+}
+
 interface Product {
   id: number;
   name_en: string;
@@ -35,6 +43,7 @@ interface Product {
   sku?: string;
   barcode?: string;
   qr_code?: string;
+  units?: ProductUnit[];
 }
 
 interface CartItem {
@@ -43,6 +52,8 @@ interface CartItem {
   price: number;
   quantity: number;
   total: number;
+  factorToBase: number;
+  unitId?: number;
 }
 
 export default function PosPage() {
@@ -60,6 +71,7 @@ export default function PosPage() {
   const [scanValue, setScanValue] = useState('');
   const [scanOpen, setScanOpen] = useState(false);
   const [scanMessage, setScanMessage] = useState<string | null>(null);
+  const [selectedUnitLevel, setSelectedUnitLevel] = useState<number>(0);
   const [customer, setCustomer] = useState({ name: '', phone: '', address: '' });
   const [business, setBusiness] = useState<any>(null);
   const scanInputRef = useRef<HTMLInputElement | null>(null);
@@ -128,7 +140,7 @@ export default function PosPage() {
 
   const loadProducts = async () => {
     try {
-      const data = await apiRequest('/products');
+      const data = await apiRequest('/products?includeUnits=1');
       setProducts(data);
       console.log('POS Products Loaded:', Array.isArray(data) ? data.length : 0);
     } catch (error) {
@@ -169,18 +181,26 @@ export default function PosPage() {
 
   const hasUncategorized = products.some((product) => !product.category_id);
 
-  const addToCart = (product: Product) => {
+  const getUnitForProduct = (product: Product, level: number): ProductUnit => {
+    const units = product.units || [];
+    const u = units.find((x) => x.level === level) || units[0] || { id: 0, name_ar: 'قطعة', factor_to_base: 1, level: 0 };
+    return u;
+  };
+
+  const addToCart = (product: Product, unit?: ProductUnit) => {
+    const u = unit ?? getUnitForProduct(product, selectedUnitLevel);
+    const factor = Number(u?.factor_to_base ?? 1);
     const avail = Number(product.available_stock ?? product.stock_quantity ?? 0);
-    if (avail <= 0) return;
+    if (avail < factor) return;
 
     setCart((prev) => {
-      const existing = prev.find((item) => item.productId === product.id);
+      const existing = prev.find((item) => item.productId === product.id && item.factorToBase === factor);
       if (existing) {
-        const cap = Number(product.available_stock ?? product.stock_quantity ?? 0);
-        if (existing.quantity >= cap) return prev;
-        const nextQty = Math.min(existing.quantity + 1, cap);
+        const maxInUnit = Math.floor(avail / factor);
+        if (existing.quantity >= maxInUnit) return prev;
+        const nextQty = Math.min(existing.quantity + 1, maxInUnit);
         return prev.map((item) =>
-          item.productId === product.id
+          item.productId === product.id && item.factorToBase === factor
             ? { ...item, quantity: nextQty, total: nextQty * Number(item.price || 0) }
             : item
         );
@@ -193,6 +213,8 @@ export default function PosPage() {
           price: Number(product.sell_price || 0),
           quantity: 1,
           total: Number(product.sell_price || 0),
+          factorToBase: factor,
+          unitId: u?.id,
         },
       ];
     });
@@ -226,7 +248,7 @@ export default function PosPage() {
       }
 
       if (match) {
-        addToCart(match);
+        addToCart(match as Product);
         setScanMessage(language === 'ar' ? 'تمت إضافة المنتج' : 'Product added to cart.');
       } else {
         setScanMessage(language === 'ar' ? 'لم يتم العثور على المنتج' : 'Product not found.');
@@ -342,28 +364,36 @@ export default function PosPage() {
     return () => window.removeEventListener('keydown', onKeyDown, true);
   }, []);
 
-  const updateQuantity = (productId: number, delta: number) => {
+  const updateQuantity = (productId: number, delta: number, itemFactor?: number) => {
     setCart((prev) => {
-      const item = prev.find((i) => i.productId === productId);
+      const item = prev.find((i) => i.productId === productId && (itemFactor == null || i.factorToBase === itemFactor));
       if (!item) return prev;
 
       const product = products.find((p) => p.id === productId);
       if (!product) return prev;
 
+      const avail = Number(product.available_stock ?? product.stock_quantity ?? 0);
+      const maxInUnit = Math.floor(avail / item.factorToBase);
       const newQuantity = item.quantity + delta;
       if (newQuantity <= 0) {
-        return prev.filter((i) => i.productId !== productId);
+        return prev.filter((i) => !(i.productId === productId && i.factorToBase === item.factorToBase));
       }
-      if (newQuantity > (product.available_stock ?? product.stock_quantity)) return prev;
+      if (newQuantity > maxInUnit) return prev;
 
       return prev.map((i) =>
-        i.productId === productId ? { ...i, quantity: newQuantity, total: newQuantity * i.price } : i
+        i.productId === productId && i.factorToBase === item.factorToBase
+          ? { ...i, quantity: newQuantity, total: newQuantity * i.price }
+          : i
       );
     });
   };
 
-  const removeFromCart = (productId: number) => {
-    setCart((prev) => prev.filter((item) => item.productId !== productId));
+  const removeFromCart = (productId: number, factorToBase?: number) => {
+    setCart((prev) =>
+      factorToBase != null
+        ? prev.filter((item) => !(item.productId === productId && item.factorToBase === factorToBase))
+        : prev.filter((item) => item.productId !== productId)
+    );
   };
 
   const clearCart = () => {
@@ -388,6 +418,8 @@ export default function PosPage() {
         productId: item.productId,
         quantity: item.quantity,
         unitPrice: item.price,
+        factorToBase: item.factorToBase,
+        unitId: item.unitId,
       }));
 
       const payload = {
@@ -470,6 +502,8 @@ export default function PosPage() {
         productId: item.productId,
         quantity: item.quantity,
         unitPrice: item.price,
+        factorToBase: item.factorToBase,
+        unitId: item.unitId,
       }));
 
       const payload = {
@@ -803,6 +837,27 @@ export default function PosPage() {
           {/* Categories & Products */}
           <div className="lg:col-span-2 space-y-6">
             <div className="neon-box rounded-xl p-4">
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <span className="text-xs text-slate-400">{language === 'ar' ? 'الوحدة:' : 'Unit:'}</span>
+                {[
+                  { level: 0, ar: 'قطعة', en: 'Piece' },
+                  { level: 1, ar: 'علبة', en: 'Pack' },
+                  { level: 2, ar: 'كرتونة', en: 'Carton' },
+                ].map((opt) => (
+                  <button
+                    key={opt.level}
+                    type="button"
+                    onClick={() => setSelectedUnitLevel(opt.level)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                      selectedUnitLevel === opt.level
+                        ? 'bg-cyan-600 text-white'
+                        : 'border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/20'
+                    }`}
+                  >
+                    {language === 'ar' ? opt.ar : opt.en}
+                  </button>
+                ))}
+              </div>
               <div className="flex flex-wrap items-center gap-3">
                 <input
                   ref={scanInputRef}
@@ -957,21 +1012,21 @@ export default function PosPage() {
                     <div key={item.productId} className="bg-gray-800 p-3 rounded-lg">
                       <div className="flex justify-between items-start mb-2">
                         <h4 className="font-medium text-white flex-1">{item.name}</h4>
-                        <button onClick={() => removeFromCart(item.productId)} className="text-red-400 hover:text-red-300 ml-2">
+                        <button onClick={() => removeFromCart(item.productId, item.factorToBase)} className="text-red-400 hover:text-red-300 ml-2">
                           <X className="w-4 h-4" />
                         </button>
                       </div>
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => updateQuantity(item.productId, -1)}
+                            onClick={() => updateQuantity(item.productId, -1, item.factorToBase)}
                             className="w-8 h-8 rounded bg-gray-700 hover:bg-gray-600 flex items-center justify-center text-sm"
                           >
                             -
                           </button>
                           <span className="text-white font-medium">{item.quantity}</span>
                           <button
-                            onClick={() => updateQuantity(item.productId, 1)}
+                            onClick={() => updateQuantity(item.productId, 1, item.factorToBase)}
                             className="w-8 h-8 rounded bg-gray-700 hover:bg-gray-600 flex items-center justify-center text-sm"
                           >
                             +

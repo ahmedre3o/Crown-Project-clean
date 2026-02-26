@@ -6,7 +6,13 @@ import { apiRequest } from '../app/contexts/AuthContext';
 import { enqueue } from './offline-queue';
 
 export async function createPosSaleOrInvoice(
-  payload: { items: Array<{ productId: number; quantity: number; unitPrice: number }>; paymentMethod: string; customerName?: string; customerPhone?: string; customerAddress?: string },
+  payload: {
+    items: Array<{ productId: number; quantity: number; unitPrice: number; factorToBase?: number; unitId?: number }>;
+    paymentMethod: string;
+    customerName?: string;
+    customerPhone?: string;
+    customerAddress?: string;
+  },
   isOnline: boolean
 ): Promise<{ saleId: number; sale: any; invoiceNumber: string }> {
   if (isOnline) {

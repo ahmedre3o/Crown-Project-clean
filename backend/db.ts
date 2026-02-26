@@ -646,6 +646,52 @@ export async function initializeDatabase() {
       }
     }
 
+    // product_units + product_barcodes (multi-level packaging)
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS product_units (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        product_id INT NOT NULL,
+        name_ar VARCHAR(64) NOT NULL,
+        name_en VARCHAR(64) NULL,
+        factor_to_base INT NOT NULL DEFAULT 1,
+        level TINYINT NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+        INDEX idx_product_units_product (product_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS product_barcodes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        product_id INT NOT NULL,
+        barcode_value VARCHAR(128) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_product_barcodes_value (barcode_value),
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+        INDEX idx_product_barcodes_product (product_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    for (const col of [
+      { name: 'carton_packs_count', def: 'INT NULL' },
+      { name: 'pack_units_count', def: 'INT NULL' },
+    ]) {
+      try {
+        await pool.execute(`ALTER TABLE products ADD COLUMN ${col.name} ${col.def}`);
+      } catch (e: any) {
+        if (e?.code !== 'ER_DUP_FIELDNAME') throw e;
+      }
+    }
+    for (const col of [
+      { name: 'unit_id', def: 'INT NULL' },
+      { name: 'quantity_base_units', def: 'INT NULL' },
+    ]) {
+      try {
+        await pool.execute(`ALTER TABLE sale_items ADD COLUMN ${col.name} ${col.def}`);
+      } catch (e: any) {
+        if (e?.code !== 'ER_DUP_FIELDNAME') throw e;
+      }
+    }
+
     try {
       await pool.execute('CREATE INDEX idx_barcode ON products (barcode)');
     } catch (error: any) {

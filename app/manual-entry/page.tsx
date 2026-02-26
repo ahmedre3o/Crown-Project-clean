@@ -42,6 +42,8 @@ export default function ManualEntryPage() {
     sellPrice: '',
     stockQuantity: '',
     minStockLevel: '',
+    cartonPacksCount: '',
+    packUnitsCount: '',
   });
   const [products, setProducts] = useState<Product[]>([]);
   const [saving, setSaving] = useState(false);
@@ -81,6 +83,8 @@ export default function ManualEntryPage() {
         sellPrice: String(existing.sell_price),
         stockQuantity: String(existing.stock_quantity),
         minStockLevel: String(existing.min_stock_level),
+        cartonPacksCount: String((existing as any).carton_packs_count ?? ''),
+        packUnitsCount: String((existing as any).pack_units_count ?? ''),
       });
     }
   };
@@ -108,6 +112,8 @@ export default function ManualEntryPage() {
           sellPrice: parseFloat(form.sellPrice),
           stockQuantity: parseInt(form.stockQuantity || '0', 10),
           minStockLevel: parseInt(form.minStockLevel || '5', 10),
+          cartonPacksCount: form.cartonPacksCount ? parseInt(form.cartonPacksCount, 10) : undefined,
+          packUnitsCount: form.packUnitsCount ? parseInt(form.packUnitsCount, 10) : undefined,
         }),
       });
       setMessage(language === 'ar' ? 'تم حفظ المنتج' : 'Product saved successfully.');
@@ -122,6 +128,8 @@ export default function ManualEntryPage() {
         sellPrice: '',
         stockQuantity: '',
         minStockLevel: '',
+        cartonPacksCount: '',
+        packUnitsCount: '',
       });
       await loadProducts();
     } catch (err: any) {
@@ -242,6 +250,20 @@ export default function ManualEntryPage() {
               value={form.minStockLevel}
               onChange={(e) => setForm((prev) => ({ ...prev, minStockLevel: e.target.value }))}
             />
+            <div className="flex gap-2">
+              <input
+                className="flex-1 bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                placeholder={language === 'ar' ? 'X (علب في الكرتونة)' : 'X (packs per carton)'}
+                value={form.cartonPacksCount}
+                onChange={(e) => setForm((prev) => ({ ...prev, cartonPacksCount: e.target.value }))}
+              />
+              <input
+                className="flex-1 bg-[#0f172a] border border-cyan-500/20 rounded-lg px-3 py-2 text-sm"
+                placeholder={language === 'ar' ? 'Y (قطع في العلبة)' : 'Y (pieces per pack)'}
+                value={form.packUnitsCount}
+                onChange={(e) => setForm((prev) => ({ ...prev, packUnitsCount: e.target.value }))}
+              />
+            </div>
           </div>
           <button
             onClick={handleSave}

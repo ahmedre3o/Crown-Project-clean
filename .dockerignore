@@ -1,0 +1,24 @@
+# Dependencies and build outputs
+node_modules
+.next
+backend/node_modules
+backend/dist
+frontend/node_modules
+
+# Backend (deploy frontend only from root)
+backend
+
+# Nested clone on Cloud Shell (git clone inside repo) — must not be in Next.js / Docker context
+Crown-Project-clean
+
+# Git and IDE
+.git
+.gitignore
+.cursor
+*.md
+.env*.local
+.DS_Store
+
+# Cloud Build and deploy configs (not needed in image)
+cloudbuild.yaml
+.dockerignore

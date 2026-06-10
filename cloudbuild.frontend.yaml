@@ -1,0 +1,51 @@
+# Build + Deploy Frontend (crown-web) with NEXT_PUBLIC_API_URL baked at build time.
+# Usage: gcloud builds submit --config=cloudbuild.frontend.yaml .
+
+substitutions:
+  _PROJECT: "gen-lang-client-0711622878"
+  _REGION: "us-central1"
+  _SERVICE: "crown-web"
+  _NEXT_PUBLIC_API_URL: "https://api.crowncs.org"
+  _GIT_SHA: "latest"
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: Build
+    args:
+      - build
+      - --build-arg
+      - NEXT_PUBLIC_API_URL=${_NEXT_PUBLIC_API_URL}
+      - -t
+      - ${_REGION}-docker.pkg.dev/${_PROJECT}/cloud-run-source-deploy/${_SERVICE}:${_GIT_SHA}
+      - -t
+      - ${_REGION}-docker.pkg.dev/${_PROJECT}/cloud-run-source-deploy/${_SERVICE}:latest
+      - .
+
+  - name: gcr.io/cloud-builders/docker
+    id: Push
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/${_PROJECT}/cloud-run-source-deploy/${_SERVICE}:${_GIT_SHA}
+
+  - name: gcr.io/cloud-builders/docker
+    id: PushLatest
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/${_PROJECT}/cloud-run-source-deploy/${_SERVICE}:latest
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: Deploy
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/${_PROJECT}/cloud-run-source-deploy/${_SERVICE}:${_GIT_SHA}
+      - --project=${_PROJECT}
+      - --region=${_REGION}
+      - --allow-unauthenticated
+      - --labels=git_sha=${_GIT_SHA},commit-sha=${_GIT_SHA},git_branch=master
+      - --quiet
+
+images:
+  - ${_REGION}-docker.pkg.dev/${_PROJECT}/cloud-run-source-deploy/${_SERVICE}:${_GIT_SHA}

@@ -1,0 +1,101 @@
+# Full deploy from master: crown-api (backend) then crown-web (frontend).
+# Use this as the Cloud Build trigger config on branch ^master$ so both services update on push.
+# Manual: gcloud builds submit --region=us-central1 --config=cloudbuild.full.yaml .
+# If you only need API or only web, use cloudbuild.backend.yaml or cloudbuild.yaml instead.
+
+timeout: 3600s
+
+substitutions:
+  _REGION: us-central1
+  _PROJECT_ID: gen-lang-client-0711622878
+  _NEXT_PUBLIC_API_URL: https://api.crowncs.org
+  _IMAGE_TAG: latest
+
+steps:
+  # ---------- crown-api ----------
+  - name: 'ubuntu'
+    id: confirm-api
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - 'echo "=== crown-api build + deploy ==="'
+    waitFor: ['-']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build-api
+    waitFor: [confirm-api]
+    args:
+      - 'build'
+      - '-f'
+      - 'backend/Dockerfile'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${_PROJECT_ID}/cloud-run-source-deploy/crown-api:${_IMAGE_TAG}'
+      - 'backend'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push-api
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/${_PROJECT_ID}/cloud-run-source-deploy/crown-api:${_IMAGE_TAG}'
+    waitFor: [build-api]
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: deploy-api
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'crown-api'
+      - '--image=${_REGION}-docker.pkg.dev/${_PROJECT_ID}/cloud-run-source-deploy/crown-api:${_IMAGE_TAG}'
+      - '--region=${_REGION}'
+      - '--project=${_PROJECT_ID}'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--add-cloudsql-instances=gen-lang-client-0711622878:us-central1:crown-services-last-project-db'
+      - '--update-env-vars=DB_HOST=/cloudsql/gen-lang-client-0711622878:us-central1:crown-services-last-project-db,DB_NAME=crown_services_dev,DB_MODE=socket,INSTANCE_CONNECTION_NAME=gen-lang-client-0711622878:us-central1:crown-services-last-project-db,GCS_PRODUCT_IMAGES_BUCKET=crown-product-images'
+      - '--max-instances=12'
+      - '--min-instances=1'
+      - '--concurrency=40'
+      - '--quiet'
+    waitFor: [push-api]
+
+  # ---------- crown-web (after API) ----------
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build-web
+    args:
+      - 'build'
+      - '--progress=plain'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_API_URL=${_NEXT_PUBLIC_API_URL}'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${_PROJECT_ID}/cloud-run-source-deploy/crown-web:${_IMAGE_TAG}'
+      - '.'
+    waitFor: [deploy-api]
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push-web
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/${_PROJECT_ID}/cloud-run-source-deploy/crown-web:${_IMAGE_TAG}'
+    waitFor: [build-web]
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: deploy-web
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'crown-web'
+      - '--image=${_REGION}-docker.pkg.dev/${_PROJECT_ID}/cloud-run-source-deploy/crown-web:${_IMAGE_TAG}'
+      - '--region=${_REGION}'
+      - '--project=${_PROJECT_ID}'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--quiet'
+    waitFor: [push-web]
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  # Match smaller quota footprint (same as cloudbuild.backend.yaml). Raise quota for E2_HIGHCPU_32 if builds OOM.
+  machineType: 'E2_HIGHCPU_8'
+  diskSizeGb: 100

@@ -1,0 +1,69 @@
+# Build + Deploy Backend (crown-api) only. For API+web on master, use cloudbuild.full.yaml.
+# Build + Deploy Backend (crown-api) from backend/Dockerfile
+# Use regional build worker (so Console shows us-central1, not global):
+#   gcloud builds submit --region=us-central1 --config=cloudbuild.backend.yaml .
+#   gcloud config set builds/region us-central1
+# Usage: gcloud builds submit --region=us-central1 --config=cloudbuild.backend.yaml .
+# Trigger: point crown-api trigger to this config ONLY. Do NOT set _SERVICE in trigger (or set to crown-api).
+# Service name is fixed to crown-api below so deploy never targets crown-web.
+
+timeout: 1800s
+
+substitutions:
+  _REGION: us-central1
+  _PROJECT_ID: gen-lang-client-0711622878
+  _IMAGE_TAG: latest
+
+steps:
+  - name: 'ubuntu'
+    id: confirm-service
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - 'echo "=== This is crown-api (backend) build. Deploy target: crown-api only ==="'
+    waitFor: []
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build
+    waitFor: [confirm-service]
+    args:
+      - 'build'
+      - '-f'
+      - 'backend/Dockerfile'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${_PROJECT_ID}/cloud-run-source-deploy/crown-api:${_IMAGE_TAG}'
+      - 'backend'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/${_PROJECT_ID}/cloud-run-source-deploy/crown-api:${_IMAGE_TAG}'
+    waitFor: [build]
+
+  # GEMINI_API_KEY for /api/chat: set on Cloud Run after deploy (do not commit keys). See README or run:
+  # gcloud run services update crown-api --region=us-central1 --project=gen-lang-client-0711622878 --update-secrets=GEMINI_API_KEY=gemini-api-key:latest
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: deploy
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'crown-api'
+      - '--image=${_REGION}-docker.pkg.dev/${_PROJECT_ID}/cloud-run-source-deploy/crown-api:${_IMAGE_TAG}'
+      - '--region=${_REGION}'
+      - '--project=${_PROJECT_ID}'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--add-cloudsql-instances=gen-lang-client-0711622878:us-central1:crown-services-last-project-db'
+      - '--update-env-vars=DB_HOST=/cloudsql/gen-lang-client-0711622878:us-central1:crown-services-last-project-db,DB_NAME=crown_services_dev,DB_MODE=socket,INSTANCE_CONNECTION_NAME=gen-lang-client-0711622878:us-central1:crown-services-last-project-db,GCS_PRODUCT_IMAGES_BUCKET=crown-product-images'
+      - '--max-instances=12'
+      - '--min-instances=1'
+      - '--concurrency=40'
+      - '--quiet'
+    waitFor: [push]
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
+  diskSizeGb: 100

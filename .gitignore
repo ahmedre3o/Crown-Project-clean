@@ -1,0 +1,78 @@
+# Accidental nested clone (e.g. Cloud Shell: cd repo && git clone ... again)
+Crown-Project-clean/
+
+# ======================
+# Node / Package managers
+# ======================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ======================
+# Environment variables
+# ======================
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+.env.*.local
+
+# ======================
+# Next.js / Frontend
+# ======================
+.next/
+out/
+dist/
+build/
+coverage/
+
+# ======================
+# Backend builds
+# ======================
+backend/dist/
+server/dist/
+
+# ======================
+# OS / Editor
+# ======================
+.DS_Store
+Thumbs.db
+
+# ======================
+# Logs
+# ======================
+logs/
+*.log
+
+# ======================
+# Secrets / keys
+# ======================
+*.key
+*.pem
+
+# local backups / temp files
+/api.ts
+backend/*.bak_*
+backend/*.bak_before_*
+*.bak
+*.bak_*
+*.bak_fix_*
+
+# local backups
+*.bak-*
+*.fixbak-*
+
+# backups
+*.bak
+*.bak2
+
+# local backups
+backend/*.bak.*
+cloud-sql-proxy
+
+# local backups
+backend/*.bak.*
+cloud-sql-proxy

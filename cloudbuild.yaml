@@ -1,0 +1,58 @@
+# Build Next.js frontend for crown-web only. For API+web on master, use cloudbuild.full.yaml.
+# Build Next.js frontend for crown-web with NEXT_PUBLIC_API_URL at build time.
+# Cloud Run + Artifact Registry region: ${_REGION} (default us-central1 below).
+# Console may show build "Region: global" unless you run the worker in a region:
+#   gcloud builds submit --region=us-central1 --config=cloudbuild.yaml .
+#   gcloud config set builds/region us-central1
+# Usage: gcloud builds submit --region=us-central1 --config=cloudbuild.yaml [--substitutions=_NEXT_PUBLIC_API_URL=https://...]
+
+# Default Cloud Build timeout is 600s — Next.js production builds often need longer.
+timeout: 2400s
+
+substitutions:
+  _REGION: us-central1
+  _PROJECT_ID: gen-lang-client-0711622878
+  _SERVICE: crown-web
+  _NEXT_PUBLIC_API_URL: https://api.crowncs.org
+  _IMAGE_TAG: latest
+
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build
+    args:
+      - 'build'
+      - '--progress=plain'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_API_URL=${_NEXT_PUBLIC_API_URL}'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${_PROJECT_ID}/cloud-run-source-deploy/${_SERVICE}:${_IMAGE_TAG}'
+      - '.'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/${_PROJECT_ID}/cloud-run-source-deploy/${_SERVICE}:${_IMAGE_TAG}'
+    waitFor: [build]
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: deploy
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - '${_SERVICE}'
+      - '--image=${_REGION}-docker.pkg.dev/${_PROJECT_ID}/cloud-run-source-deploy/${_SERVICE}:${_IMAGE_TAG}'
+      - '--region=${_REGION}'
+      - '--project=${_PROJECT_ID}'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--quiet'
+    waitFor: [push]
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  # E2_HIGHCPU_32 often hits regional quota on small projects — use E2_HIGHCPU_8 unless quota is raised.
+  # Valid: E2_HIGHCPU_8, E2_HIGHCPU_32, N1_HIGHCPU_8, N1_HIGHCPU_32 (not E2_HIGHCPU_16).
+  machineType: 'E2_HIGHCPU_8'
+  diskSizeGb: 100

@@ -1,0 +1,816 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+@import "tailwindcss";
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+@keyframes landing-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.landing-animate-in {
+  animation: landing-fade-in 0.75s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-animate-in {
+    animation: none;
+  }
+}
+
+:root {
+  --neon-cyan: #00f3ff;
+  --neon-purple: #bc13fe;
+}
+
+/* Light mode: soft off-white, reduced contrast, visible accents */
+:root[data-theme='light'] {
+  --bg-main: #F6F8FB;
+  --bg-card: #FFFFFF;
+  --text-primary: #0F172A;
+  --text-secondary: #334155;
+  --border-subtle: #E5E7EB;
+  --accent-teal: #0891B2;
+  --accent-blue: #0284C7;
+}
+
+body {
+  background-color: #000;
+  color: #e5e7eb;
+  margin: 0;
+  font-family: "Cairo", system-ui, -apple-system, sans-serif;
+}
+
+:root[data-theme='light'] body {
+  background-color: var(--bg-main) !important;
+  color: var(--text-primary) !important;
+}
+
+/* أنوار النيون لتاج الخدمات */
+.neon-box {
+  border: 1px solid #00f3ff;
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
+  background: rgba(10, 10, 12, 0.9);
+}
+
+.gold-package-border {
+  border: 1px solid #ffd700;
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+}
+
+.sidebar-link:hover {
+  background: linear-gradient(90deg, #00f3ff, transparent);
+  border-left: 4px solid #00f3ff;
+}
+
+.neon-card {
+  border: 1px solid rgba(0, 243, 255, 0.35);
+  box-shadow: 0 0 18px rgba(0, 243, 255, 0.18);
+  background: rgba(8, 10, 16, 0.95);
+}
+
+:root[data-theme='light'] .neon-box {
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  background: var(--bg-card);
+}
+
+:root[data-theme='light'] .neon-card {
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  background: var(--bg-card);
+  border-radius: 0.75rem;
+}
+
+:root[data-theme='light'] .sidebar-link:hover {
+  background: linear-gradient(90deg, rgba(6, 182, 212, 0.2), transparent);
+  border-left: 4px solid #06b6d4;
+}
+
+:root[data-theme='light'] .bg-black {
+  background-color: var(--bg-main) !important;
+}
+
+:root[data-theme='light'] [class*="bg-black/"] {
+  background-color: rgba(31, 41, 55, 0.06) !important;
+}
+
+/* Modal/overlay backdrops stay dark in light mode */
+:root[data-theme='light'] div.fixed.inset-0[class*="bg-black/"] {
+  background-color: rgba(0, 0, 0, 0.45) !important;
+}
+
+/* Sidebar: slightly darker than main in light mode */
+:root[data-theme='light'] aside[class*="bg-[#0a0f18]"],
+:root[data-theme='light'] [class*="bg-[#0a0f18]"] {
+  background-color: #EEF2F7 !important;
+  border-color: var(--border-subtle) !important;
+}
+
+:root[data-theme='light'] aside [class*="border-cyan"] {
+  border-color: var(--border-subtle) !important;
+}
+
+:root[data-theme='light'] [class*="bg-[#0b1220]"],
+:root[data-theme='light'] [class*="bg-[#020617]"],
+:root[data-theme='light'] [class*="bg-[#0f172a]"],
+:root[data-theme='light'] [class*="bg-[#0b0f1a]"] {
+  background-color: var(--bg-main) !important;
+}
+
+:root[data-theme='light'] .text-white {
+  color: var(--text-primary) !important;
+}
+
+:root[data-theme='light'] [class*="text-slate-"] {
+  color: var(--text-secondary) !important;
+}
+
+/* Remove neon glow in light mode */
+:root[data-theme='light'] .neon-glow-cyan,
+:root[data-theme='light'] .neon-glow-fuchsia {
+  box-shadow: none !important;
+}
+
+:root[data-theme='light'] .neon-text {
+  color: #0891b2;
+  text-shadow: none;
+}
+
+/* Cards with bg-white/5 become solid in light mode */
+:root[data-theme='light'] [class*="bg-white/5"] {
+  background-color: var(--bg-card) !important;
+}
+
+/* Light mode: header/toolbar visibility - no faint opacity */
+:root[data-theme='light'] .text-cyan-100,
+:root[data-theme='light'] .text-cyan-200,
+:root[data-theme='light'] .text-cyan-300 {
+  color: var(--accent-teal) !important;
+}
+
+:root[data-theme='light'] .text-fuchsia-200 {
+  color: #a21caf !important;
+}
+
+/* Sidebar header badges: visible background in light mode */
+:root[data-theme='light'] aside [class*="bg-black/25"],
+:root[data-theme='light'] aside [class*="bg-black/30"] {
+  background-color: rgba(8, 145, 178, 0.12) !important;
+  border-color: rgba(8, 145, 178, 0.35) !important;
+}
+
+:root[data-theme='light'] aside .text-cyan-200,
+:root[data-theme='light'] aside .text-cyan-300 {
+  color: var(--accent-teal) !important;
+}
+
+:root[data-theme='light'] aside .text-slate-100 {
+  color: var(--text-primary) !important;
+}
+
+/* Remove faint glow from sidebar header in light mode */
+:root[data-theme='light'] aside [class*="shadow-[0_0_"] {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Invoice status badges: contrast in light mode only */
+:root[data-theme='light'] .invoice-badge-red {
+  background-color: rgb(254 202 202) !important; /* red-200 */
+  color: rgb(185 28 28) !important; /* red-700 */
+  border-color: rgb(248 113 113) !important; /* red-400 */
+}
+
+:root[data-theme='light'] .invoice-badge-amber {
+  background-color: rgb(254 240 138) !important; /* yellow-200 */
+  color: rgb(133 77 14) !important; /* yellow-800 */
+  border-color: rgb(250 204 21) !important; /* yellow-400 */
+}
+
+.neon-glow-cyan {
+  box-shadow: 0 0 20px rgba(0, 243, 255, 0.45);
+}
+
+.neon-glow-fuchsia {
+  box-shadow: 0 0 20px rgba(236, 72, 153, 0.45);
+}
+
+.neon-text {
+  color: #00f3ff;
+  text-shadow: 
+    0 0 10px rgba(0, 243, 255, 0.8),
+    0 0 20px rgba(0, 243, 255, 0.6),
+    0 0 30px rgba(0, 243, 255, 0.4);
+  font-weight: 700;
+}
+
+@keyframes crown-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.6));
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 14px rgba(34, 211, 238, 0.95));
+    opacity: 0.95;
+    transform: scale(1.05);
+  }
+}
+
+/* Global admin tables — generous spacing + RTL */
+.break-text {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* RTL table block: headers + cells share same horizontal alignment */
+.table-rtl-wrap {
+  direction: rtl;
+  text-align: right;
+}
+
+[dir='ltr'] .table-rtl-wrap {
+  direction: ltr;
+  text-align: left;
+}
+
+/* Strict spreadsheet grid — every cell bordered (matches invoice line-item grid) */
+.data-table {
+  width: 100%;
+  min-width: 1000px;
+  border-collapse: collapse;
+  table-layout: auto;
+  text-align: right;
+  border: 1px solid #374151;
+}
+
+[dir='ltr'] .data-table {
+  text-align: left;
+}
+
+.data-table thead th {
+  border: 1px solid #374151;
+  padding: 12px 16px;
+  vertical-align: middle;
+  font-weight: 600;
+  white-space: nowrap;
+  background: rgb(31 41 55);
+  color: rgb(229 231 235);
+}
+
+[dir='rtl'] .data-table thead th:not(.col-center) {
+  text-align: right;
+}
+
+[dir='ltr'] .data-table thead th:not(.col-center) {
+  text-align: left;
+}
+
+.data-table thead th.col-center {
+  text-align: center;
+}
+
+:root[data-theme='light'] .data-table {
+  border-color: #d1d5db;
+}
+
+:root[data-theme='light'] .data-table thead th {
+  background: #f3f4f6;
+  color: #111827;
+  border-color: #d1d5db;
+}
+
+.data-table tbody td {
+  border: 1px solid #374151;
+  padding: 12px 16px;
+  vertical-align: middle;
+  color: inherit;
+  white-space: nowrap;
+}
+
+[dir='rtl'] .data-table tbody td:not(.data-table-num):not(.data-table-center) {
+  text-align: right;
+}
+
+[dir='ltr'] .data-table tbody td:not(.data-table-num):not(.data-table-center) {
+  text-align: left;
+}
+
+/* Long text columns: min width + single line (scroll handles overflow) */
+.data-table thead th.table-col-long,
+.data-table tbody td.table-col-long {
+  min-width: 280px;
+  white-space: nowrap;
+}
+
+.data-table thead th.table-col-compact,
+.data-table tbody td.table-col-compact {
+  min-width: 5.5rem;
+  white-space: nowrap;
+}
+
+.data-table thead th.table-col-date,
+.data-table tbody td.table-col-date {
+  min-width: 7.5rem;
+  white-space: nowrap;
+}
+
+.data-table thead th.table-col-currency,
+.data-table tbody td.table-col-currency {
+  min-width: 10rem;
+  white-space: nowrap;
+}
+
+/* Expanded / detail rows only */
+.data-table tbody td.table-col-multiline {
+  white-space: normal;
+  word-break: break-word;
+  vertical-align: top;
+}
+
+.data-table tbody td.data-table-num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.data-table tbody td.data-table-center {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.data-table tbody td.data-table-truncate {
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-table tbody td.data-table-wrap {
+  white-space: nowrap;
+  min-width: 200px;
+}
+
+:root[data-theme='light'] .data-table tbody td {
+  border-color: #d1d5db;
+}
+
+/* Returns: separate return # from invoice # (no column collision) */
+.data-table th.returns-col-return,
+.data-table td.returns-col-return,
+.data-table th.returns-col-invoice,
+.data-table td.returns-col-invoice {
+  min-width: 150px;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+  box-sizing: border-box;
+}
+
+/* Strict grid for list tables that use w-full but not .data-table (stock-movements, purchases, etc.) */
+.min-h-screen.bg-black.flex table.w-full:not(.data-table) {
+  border-collapse: collapse;
+  border: 1px solid #374151;
+}
+.min-h-screen.bg-black.flex table.w-full:not(.data-table) :is(th, td) {
+  border: 1px solid #374151;
+  padding: 12px 16px;
+  vertical-align: middle;
+}
+.min-h-screen.bg-black.flex table.w-full:not(.data-table) thead th {
+  background: rgb(31 41 55);
+  color: rgb(229 231 235);
+  font-weight: 600;
+}
+:root[data-theme='light'] .min-h-screen.bg-black.flex table.w-full:not(.data-table) :is(th, td) {
+  border-color: #d1d5db;
+}
+:root[data-theme='light'] .min-h-screen.bg-black.flex table.w-full:not(.data-table) thead th {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+/* Fixed width for action columns — no overlap with data */
+.data-table thead th.actions-column,
+.data-table tbody td.actions-column {
+  width: 10rem;
+  min-width: 10rem;
+  max-width: 11rem;
+  box-sizing: border-box;
+}
+
+.page-break {
+  page-break-before: always;
+}
+
+.print-branch {
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+/* Hide the custom print footer on normal screens */
+@media screen {
+  #crown-print-footer {
+    display: none !important;
+  }
+}
+
+/* ========== Print: landscape, no horizontal clip, strict grid ========== */
+@media print {
+  /* 1. HIDE BROWSER DEFAULTS: Setting @page margin to 0 kills the browser's URL/Date headers */
+  @page {
+    margin: 0 !important;
+    size: A4 landscape;
+  }
+
+  body {
+    padding: 1cm !important;
+    background: #fff !important;
+    color: #000 !important;
+    margin: 0 !important;
+  }
+
+  #crown-print-footer {
+    display: block !important;
+    position: static !important;
+    text-align: center;
+    margin-top: 16px !important;
+    padding-top: 10px !important;
+    border-top: 1px solid #ccc !important;
+    font-size: 13px;
+    font-weight: 700;
+    color: #000 !important;
+    font-family: monospace, sans-serif;
+    direction: ltr !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+
+  .print\:hidden {
+    display: none !important;
+  }
+  .print\:block {
+    display: block !important;
+  }
+
+  nav,
+  aside,
+  sidebar,
+  header,
+  footer,
+  [data-sidebar],
+  .no-print,
+  button,
+  .actions-column,
+  .print-hide-col {
+    display: none !important;
+  }
+
+  .print-branch {
+    font-weight: bold !important;
+    margin-bottom: 10px !important;
+    color: #000 !important;
+  }
+
+  main,
+  .main-content {
+    background: #fff !important;
+    color: #000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Kill overflow clipping on scroll wrappers (root cause of cut-off tables) */
+  .overflow-x-auto,
+  .overflow-x-scroll,
+  .overflow-hidden,
+  .table-scroll,
+  .table-responsive,
+  [class*='overflow-x'] {
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    max-width: none !important;
+    width: auto !important;
+    max-height: none !important;
+  }
+
+  .flex-1.min-w-0,
+  .flex-1 {
+    min-width: 0 !important;
+    max-width: none !important;
+    overflow: visible !important;
+  }
+
+  .table-scroll {
+    width: 100% !important;
+  }
+
+  .print-area,
+  .accounting-print,
+  .neon-card {
+    background: #fff !important;
+    color: #000 !important;
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: none !important;
+    padding: 8px !important;
+    max-width: none !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
+  table,
+  .data-table {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    border: 1px solid #4a5568 !important;
+    border-collapse: collapse !important;
+    margin-bottom: 16px !important;
+    font-size: 9pt !important;
+    direction: rtl !important;
+    table-layout: auto !important;
+    page-break-inside: auto;
+  }
+
+  html[dir='ltr'] table,
+  html[dir='ltr'] .data-table {
+    direction: ltr !important;
+  }
+
+  .data-table thead th,
+  .data-table tbody td,
+  table th,
+  table td {
+    border: 1px solid #4a5568 !important;
+    padding: 8px 12px !important;
+    text-align: right !important;
+    color: #000 !important;
+    background-color: #fff !important;
+    overflow: visible !important;
+    word-wrap: break-word !important;
+    white-space: normal !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  html[dir='ltr'] .data-table thead th,
+  html[dir='ltr'] .data-table tbody td,
+  html[dir='ltr'] table th,
+  html[dir='ltr'] table td {
+    text-align: left !important;
+  }
+
+  .data-table thead th,
+  table thead th {
+    background-color: #edf2f7 !important;
+    color: #1a202c !important;
+    font-weight: 700 !important;
+  }
+
+  .data-table tbody td.data-table-num,
+  table td.data-table-num {
+    text-align: end !important;
+    white-space: nowrap !important;
+    font-variant-numeric: tabular-nums !important;
+  }
+
+  html[dir='ltr'] .data-table tbody td.data-table-num,
+  html[dir='ltr'] table td.data-table-num {
+    text-align: end !important;
+  }
+
+  .data-table tbody td.data-table-center,
+  table td.data-table-center {
+    text-align: center !important;
+  }
+
+  tr {
+    page-break-inside: auto !important;
+  }
+
+  .accounting-print h1,
+  .accounting-print h2,
+  .accounting-print h3,
+  .accounting-print .text-cyan-200,
+  .accounting-print .text-slate-400 {
+    color: #000 !important;
+  }
+
+  .accounting-print .text-green-400,
+  .accounting-print .text-red-400,
+  .accounting-print .text-cyan-300 {
+    color: #000 !important;
+  }
+
+  .break-inside-avoid {
+    break-inside: avoid;
+  }
+
+  /* Reports & long print views: tall cards must split across pages (avoid "header only" on page 1) */
+  .print-area .break-inside-avoid,
+  .print-area .neon-card {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  /* Flex + min-h-screen stretches main column → huge blank area when printing */
+  body.min-h-screen,
+  .min-h-screen {
+    min-height: auto !important;
+  }
+
+  .reports-print-root {
+    display: block !important;
+    min-height: auto !important;
+    height: auto !important;
+  }
+
+  .reports-print-root > .flex-1 {
+    flex: none !important;
+    overflow: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+  }
+
+  /* Recharts: fixed pixel heights don't fit A4; shrink so KPI + chart can share page 1 */
+  .print-area .recharts-responsive-container {
+    height: 200px !important;
+    max-height: 220px !important;
+  }
+
+  .print-area .recharts-wrapper,
+  .print-area .recharts-surface {
+    max-height: 220px !important;
+  }
+
+  /* Chart wrappers use min-h-[320px] etc.; don't reserve empty vertical space in print */
+  .print-area [class*='min-h-'] {
+    min-height: 0 !important;
+  }
+
+  .page-break {
+    page-break-before: always !important;
+  }
+
+  /* HR payslip: keep section bands + net row readable on paper */
+  .payslip-sheet .payslip-section-cell {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .payslip-sheet .payslip-net-row td {
+    background-color: #0e7490 !important;
+    color: #fff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .payslip-sheet .payslip-header {
+    background: #fff !important;
+    border-bottom: 2px solid #0891b2 !important;
+  }
+}
+
+/* Dashboard: date inputs on dark UI — visible text + native calendar affordance */
+.crown-dashboard-date-input {
+  color: #e0f2fe;
+  min-height: 2.5rem;
+}
+.crown-dashboard-date-input::placeholder {
+  color: rgba(34, 211, 238, 0.55);
+}
+.crown-dashboard-date-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.85;
+  filter: invert(1) brightness(1.15);
+}
+.crown-dashboard-date-input::-webkit-datetime-edit-fields-wrapper {
+  padding: 0;
+}
+
+/* Dashboard charts: internal scroll with neon scrollbar + bottom fade hint */
+.crown-dashboard-chart-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 243, 255, 0.85) transparent;
+}
+
+.crown-dashboard-chart-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.crown-dashboard-chart-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #00e5ff 0%, #c800ff 100%);
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.4), 0 0 12px rgba(200, 0, 255, 0.35);
+}
+
+.crown-dashboard-chart-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Login page — About / Contact modals */
+@keyframes login-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.login-modal-panel {
+  animation: login-modal-in 0.28s ease-out both;
+}
+
+/* Login — plan tier halo + checkmarks + chart shimmer */
+@keyframes login-plan-halo {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.72;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes login-plan-check-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.35);
+  }
+  70% {
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes login-chart-shimmer {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+@keyframes login-landing-bullet {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.login-landing-bullet-in {
+  animation: login-landing-bullet 0.42s ease-out both;
+}
+
+.login-plan-check {
+  animation: login-plan-check-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.login-chart-shimmer-overlay {
+  animation: login-chart-shimmer 2.8s ease-in-out infinite;
+}
+
+.animate-login-plan-halo {
+  animation: login-plan-halo 2.8s ease-in-out infinite;
+}
+
+.login-plan-check-icon {
+  animation: login-plan-check-pop 0.48s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}

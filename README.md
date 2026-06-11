@@ -79,7 +79,7 @@ DB_PASSWORD=your_secure_password
 DB_NAME=crown-services-last-project-db
 DB_SSL=false
 JWT_SECRET=your_jwt_secret_key
-GEMINI_API_KEY=AIzaSyYourActualKeyGoesHere
+GEMINI_API_KEY=YOUR_GEMINI_API_KEY
 ```
 
 ### Required Environment Variables

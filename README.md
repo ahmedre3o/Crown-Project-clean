@@ -75,11 +75,11 @@ Update `backend/.env` with your Google Cloud SQL connection details:
 DB_HOST=your-cloud-sql-ip
 DB_PORT=3306
 DB_USER=root
-DB_PASSWORD=crown2026
+DB_PASSWORD=your_secure_password
 DB_NAME=crown-services-last-project-db
 DB_SSL=false
-JWT_SECRET=crown-services-secret-key-2026
-GEMINI_API_KEY=AIzaSyD3zXRza2kSUTyT34SRvf_hPCx6SDK3F3E
+JWT_SECRET=your_jwt_secret_key
+GEMINI_API_KEY=AIzaSyYourActualKeyGoesHere
 ```
 
 ### Required Environment Variables

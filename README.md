@@ -79,13 +79,13 @@ JWT_SECRET=your_jwt_secret_key
 GEMINI_API_KEY=YOUR_GEMINI_API_KEY
 
 Required Environment Variables
-Frontend (Vercel / Next.js)
-NEXT_PUBLIC_API_URL – Base URL of the backend API (Cloud Run), e.g. https://api.crowncs.org/api
+💻 Frontend (Vercel / Next.js)
+NEXT_PUBLIC_API_URL – Base URL of the backend API (Cloud Run), e.g. [https://api.crowncs.org/api](https://api.crowncs.org/api)
 
-Backend (Cloud Run / Node)
+⚙️ Backend (Cloud Run / Node)
 PORT – Provided by Cloud Run (defaults to 8080 in code)
 
-CORS_ORIGIN – Comma-separated allowed origins, e.g. https://crown-project.vercel.app
+CORS_ORIGIN – Comma-separated allowed origins, e.g. [https://crown-project.vercel.app](https://crown-project.vercel.app)
 
 DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, DB_SSL
 
@@ -98,13 +98,23 @@ Start Backend (local dev):
 
 npm run backend:dev
 
-Backend runs on http://localhost:5000
+
+
+
+Backend runs on http://localhost:5000Backend runs on http://localhost:5000
+
+Start Next.js Frontend (local dev):
+
+Bash
+npm run dev
+
+
 
 Start Next.js Frontend (local dev):
 
 npm run dev
 
-Frontend runs on http://localhost:3000 and talks to backend via NEXT_PUBLIC_API_URL.
+💻Frontend runs on http://localhost:3000 and talks to backend via NEXT_PUBLIC_API_URL.
 
 API Endpoints
 Authentication

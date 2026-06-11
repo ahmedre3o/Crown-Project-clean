@@ -55,11 +55,10 @@ A comprehensive SaaS ERP system for auto parts and services management with mult
 - MySQL database (Google Cloud SQL)
 - TypeScript
 
-### Installation (Monorepo: Next.js + Backend)
-
-1. Install root (Next.js app) dependencies:
-```bash
+Installation (Monorepo: Next.js + Backend)
+Install root (Next.js app) dependencies:
 npm install
+
 
 Backend dependencies:
 cd backend

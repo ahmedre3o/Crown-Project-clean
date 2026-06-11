@@ -21,7 +21,7 @@ A comprehensive SaaS ERP system for auto parts and services management with mult
 
 ### ✅ Database Connection
 - Connected to Google Cloud SQL: `crown-services-last-project-db`
-- Credentials: `Credentials: root / your_secure_password`
+- Credentials: `root / your_secure_password`
 - Automatic table initialization on startup
 
 ### ✅ POS & Invoices
@@ -38,13 +38,15 @@ A comprehensive SaaS ERP system for auto parts and services management with mult
 
 ### ✅ AI Assistant
 - Floating Gemini AI Assistant
-- API Key: YOUR_GEMINI_API_KEY`
+- API Key: `YOUR_GEMINI_API_KEY`
 - Cyberpunk-styled chat interface
 
 ### ✅ Public Storefront (Gold Package)
 - Public-facing online store for Gold package shops
 - Accessible at `/storefront/:shopId`
 - Product catalog with shopping cart
+
+---
 
 ## Setup Instructions
 
@@ -55,23 +57,19 @@ A comprehensive SaaS ERP system for auto parts and services management with mult
 
 ### Installation (Monorepo: Next.js + Backend)
 
-1. **Install root (Next.js app) dependencies:**
+1. Install root (Next.js app) dependencies:
 ```bash
 npm install
-```
 
-2. **Backend dependencies:**
-```bash
+Backend dependencies:
 cd backend
 npm install bcryptjs jsonwebtoken @types/bcryptjs @types/jsonwebtoken
-```
 
-3. **(Legacy) `frontend/` Vite app is no longer used for production. Vercel should use the repo root (Next.js app) as the project directory.**
+Note: (Legacy) frontend/ Vite app is no longer used for production. Vercel should use the repo root (Next.js app) as the project directory.
 
-### Backend Configuration (.env for Cloud Run / local)
+Backend Configuration (.env for Cloud Run / local)
+Update backend/.env with your Google Cloud SQL connection details:
 
-Update `backend/.env` with your Google Cloud SQL connection details:
-```env
 DB_HOST=your-cloud-sql-ip
 DB_PORT=3306
 DB_USER=root
@@ -80,124 +78,142 @@ DB_NAME=crown-services-last-project-db
 DB_SSL=false
 JWT_SECRET=your_jwt_secret_key
 GEMINI_API_KEY=YOUR_GEMINI_API_KEY
-```
 
-### Required Environment Variables
+Required Environment Variables
+Frontend (Vercel / Next.js)
+NEXT_PUBLIC_API_URL – Base URL of the backend API (Cloud Run), e.g. https://api.crowncs.org/api
 
-#### Frontend (Vercel / Next.js)
+Backend (Cloud Run / Node)
+PORT – Provided by Cloud Run (defaults to 8080 in code)
 
-- `NEXT_PUBLIC_API_URL` – Base URL of the backend API (Cloud Run), e.g. `https://api.crowncs.org/api`
+CORS_ORIGIN – Comma-separated allowed origins, e.g. https://crown-project.vercel.app
 
-#### Backend (Cloud Run / Node)
+DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, DB_SSL
 
-- `PORT` – Provided by Cloud Run (defaults to `8080` in code)
-- `CORS_ORIGIN` – Comma-separated allowed origins, e.g. `https://crown-project.vercel.app`
-- `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSL`
-- `JWT_SECRET`
-- `GEMINI_API_KEY`
+JWT_SECRET
 
-### Running the Application
+GEMINI_API_KEY
 
-1. **Start Backend (local dev):**
-```bash
+Running the Application
+Start Backend (local dev):
+
 npm run backend:dev
-```
-Backend runs on `http://localhost:5000`
 
-2. **Start Next.js Frontend (local dev):**
-```bash
+Backend runs on http://localhost:5000
+
+Start Next.js Frontend (local dev):
+
 npm run dev
-```
-Frontend runs on `http://localhost:3000` and talks to backend via `NEXT_PUBLIC_API_URL`.
 
-## API Endpoints
+Frontend runs on http://localhost:3000 and talks to backend via NEXT_PUBLIC_API_URL.
 
-### Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - Login user
+API Endpoints
+Authentication
+POST /api/auth/register - Register new user
 
-### Products & Inventory
-- `GET /api/products` - Get all products
-- `POST /api/products` - Create product (Shop Owner/Super Admin)
-- `GET /api/products/low-stock` - Get low stock alerts
+POST /api/auth/login - Login user
 
-### Sales & POS
-- `POST /api/sales` - Create new sale
-- `GET /api/sales` - Get sales history
+Products & Inventory
+GET /api/products - Get all products
 
-### Dashboard
-- `GET /api/dashboard/stats` - Get dashboard statistics
-- `GET /api/dashboard/sales-chart` - Get sales chart data
-- `GET /api/dashboard/profit-chart` - Get profit chart data
+POST /api/products - Create product (Shop Owner/Super Admin)
 
-### Public Storefront
-- `GET /api/public/storefront/:shopId` - Get storefront data (Gold package only)
+GET /api/products/low-stock - Get low stock alerts
 
-### AI Assistant
-- `POST /api/chat` - Chat with Gemini AI
+Sales & POS
+POST /api/sales - Create new sale
 
-## Default Categories
+GET /api/sales - Get sales history
 
+Dashboard
+GET /api/dashboard/stats - Get dashboard statistics
+
+GET /api/dashboard/sales-chart - Get sales chart data
+
+GET /api/dashboard/profit-chart - Get profit chart data
+
+Public Storefront
+GET /api/public/storefront/:shopId - Get storefront data (Gold package only)
+
+AI Assistant
+POST /api/chat - Chat with Gemini AI
+
+Default Categories
 The system automatically creates these categories:
-- Oil (زيت)
-- Tires (إطارات)
-- Batteries (بطاريات)
 
-## User Roles & Permissions
+Oil (زيت)
 
-| Role | Permissions |
-|------|------------|
-|Role,Permissions
+Tires (إطارات)
+
+Batteries (بطاريات)
+
+User Roles & Permissions
+
+Role,Permissions
 Super Admin,"All permissions, manage all shops and system settings"
 Shop Owner,"Full control over own shop, inventory, staff, and branches"
 Multi-Branch Manager,"Manage all branches, view dashboard (without profits)"
 Branch Manager,"Manage assigned branch only, branch-scoped payments (no profits)"
 Warehouse,"Access to Inventory, Manual Entry, Excel Import, Slow Stock"
-Cashier,"POS access, view inventory (Read-only), Invoices, Online Orders" |
+Cashier,"POS access, view inventory (Read-only), Invoices, Online Orders"
 
-## Package Features
-
-| Package | Features |
-|---------|----------|
-| Package,User Limits,Key Features
+Package Features
+Package,User Limits,Key Features
 Bronze (برونزي),1 Additional User (Total 2),"Basic POS, limited users, standard analytics"
 Silver (فضي),4 Additional Users (Total 5),"Enhanced features, more staff accounts, advanced reports"
 Gold (ذهبي),9 Additional Users (Total 10),Full features + Public Storefront for the shop
 Branches (فروع),29 Additional Users (Total 30),"Multi-branch support, cross-branch availability tracking"
 
-## Technologies Used
+Technologies Used
+Backend: Express.js, TypeScript, MySQL2
 
-- **Backend**: Express.js, TypeScript, MySQL2
-- **Frontend**: Next.js (React), TypeScript, Tailwind CSS
-- **Charts**: Recharts
-- **AI**: Google Gemini API
-- **Authentication**: JWT, bcryptjs
+Frontend: Next.js (React), TypeScript, Tailwind CSS
 
-## End-to-End Test: Notifications & Activity
+Charts: Recharts
 
-1. **Start app:** `npm run dev:all` (backend :5001, frontend :3000)
-2. **Create an online order:**
-   - Open `/storefront?shopId=1` (or `/storefront?preview=1-shop`)
-   - Add products to cart, click "Order Now", fill checkout form, submit
-   - Check bell icon: unread badge should appear; dropdown shows "New online order"
-3. **Create a POS sale:**
-   - Log in as shop_owner/cashier, go to `/pos`
-   - Add products to cart, complete sale
-   - Check bell: new "New POS sale" notification
-4. **View full activity:** Click "View all notifications" → `/store-admin/notifications`
-   - Filters: All / Online / POS / System
-   - Search, mark all read, load more (pagination)
-5. **Track order & Back to Store:**
-   - After placing online order, click "Track Order" → `/track?code=...&phone=...`
-   - Click "Back to Store" → should land on working storefront (no Unknown domain)
+AI: Google Gemini API
 
-## Notes
+Authentication: JWT, bcryptjs
 
-- The database connection uses Google Cloud SQL. Make sure your IP is whitelisted.
-- The AI Assistant uses the provided Gemini API key.
-- All passwords should be hashed in production (currently using bcryptjs).
-- The receipt printing opens a new window with styled HTML for printing.
+End-to-End Test: Notifications & Activity
+Start app: npm run dev:all (backend :5001, frontend :3000)
 
-## License
+Create an online order:
 
+Open /storefront?shopId=1 (or /storefront?preview=1-shop)
+
+Add products to cart, click "Order Now", fill checkout form, submit
+
+Check bell icon: unread badge should appear; dropdown shows "New online order"
+
+Create a POS sale:
+
+Log in as shop_owner/cashier, go to /pos
+
+Add products to cart, complete sale
+
+Check bell: new "New POS sale" notification
+
+View full activity: Click "View all notifications" → /store-admin/notifications
+
+Filters: All / Online / POS / System
+
+Search, mark all read, load more (pagination)
+
+Track order & Back to Store:
+
+After placing online order, click "Track Order" → /track?code=...&phone=...
+
+Click "Back to Store" → should land on working storefront (no Unknown domain)
+
+Notes
+The database connection uses Google Cloud SQL. Make sure your IP is whitelisted.
+
+The AI Assistant uses the provided Gemini API key.
+
+All passwords should be hashed in production (currently using bcryptjs).
+
+The receipt printing opens a new window with styled HTML for printing.
+
+License
 MIT License - Crown Services

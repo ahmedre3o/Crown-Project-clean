@@ -21,7 +21,7 @@ A comprehensive SaaS ERP system for auto parts and services management with mult
 
 ### ✅ Database Connection
 - Connected to Google Cloud SQL: `crown-services-last-project-db`
-- Credentials: `root` / `crown2026`
+- Credentials: `Credentials: root / your_secure_password`
 - Automatic table initialization on startup
 
 ### ✅ POS & Invoices
@@ -38,7 +38,7 @@ A comprehensive SaaS ERP system for auto parts and services management with mult
 
 ### ✅ AI Assistant
 - Floating Gemini AI Assistant
-- API Key: `AIzaSyD3zXRza2kSUTyT34SRvf_hPCx6SDK3F3E`
+- API Key: YOUR_GEMINI_API_KEY`
 - Cyberpunk-styled chat interface
 
 ### ✅ Public Storefront (Gold Package)
@@ -194,4 +194,4 @@ The system automatically creates these categories:
 
 ## License
 
-Private - Crown Services
+MIT License - Crown Services

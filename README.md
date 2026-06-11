@@ -147,22 +147,28 @@ The system automatically creates these categories:
 
 | Role | Permissions |
 |------|------------|
-| Super Admin | All permissions, manage all shops |
-| Shop Owner | Manage own shop, inventory, staff |
-| Cashier | POS access only |
+|Role,Permissions
+Super Admin,"All permissions, manage all shops and system settings"
+Shop Owner,"Full control over own shop, inventory, staff, and branches"
+Multi-Branch Manager,"Manage all branches, view dashboard (without profits)"
+Branch Manager,"Manage assigned branch only, branch-scoped payments (no profits)"
+Warehouse,"Access to Inventory, Manual Entry, Excel Import, Slow Stock"
+Cashier,"POS access, view inventory (Read-only), Invoices, Online Orders" |
 
 ## Package Features
 
 | Package | Features |
 |---------|----------|
-| Bronze | Basic POS, limited users |
-| Silver | Enhanced features, more users |
-| Gold | Full features + Public storefront |
+| Package,User Limits,Key Features
+Bronze (برونزي),1 Additional User (Total 2),"Basic POS, limited users, standard analytics"
+Silver (فضي),4 Additional Users (Total 5),"Enhanced features, more staff accounts, advanced reports"
+Gold (ذهبي),9 Additional Users (Total 10),Full features + Public Storefront for the shop
+Branches (فروع),29 Additional Users (Total 30),"Multi-branch support, cross-branch availability tracking"
 
 ## Technologies Used
 
 - **Backend**: Express.js, TypeScript, MySQL2
-- **Frontend**: React, TypeScript, Vite, Tailwind CSS
+- **Frontend**: Next.js (React), TypeScript, Tailwind CSS
 - **Charts**: Recharts
 - **AI**: Google Gemini API
 - **Authentication**: JWT, bcryptjs
